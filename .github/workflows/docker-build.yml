@@ -36,7 +36,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            tbphp/gpt-load
+            ${{ github.repository }}
             ghcr.io/${{ github.repository }}
           flavor: |
             latest=false
