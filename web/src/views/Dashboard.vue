@@ -1,12 +1,33 @@
 <script setup lang="ts">
+import { getDashboardStats } from "@/api/dashboard";
 import BaseInfoCard from "@/components/BaseInfoCard.vue";
 import LineChart from "@/components/LineChart.vue";
+import SecurityAlert from "@/components/SecurityAlert.vue";
+import type { DashboardStatsResponse } from "@/types/models";
 import { NSpace } from "naive-ui";
+import { onMounted, ref } from "vue";
+
+const dashboardStats = ref<DashboardStatsResponse | null>(null);
+
+onMounted(async () => {
+  try {
+    const response = await getDashboardStats();
+    dashboardStats.value = response.data;
+  } catch (error) {
+    console.error("Failed to load dashboard stats:", error);
+  }
+});
 </script>
 
 <template>
   <div class="dashboard-container">
     <n-space vertical size="large">
+      <!-- 安全警告横幅 -->
+      <security-alert
+        v-if="dashboardStats?.security_warnings"
+        :warnings="dashboardStats.security_warnings"
+      />
+
       <base-info-card />
       <line-chart class="dashboard-chart" />
     </n-space>
@@ -15,9 +36,9 @@ import { NSpace } from "naive-ui";
 
 <style scoped>
 .dashboard-header-card {
-  background: rgba(255, 255, 255, 0.98);
+  background: var(--card-bg);
   border-radius: var(--border-radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--border-color-light);
   animation: fadeInUp 0.2s ease-out;
 }
 
