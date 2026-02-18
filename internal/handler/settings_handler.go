@@ -77,13 +77,13 @@ func (s *Server) UpdateSettings(c *gin.Context) {
 		}
 	}
 
-	// 更新配置
+	// Update configuration
 	if err := s.SettingsManager.UpdateSettings(settingsMap); err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrDatabase, err.Error()))
 		return
 	}
 
-	time.Sleep(100 * time.Millisecond) // 等待异步更新配置
+	time.Sleep(100 * time.Millisecond) // Wait for asynchronous configuration update
 
 	response.SuccessI18n(c, "settings.update_success", nil)
 }

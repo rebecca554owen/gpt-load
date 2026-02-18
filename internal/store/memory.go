@@ -377,6 +377,29 @@ func (s *MemoryStore) SPopN(key string, count int64) ([]string, error) {
 	return popped, nil
 }
 
+// SMembers returns all members of a set.
+func (s *MemoryStore) SMembers(key string) ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	rawSet, exists := s.data[key]
+	if !exists {
+		return []string{}, nil
+	}
+
+	set, ok := rawSet.(map[string]struct{})
+	if !ok {
+		return nil, fmt.Errorf("type mismatch: key '%s' holds a different data type", key)
+	}
+
+	members := make([]string, 0, len(set))
+	for member := range set {
+		members = append(members, member)
+	}
+
+	return members, nil
+}
+
 // --- Pub/Sub operations ---
 
 // memorySubscription implements the Subscription interface for the in-memory store.

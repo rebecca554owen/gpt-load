@@ -11,7 +11,31 @@ func MigrateDatabase(db *gorm.DB) error {
 	}
 
 	// Run v1.1.0 migration
-	return V1_1_0_AddKeyHashColumn(db)
+	if err := V1_1_0_AddKeyHashColumn(db); err != nil {
+		return err
+	}
+
+	// Run v1.4.4 migration
+	if err := V1_4_4_AddTokenColumns(db); err != nil {
+		return err
+	}
+
+	// Run v1.4.6 migration
+	if err := V1_4_6_AddModelMappingColumn(db); err != nil {
+		return err
+	}
+
+	// Run v1.4.5 migration
+	if err := V1_4_5_AddOriginalModelColumn(db); err != nil {
+		return err
+	}
+
+	// Run v1.4.7 migration
+	if err := V1_4_7_AddRequestLogCompositeIndex(db); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // HandleLegacyIndexes removes old indexes from previous versions to prevent migration errors

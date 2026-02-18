@@ -7,6 +7,7 @@ import (
 	"gpt-load/internal/i18n"
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
+	"gpt-load/internal/utils"
 	"strings"
 	"time"
 
@@ -14,11 +15,82 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	rpmCalculationWindowMinutes = 10
+	rpmComparisonWindowMinutes  = 20
+)
+
+// boolToInt64 converts bool to int64 (1 for true, 0 for false)
+func boolToInt64(b bool) int64 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+// parseDaysParameter converts days string to days integer (for stats API)
+func parseDaysParameter(daysStr string) int {
+	switch daysStr {
+	case "3":
+		return 3
+	case "7":
+		return 7
+	default:
+		return 1
+	}
+}
+
+// parseHoursParameter converts hours string to hours integer
+// Supports: 1, 5, 24(1 day), 168(1 week), 720(1 month)
+func parseHoursParameter(hoursStr string) int {
+	switch hoursStr {
+	case "1":
+		return 1
+	case "5":
+		return 5
+	case "24":
+		return 24
+	case "168":
+		return 168
+	case "720":
+		return 720
+	default:
+		return 24 // default to 24 hours (1 day)
+	}
+}
+
+type trendResult struct {
+	value       float64
+	isGrowth     bool
+}
+
+func calculateTrend(current, previous int64) trendResult {
+	if previous > 0 {
+		trend := (float64(current-previous) / float64(previous)) * 100
+		return trendResult{value: trend, isGrowth: trend >= 0}
+	} else if current > 0 {
+		return trendResult{value: 100.0, isGrowth: true}
+	}
+	return trendResult{value: 0.0, isGrowth: true}
+}
+
+func calculateErrorRateTrend(currentErrorRate, previousErrorRate float64, hasCurrentData, hasPreviousData bool) trendResult {
+	if hasPreviousData {
+		trend := currentErrorRate - previousErrorRate
+		isGrowth := trend < 0
+		return trendResult{value: trend, isGrowth: isGrowth}
+	} else if hasCurrentData {
+		if currentErrorRate == 0 {
+			return trendResult{value: currentErrorRate, isGrowth: true}
+		}
+		return trendResult{value: currentErrorRate, isGrowth: false}
+	}
+	return trendResult{value: 0.0, isGrowth: true}
+}
+
 // Stats Get dashboard statistics
 func (s *Server) Stats(c *gin.Context) {
-	var activeKeys, invalidKeys int64
-	s.DB.Model(&models.APIKey{}).Where("status = ?", models.KeyStatusActive).Count(&activeKeys)
-	s.DB.Model(&models.APIKey{}).Where("status = ?", models.KeyStatusInvalid).Count(&invalidKeys)
+	days := parseDaysParameter(c.DefaultQuery("days", "1"))
 
 	now := time.Now()
 	rpmStats, err := s.getRPMStats(now)
@@ -26,38 +98,54 @@ func (s *Server) Stats(c *gin.Context) {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.rpm_stats_failed")
 		return
 	}
-	twentyFourHoursAgo := now.Add(-24 * time.Hour)
-	fortyEightHoursAgo := now.Add(-48 * time.Hour)
 
-	currentPeriod, err := s.getHourlyStats(twentyFourHoursAgo, now)
+	// Calculate time ranges based on days
+	currentDuration := time.Duration(days*24) * time.Hour
+	previousDuration := currentDuration
+
+	currentStart := now.Add(-currentDuration)
+	previousStart := now.Add(-currentDuration - previousDuration)
+	previousEnd := currentStart
+
+	// Get token consumption statistics
+	currentTokenStats, err := s.getDetailedTokenStats(currentStart, now)
 	if err != nil {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.current_stats_failed")
 		return
 	}
-	previousPeriod, err := s.getHourlyStats(fortyEightHoursAgo, twentyFourHoursAgo)
+	previousTokenStats, err := s.getDetailedTokenStats(previousStart, previousEnd)
 	if err != nil {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.previous_stats_failed")
 		return
 	}
 
-	// 计算请求量趋势
-	reqTrend := 0.0
-	reqTrendIsGrowth := true
-	if previousPeriod.TotalRequests > 0 {
-		// 有前期数据，计算百分比变化
-		reqTrend = (float64(currentPeriod.TotalRequests-previousPeriod.TotalRequests) / float64(previousPeriod.TotalRequests)) * 100
-		reqTrendIsGrowth = reqTrend >= 0
-	} else if currentPeriod.TotalRequests > 0 {
-		// 前期无数据，当前有数据，视为100%增长
-		reqTrend = 100.0
-		reqTrendIsGrowth = true
-	} else {
-		// 前期和当前都无数据
-		reqTrend = 0.0
-		reqTrendIsGrowth = true
+	currentPeriod, err := s.getHourlyStats(currentStart, now)
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.current_stats_failed")
+		return
+	}
+	previousPeriod, err := s.getHourlyStats(previousStart, previousEnd)
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.previous_stats_failed")
+		return
 	}
 
-	// 计算当前和前期错误率
+	// Get key count statistics
+	currentKeyStats, err := s.getKeyStats(currentStart, now)
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.key_stats_failed")
+		return
+	}
+	previousKeyStats, err := s.getKeyStats(previousStart, previousEnd)
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.previous_stats_failed")
+		return
+	}
+
+	reqTrendResult := calculateTrend(currentPeriod.TotalRequests, previousPeriod.TotalRequests)
+	reqTrend := reqTrendResult.value
+	reqTrendIsGrowth := reqTrendResult.isGrowth
+
 	currentErrorRate := 0.0
 	if currentPeriod.TotalRequests > 0 {
 		currentErrorRate = (float64(currentPeriod.TotalFailures) / float64(currentPeriod.TotalRequests)) * 100
@@ -68,34 +156,63 @@ func (s *Server) Stats(c *gin.Context) {
 		previousErrorRate = (float64(previousPeriod.TotalFailures) / float64(previousPeriod.TotalRequests)) * 100
 	}
 
-	// 计算错误率趋势
-	errorRateTrend := 0.0
-	errorRateTrendIsGrowth := false
-	if previousPeriod.TotalRequests > 0 {
-		// 有前期数据，计算百分点差异
-		errorRateTrend = currentErrorRate - previousErrorRate
-		errorRateTrendIsGrowth = errorRateTrend < 0 // 错误率下降是好事
-	} else if currentPeriod.TotalRequests > 0 {
-		// 前期无数据，当前有数据
-		errorRateTrend = currentErrorRate // 显示当前错误率
-		errorRateTrendIsGrowth = false    // 有错误是坏事（如果错误率>0）
-		if currentErrorRate == 0 {
-			errorRateTrendIsGrowth = true // 如果当前无错误，标记为正面
-		}
-	} else {
-		// 都无数据
-		errorRateTrend = 0.0
-		errorRateTrendIsGrowth = true
-	}
+	errorRateTrendResult := calculateErrorRateTrend(currentErrorRate, previousErrorRate, currentPeriod.TotalRequests > 0, previousPeriod.TotalRequests > 0)
+	errorRateTrend := errorRateTrendResult.value
+	errorRateTrendIsGrowth := errorRateTrendResult.isGrowth
 
-	// 获取安全警告信息
+	tokenTrendResult := calculateTrend(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens)
+	tokenTrend := tokenTrendResult.value
+	tokenTrendIsGrowth := tokenTrendResult.isGrowth
+
+	completionTrendResult := calculateTrend(currentTokenStats.CompletionTokens, previousTokenStats.CompletionTokens)
+	completionTrend := completionTrendResult.value
+	completionTrendIsGrowth := completionTrendResult.isGrowth
+
+	cachedTrendResult := calculateTrend(currentTokenStats.CachedTokens, previousTokenStats.CachedTokens)
+	cachedTrend := cachedTrendResult.value
+	cachedTrendIsGrowth := cachedTrendResult.isGrowth
+
+	promptTrendResult := calculateTrend(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens)
+	promptTrend := promptTrendResult.value
+	promptTrendIsGrowth := promptTrendResult.isGrowth
+
+	keyTrendResult := calculateTrend(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys)
+	keyTrend := keyTrendResult.value
+	keyTrendIsGrowth := keyTrendResult.isGrowth
+
+	// Get security warning information
 	securityWarnings := s.getSecurityWarnings(c)
 
 	stats := models.DashboardStatsResponse{
 		KeyCount: models.StatCard{
-			Value:       float64(activeKeys),
-			SubValue:    invalidKeys,
-			SubValueTip: i18n.Message(c, "dashboard.invalid_keys"),
+			Value:         float64(currentKeyStats.TotalKeys),
+			Trend:         keyTrend,
+			TrendIsGrowth: keyTrendIsGrowth,
+		},
+		TokenConsumption: models.StatCard{
+			Value:         float64(currentTokenStats.TotalTokens),
+			Trend:         tokenTrend,
+			TrendIsGrowth: tokenTrendIsGrowth,
+		},
+		PromptTokens: models.StatCard{
+			Value:         float64(currentTokenStats.PromptTokens),
+			Trend:         promptTrend,
+			TrendIsGrowth: promptTrendIsGrowth,
+		},
+		CachedTokens: models.StatCard{
+			Value:         float64(currentTokenStats.CachedTokens),
+			Trend:         cachedTrend,
+			TrendIsGrowth: cachedTrendIsGrowth,
+		},
+		CompletionTokens: models.StatCard{
+			Value:         float64(currentTokenStats.CompletionTokens),
+			Trend:         completionTrend,
+			TrendIsGrowth: completionTrendIsGrowth,
+		},
+		TotalTokens: models.StatCard{
+			Value:         float64(currentTokenStats.TotalTokens),
+			Trend:         tokenTrend,
+			TrendIsGrowth: tokenTrendIsGrowth,
 		},
 		RPM: rpmStats,
 		RequestCount: models.StatCard{
@@ -116,49 +233,205 @@ func (s *Server) Stats(c *gin.Context) {
 
 // Chart Get dashboard chart data
 func (s *Server) Chart(c *gin.Context) {
-	groupID := c.Query("groupId")
+	viewType := c.DefaultQuery("view", "request")
+	hours := parseHoursParameter(c.DefaultQuery("hours", "24"))
 
 	now := time.Now()
-	endHour := now.Truncate(time.Hour)
-	startHour := endHour.Add(-23 * time.Hour)
+	endTime := now
+	startTime := now.Add(-time.Duration(hours) * time.Hour)
 
-	var hourlyStats []models.GroupHourlyStat
-	query := s.DB.Table("group_hourly_stats").
-		Where("time >= ? AND time < ?", startHour, endHour.Add(time.Hour))
-	if groupID != "" {
-		query = query.Where("group_id = ?", groupID)
+	if viewType == "token" {
+		// Token view - get token statistics from request_logs
+		s.getTokenChart(c, startTime, endTime)
 	} else {
-		query = query.Where("group_id NOT IN (?)",
-			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate"))
+		// Request view - get request statistics from group_hourly_stats
+		s.getRequestChart(c, startTime, endTime)
 	}
-	if err := query.Order("time asc").Find(&hourlyStats).Error; err != nil {
-		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
-		return
+}
+
+// getRequestChart returns request statistics chart data with dynamic granularity
+func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
+	now := time.Now()
+
+	totalHours := int(now.Sub(startTime).Hours())
+	if totalHours < 1 {
+		totalHours = 1
 	}
 
-	statsByHour := make(map[time.Time]map[string]int64)
-	for _, stat := range hourlyStats {
-		hour := stat.Time.Local().Truncate(time.Hour)
-		if _, ok := statsByHour[hour]; !ok {
-			statsByHour[hour] = make(map[string]int64)
-		}
-		statsByHour[hour]["success"] += stat.SuccessCount
-		statsByHour[hour]["failure"] += stat.FailureCount
+	// Determine granularity based on time range
+	// Match the same granularity as getTokenChart for consistency
+	var intervalMinutes int
+	switch {
+	case totalHours <= 1: // 1 hour
+		intervalMinutes = 5 // 12 points
+	case totalHours <= 5: // 1-5 hours
+		intervalMinutes = 15 // 20 points
+	case totalHours <= 24: // 5-24 hours
+		intervalMinutes = 30 // 48 points for 24h (every 30 min)
+	case totalHours <= 168: // 24 hours to 1 week
+		intervalMinutes = 120 // 84 points (every 2 hours)
+	default: // > 1 week (1 month = 720 hours)
+		intervalMinutes = 600 // 72 points (every 10 hours)
 	}
 
+	// For hour-level or larger intervals, use group_hourly_stats (more efficient)
+	// For minute-level intervals (less than 60 minutes), use request_logs directly
 	var labels []string
 	var successData, failureData []int64
 
-	for i := range 24 {
-		hour := startHour.Add(time.Duration(i) * time.Hour)
-		labels = append(labels, hour.Format(time.RFC3339))
+	if intervalMinutes < 60 {
+		// Use request_logs for minute-level granularity
+		type requestResult struct {
+			TimeSlot string
+			Success  int64
+			Failure  int64
+		}
+		var results []requestResult
 
-		if data, ok := statsByHour[hour]; ok {
-			successData = append(successData, data["success"])
-			failureData = append(failureData, data["failure"])
-		} else {
-			successData = append(successData, 0)
-			failureData = append(failureData, 0)
+		// Build database-specific query for minute-level aggregation
+		dbType := s.DB.Dialector.Name()
+		var selectClause, groupClause string
+
+		switch dbType {
+		case "mysql":
+			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:%%i:00') as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		case "postgres":
+			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('minute', timestamp), 'YYYY-MM-DD HH24:MI:00') as time_slot, SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		default: // sqlite and others
+			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M:00', timestamp) as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		}
+
+		err := s.DB.Model(&models.RequestLog{}).
+			Select(selectClause).
+			Where("timestamp >= ? AND timestamp < ?", startTime, endTime).
+			Where("group_id NOT IN (?)",
+				s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
+			Group(groupClause).
+			Order("time_slot asc").
+			Scan(&results).Error
+
+		if err != nil {
+			response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
+			return
+		}
+
+		// Create a map for easy lookup
+		statsBySlot := make(map[time.Time]requestResult)
+		for _, result := range results {
+			slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+			slotTime = slotTime.Truncate(time.Minute)
+			statsBySlot[slotTime] = result
+		}
+
+		// Get pending logs from Redis cache for real-time statistics
+		if s.RequestLogService != nil {
+			pendingLogs, err := s.RequestLogService.GetPendingLogs()
+			if err != nil {
+				logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
+			} else {
+				for _, log := range pendingLogs {
+					if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
+						continue
+					}
+
+					slotTime := log.Timestamp.Truncate(time.Minute)
+					if existing, ok := statsBySlot[slotTime]; ok {
+						if log.IsSuccess {
+							existing.Success++
+						} else {
+							existing.Failure++
+						}
+						statsBySlot[slotTime] = existing
+					} else {
+						statsBySlot[slotTime] = requestResult{
+							TimeSlot: slotTime.Format("2006-01-02 15:04:05"),
+							Success:  boolToInt64(log.IsSuccess),
+							Failure:  boolToInt64(!log.IsSuccess),
+						}
+					}
+				}
+			}
+		}
+
+		totalMinutes := totalHours * 60
+		intervals := totalMinutes / intervalMinutes
+		if intervals < 1 {
+			intervals = 1
+		}
+
+		startSlot := startTime.Truncate(time.Minute)
+		for i := 0; i < intervals; i++ {
+			slot := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+			labels = append(labels, slot.Format(time.RFC3339))
+
+			if data, ok := statsBySlot[slot]; ok {
+				successData = append(successData, data.Success)
+				failureData = append(failureData, data.Failure)
+			} else {
+				successData = append(successData, 0)
+				failureData = append(failureData, 0)
+			}
+		}
+	} else {
+		// Use group_hourly_stats for hour-level or larger granularity (more efficient)
+		var hourlyStats []models.GroupHourlyStat
+		query := s.DB.Table("group_hourly_stats").
+			Where("time >= ? AND time < ?", startTime.Truncate(time.Hour), endTime.Truncate(time.Hour).Add(time.Hour))
+		query = query.Where("group_id NOT IN (?)",
+			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate"))
+		if err := query.Order("time asc").Find(&hourlyStats).Error; err != nil {
+			response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
+			return
+		}
+
+		statsByHour := make(map[time.Time]map[string]int64)
+		for _, stat := range hourlyStats {
+			hour := stat.Time.Local().Truncate(time.Hour)
+			if _, ok := statsByHour[hour]; !ok {
+				statsByHour[hour] = make(map[string]int64)
+			}
+			statsByHour[hour]["success"] += stat.SuccessCount
+			statsByHour[hour]["failure"] += stat.FailureCount
+		}
+
+		// Get pending stats from buffer for real-time data
+		if s.RequestLogService != nil {
+			pendingStats := s.RequestLogService.GetPendingStats()
+			for _, stat := range pendingStats {
+				hour := stat.Time.Truncate(time.Hour)
+				if stat.Time.After(startTime.Truncate(time.Hour)) && stat.Time.Before(endTime) {
+					if _, ok := statsByHour[hour]; !ok {
+						statsByHour[hour] = make(map[string]int64)
+					}
+					statsByHour[hour]["success"] += stat.SuccessCount
+					statsByHour[hour]["failure"] += stat.FailureCount
+				}
+			}
+		}
+
+		totalMinutes := totalHours * 60
+		intervals := totalMinutes / intervalMinutes
+		if intervals < 1 {
+			intervals = 1
+		}
+
+		startSlot := startTime.Truncate(time.Minute)
+		for i := 0; i < intervals; i++ {
+			slot := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+			labels = append(labels, slot.Format(time.RFC3339))
+
+			// Round to nearest hour for lookup
+			hour := slot.Truncate(time.Hour)
+			if data, ok := statsByHour[hour]; ok {
+				successData = append(successData, data["success"])
+				failureData = append(failureData, data["failure"])
+			} else {
+				successData = append(successData, 0)
+				failureData = append(failureData, 0)
+			}
 		}
 	}
 
@@ -166,14 +439,193 @@ func (s *Server) Chart(c *gin.Context) {
 		Labels: labels,
 		Datasets: []models.ChartDataset{
 			{
-				Label: i18n.Message(c, "dashboard.success_requests"),
-				Data:  successData,
-				Color: "rgba(10, 200, 110, 1)",
+				Label:    i18n.Message(c, "dashboard.success_requests"),
+				LabelKey: "dashboard.success_requests",
+				Data:     successData,
 			},
 			{
-				Label: i18n.Message(c, "dashboard.failed_requests"),
-				Data:  failureData,
-				Color: "rgba(255, 70, 70, 1)",
+				Label:    i18n.Message(c, "dashboard.failed_requests"),
+				LabelKey: "dashboard.failed_requests",
+				Data:     failureData,
+			},
+		},
+	}
+
+	response.Success(c, chartData)
+}
+
+// getTokenChart returns token statistics chart data with dynamic granularity
+func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
+	now := time.Now()
+	totalHours := int(now.Sub(startTime).Hours())
+	if totalHours < 1 {
+		totalHours = 1
+	}
+
+	// Determine granularity based on time range
+	// Fewer data points for cleaner X-axis labels
+	var intervalMinutes int
+	switch {
+	case totalHours <= 1: // 1 hour
+		intervalMinutes = 5 // 12 points
+	case totalHours <= 5: // 1-5 hours
+		intervalMinutes = 15 // 20 points
+	case totalHours <= 24: // 5-24 hours
+		intervalMinutes = 30 // 48 points for 24h (every 30 min)
+	case totalHours <= 168: // 24 hours to 1 week
+		intervalMinutes = 120 // 84 points (every 2 hours)
+	default: // > 1 week (1 month = 720 hours)
+		intervalMinutes = 600 // 72 points (every 10 hours)
+	}
+
+	// Get token statistics from request_logs with dynamic aggregation
+	type tokenResult struct {
+		TimeSlot         string
+		PromptTokens     int64
+		CompletionTokens int64
+		TotalTokens      int64
+		CachedTokens     int64
+	}
+
+	var results []tokenResult
+
+	// Build database-specific query for dynamic granularity
+	dbType := s.DB.Dialector.Name()
+	var selectClause, groupClause string
+
+	switch dbType {
+	case "mysql":
+		selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:%%i:00') as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
+		groupClause = "time_slot"
+	case "postgres":
+		selectClause = fmt.Sprintf("to_char(DATE_TRUNC('minute', timestamp), 'YYYY-MM-DD HH24:MI:00') as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
+		groupClause = "time_slot"
+	default: // sqlite and others
+		selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M:00', timestamp) as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
+		groupClause = "time_slot"
+	}
+
+	err := s.DB.Model(&models.RequestLog{}).
+		Select(selectClause).
+		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
+		Group(groupClause).
+		Order("time_slot asc").
+		Scan(&results).Error
+
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
+		return
+	}
+
+	// Create a map for easy lookup
+	statsBySlot := make(map[time.Time]tokenResult)
+	for _, result := range results {
+		slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+		slotTime = slotTime.Truncate(time.Minute)
+		statsBySlot[slotTime] = result
+	}
+
+	// Get pending logs from Redis cache for real-time statistics
+	if s.RequestLogService != nil {
+		pendingLogs, err := s.RequestLogService.GetPendingLogs()
+		if err != nil {
+			logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
+		} else {
+			// Aggregate pending logs by time slot
+			pendingBySlot := make(map[time.Time]*tokenResult)
+			for _, log := range pendingLogs {
+				if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) || log.RequestType != models.RequestTypeFinal {
+					continue
+				}
+
+				// Truncate to minute level for aggregation
+				slotTime := log.Timestamp.Truncate(time.Minute)
+				if _, exists := pendingBySlot[slotTime]; !exists {
+					pendingBySlot[slotTime] = &tokenResult{
+						TimeSlot:         slotTime.Format("2006-01-02 15:04:05"),
+						PromptTokens:     0,
+						CompletionTokens: 0,
+						TotalTokens:      0,
+						CachedTokens:     0,
+					}
+				}
+				pendingBySlot[slotTime].PromptTokens += log.PromptTokens
+				pendingBySlot[slotTime].CompletionTokens += log.CompletionTokens
+				pendingBySlot[slotTime].TotalTokens += log.TotalTokens
+				pendingBySlot[slotTime].CachedTokens += log.CachedTokens
+			}
+
+			// Merge pending data into statsBySlot
+			for slotTime, pendingData := range pendingBySlot {
+				if existing, ok := statsBySlot[slotTime]; ok {
+					// Add to existing data
+					existing.PromptTokens += pendingData.PromptTokens
+					existing.CompletionTokens += pendingData.CompletionTokens
+					existing.TotalTokens += pendingData.TotalTokens
+					existing.CachedTokens += pendingData.CachedTokens
+					statsBySlot[slotTime] = existing
+				} else {
+					// New time slot
+					statsBySlot[slotTime] = *pendingData
+				}
+			}
+		}
+	}
+
+	var labels []string
+	var promptData, cachedData, outputData, totalData []int64
+
+	totalMinutes := totalHours * 60
+	intervals := totalMinutes / intervalMinutes
+	if intervals < 1 {
+		intervals = 1
+	}
+
+	startSlot := startTime.Truncate(time.Minute)
+	for i := 0; i < intervals; i++ {
+		slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+		slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
+		labels = append(labels, slotStart.Format(time.RFC3339))
+
+		var promptSum, cachedSum, outputSum, totalSum int64
+
+		for t := slotStart; t.Before(slotEnd); t = t.Add(time.Minute) {
+			if data, ok := statsBySlot[t]; ok {
+				promptSum += data.PromptTokens
+				cachedSum += data.CachedTokens
+				outputSum += data.CompletionTokens
+				totalSum += data.TotalTokens
+			}
+		}
+
+		promptData = append(promptData, promptSum)
+		cachedData = append(cachedData, cachedSum)
+		outputData = append(outputData, outputSum)
+		totalData = append(totalData, totalSum)
+	}
+
+	chartData := models.ChartData{
+		Labels: labels,
+		Datasets: []models.ChartDataset{
+			{
+				Label:    i18n.Message(c, "dashboard.prompt_tokens"),
+				LabelKey: "dashboard.prompt_tokens",
+				Data:     promptData,
+			},
+			{
+				Label:    i18n.Message(c, "dashboard.cached_tokens"),
+				LabelKey: "dashboard.cached_tokens",
+				Data:     cachedData,
+			},
+			{
+				Label:    i18n.Message(c, "dashboard.completion_tokens"),
+				LabelKey: "dashboard.completion_tokens",
+				Data:     outputData,
+			},
+			{
+				Label:    i18n.Message(c, "dashboard.total_tokens"),
+				LabelKey: "dashboard.total_tokens",
+				Data:     totalData,
 			},
 		},
 	}
@@ -203,8 +655,8 @@ type rpmStatResult struct {
 }
 
 func (s *Server) getRPMStats(now time.Time) (models.StatCard, error) {
-	tenMinutesAgo := now.Add(-10 * time.Minute)
-	twentyMinutesAgo := now.Add(-20 * time.Minute)
+	tenMinutesAgo := now.Add(-time.Duration(rpmCalculationWindowMinutes) * time.Minute)
+	twentyMinutesAgo := now.Add(-time.Duration(rpmComparisonWindowMinutes) * time.Minute)
 
 	var result rpmStatResult
 	err := s.DB.Model(&models.RequestLog{}).
@@ -216,8 +668,8 @@ func (s *Server) getRPMStats(now time.Time) (models.StatCard, error) {
 		return models.StatCard{}, err
 	}
 
-	currentRPM := float64(result.CurrentRequests) / 10.0
-	previousRPM := float64(result.PreviousRequests) / 10.0
+	currentRPM := float64(result.CurrentRequests) / float64(rpmCalculationWindowMinutes)
+	previousRPM := float64(result.PreviousRequests) / float64(rpmCalculationWindowMinutes)
 
 	rpmTrend := 0.0
 	rpmTrendIsGrowth := true
@@ -236,15 +688,15 @@ func (s *Server) getRPMStats(now time.Time) (models.StatCard, error) {
 	}, nil
 }
 
-// getSecurityWarnings 检查安全配置并返回警告信息
+// getSecurityWarnings checks security configuration and returns warning messages
 func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 	var warnings []models.SecurityWarning
 
-	// 获取AUTH_KEY和ENCRYPTION_KEY
+	// Get AUTH_KEY and ENCRYPTION_KEY
 	authConfig := s.config.GetAuthConfig()
 	encryptionKey := s.config.GetEncryptionKey()
 
-	// 检查AUTH_KEY
+	// Check AUTH_KEY
 	if authConfig.Key == "" {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       "AUTH_KEY",
@@ -257,7 +709,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		warnings = append(warnings, authWarnings...)
 	}
 
-	// 检查ENCRYPTION_KEY
+	// Check ENCRYPTION_KEY
 	if encryptionKey == "" {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       "ENCRYPTION_KEY",
@@ -270,7 +722,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		warnings = append(warnings, encryptionWarnings...)
 	}
 
-	// 检查系统级代理密钥
+	// Check system-level proxy keys
 	systemSettings := s.SettingsManager.GetSettings()
 	if systemSettings.ProxyKeys != "" {
 		proxyKeys := strings.Split(systemSettings.ProxyKeys, ",")
@@ -284,7 +736,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		}
 	}
 
-	// 检查分组级代理密钥
+	// Check group-level proxy keys
 	var groups []models.Group
 	if err := s.DB.Where("proxy_keys IS NOT NULL AND proxy_keys != ''").Find(&groups).Error; err == nil {
 		for _, group := range groups {
@@ -305,16 +757,16 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 	return warnings
 }
 
-// checkPasswordSecurity 综合检查密码安全性
+// checkPasswordSecurity comprehensively checks password security
 func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.SecurityWarning {
 	var warnings []models.SecurityWarning
 
-	// 1. 长度检查
+	// 1. Length check
 	if len(password) < 16 {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       keyType,
 			Message:    i18n.Message(c, "security.password_too_short", map[string]any{"keyType": keyType, "length": len(password)}),
-			Severity:   "high", // 长度不足是高风险
+			Severity:   "high", // Insufficient length is high risk
 			Suggestion: i18n.Message(c, "security.password_recommendation_16"),
 		})
 	} else if len(password) < 32 {
@@ -326,13 +778,9 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 		})
 	}
 
-	// 2. 常见弱密码检查
+	// 2. Common weak password check
 	lower := strings.ToLower(password)
-	weakPatterns := []string{
-		"password", "123456", "admin", "secret", "test", "demo",
-		"sk-123456", "key", "token", "pass", "pwd", "qwerty",
-		"abc", "default", "user", "login", "auth", "temp",
-	}
+	weakPatterns := utils.WeakPasswordPatterns
 
 	for _, pattern := range weakPatterns {
 		if strings.Contains(lower, pattern) {
@@ -346,7 +794,7 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 		}
 	}
 
-	// 3. 复杂度检查（仅在长度足够时检查）
+	// 3. Complexity check (only when length is sufficient)
 	if len(password) >= 16 && !hasGoodComplexity(password) {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       keyType,
@@ -359,7 +807,7 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 	return warnings
 }
 
-// hasGoodComplexity 检查密码复杂度
+// hasGoodComplexity checks password complexity
 func hasGoodComplexity(password string) bool {
 	var hasUpper, hasLower, hasDigit, hasSpecial bool
 
@@ -376,7 +824,7 @@ func hasGoodComplexity(password string) bool {
 		}
 	}
 
-	// 至少包含3种类型的字符
+	// At least 3 types of characters required
 	count := 0
 	if hasUpper {
 		count++
@@ -493,4 +941,50 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 	}
 
 	return false, ScenarioNone, "", ""
+}
+
+// getTokenStats gets token usage statistics for a time period
+type tokenStatsResult struct {
+	TotalTokens int64
+}
+
+func (s *Server) getTokenStats(startTime, endTime time.Time) (tokenStatsResult, error) {
+	var result tokenStatsResult
+	err := s.DB.Model(&models.RequestLog{}).
+		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
+		Select("COALESCE(SUM(total_tokens), 0) as total_tokens").
+		Scan(&result).Error
+	return result, err
+}
+
+// detailedTokenStatsResult represents detailed token statistics
+type detailedTokenStatsResult struct {
+	PromptTokens     int64
+	CompletionTokens int64
+	TotalTokens      int64
+	CachedTokens     int64
+}
+
+// getDetailedTokenStats gets detailed token usage statistics for a time period
+func (s *Server) getDetailedTokenStats(startTime, endTime time.Time) (detailedTokenStatsResult, error) {
+	var result detailedTokenStatsResult
+	err := s.DB.Model(&models.RequestLog{}).
+		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
+		Select("COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens").
+		Scan(&result).Error
+	return result, err
+}
+
+// keyStatsResult represents key count statistics
+type keyStatsResult struct {
+	TotalKeys int64
+}
+
+// getKeyStats gets key count statistics for a time period
+func (s *Server) getKeyStats(startTime, endTime time.Time) (keyStatsResult, error) {
+	var result keyStatsResult
+	err := s.DB.Model(&models.APIKey{}).
+		Select("COUNT(*) as total_keys").
+		Scan(&result).Error
+	return result, err
 }

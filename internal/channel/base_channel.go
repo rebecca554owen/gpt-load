@@ -2,17 +2,21 @@ package channel
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
 	"gpt-load/internal/types"
 	"gpt-load/internal/utils"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
 	"strings"
 	"sync"
 
+	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )
@@ -22,6 +26,18 @@ type UpstreamInfo struct {
 	URL           *url.URL
 	Weight        int
 	CurrentWeight int
+}
+
+func (u *UpstreamInfo) GetWeight() int {
+	return u.Weight
+}
+
+func (u *UpstreamInfo) GetCurrentWeight() int {
+	return u.CurrentWeight
+}
+
+func (u *UpstreamInfo) SetCurrentWeight(w int) {
+	u.CurrentWeight = w
 }
 
 // BaseChannel provides common functionality for channel proxies.
@@ -54,25 +70,17 @@ func (b *BaseChannel) getUpstreamURL() *url.URL {
 		return b.Upstreams[0].URL
 	}
 
-	totalWeight := 0
-	var best *UpstreamInfo
-
+	items := make([]utils.WeightedItem, len(b.Upstreams))
 	for i := range b.Upstreams {
-		up := &b.Upstreams[i]
-		totalWeight += up.Weight
-		up.CurrentWeight += up.Weight
-
-		if best == nil || up.CurrentWeight > best.CurrentWeight {
-			best = up
-		}
+		items[i] = &b.Upstreams[i]
 	}
 
-	if best == nil {
-		return b.Upstreams[0].URL // 降级到第一个可用的
+	selected := utils.SelectByWeightedRoundRobin(items)
+	if selected == nil {
+		return b.Upstreams[0].URL
 	}
 
-	best.CurrentWeight -= totalWeight
-	return best.URL
+	return selected.(*UpstreamInfo).URL
 }
 
 // BuildUpstreamURL constructs the target URL for the upstream service.
@@ -89,6 +97,34 @@ func (b *BaseChannel) BuildUpstreamURL(originalURL *url.URL, groupName string) (
 
 	finalURL.Path = strings.TrimRight(finalURL.Path, "/") + requestPath
 
+	finalURL.RawQuery = originalURL.RawQuery
+
+	return finalURL.String(), nil
+}
+
+// BuildUpstreamURLForAggregate constructs the target URL for aggregate group sub-groups.
+// It uses the validation endpoint instead of the request path to ensure compatibility
+// with different upstream endpoints.
+func (b *BaseChannel) BuildUpstreamURLForAggregate(originalURL *url.URL, groupName string) (string, error) {
+	base := b.getUpstreamURL()
+	if base == nil {
+		return "", fmt.Errorf("no upstream URL configured for channel %s", b.Name)
+	}
+
+	finalURL := *base
+
+	// For aggregate groups, always use the validation endpoint
+	// This ensures each sub-group uses its configured endpoint path
+	targetPath := b.ValidationEndpoint
+	if targetPath == "" {
+		// Fallback to request path if no validation endpoint is configured
+		proxyPrefix := "/proxy/" + groupName
+		requestPath := originalURL.Path
+		requestPath = strings.TrimPrefix(requestPath, proxyPrefix)
+		targetPath = requestPath
+	}
+
+	finalURL.Path = strings.TrimRight(finalURL.Path, "/") + targetPath
 	finalURL.RawQuery = originalURL.RawQuery
 
 	return finalURL.String(), nil
@@ -269,4 +305,134 @@ func mergeModelLists(upstream []any, configured []any) []any {
 	}
 
 	return result
+}
+
+// ExtractModel extracts the model field from request body using standard OpenAI format
+func (b *BaseChannel) ExtractModel(_ *gin.Context, bodyBytes []byte) string {
+	type modelPayload struct {
+		Model string `json:"model"`
+	}
+	var p modelPayload
+	if err := json.Unmarshal(bodyBytes, &p); err == nil {
+		return p.Model
+	}
+	return ""
+}
+
+// IsStreamRequest checks if the request is for a streaming response using common indicators
+func (b *BaseChannel) IsStreamRequest(c *gin.Context, bodyBytes []byte) bool {
+	// Check Accept header
+	if strings.Contains(c.GetHeader("Accept"), "text/event-stream") {
+		return true
+	}
+
+	// Check stream query parameter
+	if c.Query("stream") == "true" {
+		return true
+	}
+
+	// Check stream field in request body
+	type streamPayload struct {
+		Stream bool `json:"stream"`
+	}
+	var p streamPayload
+	if err := json.Unmarshal(bodyBytes, &p); err == nil {
+		return p.Stream
+	}
+
+	return false
+}
+
+// ValidateKeyConfig holds channel-specific validation logic
+type ValidateKeyConfig struct {
+	// BuildPayload constructs the request body for validation
+	BuildPayload func(model string) (map[string]any, error)
+	// SetAuthHeaders sets channel-specific authentication headers
+	SetAuthHeaders func(req *http.Request, apiKey *models.APIKey)
+	// BuildRequestURL builds the validation request URL (optional, defaults to ValidationEndpoint)
+	BuildRequestURL func(upstreamURL *url.URL) (string, error)
+}
+
+// validateKeyCommon provides common key validation logic for all channels
+func (b *BaseChannel) validateKeyCommon(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string, config ValidateKeyConfig) (bool, error) {
+	upstreamURL := b.getUpstreamURL()
+	if upstreamURL == nil {
+		return false, fmt.Errorf("no upstream URL configured for channel %s", b.Name)
+	}
+
+	// Build request URL
+	var reqURL string
+	var err error
+	if config.BuildRequestURL != nil {
+		reqURL, err = config.BuildRequestURL(upstreamURL)
+	} else {
+		endpointURL, parseErr := url.Parse(b.ValidationEndpoint)
+		if parseErr != nil {
+			return false, fmt.Errorf("failed to parse validation endpoint: %w", parseErr)
+		}
+		finalURL := *upstreamURL
+		finalURL.Path = strings.TrimRight(finalURL.Path, "/") + endpointURL.Path
+		finalURL.RawQuery = endpointURL.RawQuery
+		reqURL = finalURL.String()
+	}
+
+	if err != nil {
+		return false, err
+	}
+
+	// Use provided model or fall back to channel's TestModel
+	testModel := model
+	if testModel == "" {
+		testModel = b.TestModel
+	}
+
+	// Build payload using channel-specific function
+	payload, err := config.BuildPayload(testModel)
+	if err != nil {
+		return false, fmt.Errorf("failed to build validation payload: %w", err)
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return false, fmt.Errorf("failed to marshal validation payload: %w", err)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewBuffer(body))
+	if err != nil {
+		return false, fmt.Errorf("failed to create validation request: %w", err)
+	}
+
+	// Set channel-specific authentication headers
+	config.SetAuthHeaders(req, apiKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	// Apply custom header rules if available
+	if len(group.HeaderRuleList) > 0 {
+		headerCtx := utils.NewHeaderVariableContext(group, apiKey)
+		utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
+	}
+
+	// Send request
+	resp, err := b.HTTPClient.Do(req)
+	if err != nil {
+		return false, fmt.Errorf("failed to send validation request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Any 2xx status code indicates the key is valid
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+		return true, nil
+	}
+
+	// For non-200 responses, parse the body to provide a more specific error reason
+	errorBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, fmt.Errorf("key is invalid (status %d), but failed to read error body: %w", resp.StatusCode, err)
+	}
+
+	// Use the parser to extract a clean error message
+	parsedError := app_errors.ParseUpstreamError(errorBody)
+
+	return false, fmt.Errorf("[status %d] %s", resp.StatusCode, parsedError)
 }

@@ -3,18 +3,21 @@ package services
 import (
 	"encoding/json"
 	"fmt"
-	"gpt-load/internal/encryption"
-	"gpt-load/internal/keypool"
-	"gpt-load/internal/models"
 	"io"
 	"regexp"
 	"strings"
+
+	"gpt-load/internal/encryption"
+	app_errors "gpt-load/internal/errors"
+	"gpt-load/internal/keypool"
+	"gpt-load/internal/models"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 const (
+	// Batch processing sizes (synced with config.MaxRequestKeys/config.KeyChunkSize)
 	maxRequestKeys = 5000
 	chunkSize      = 500
 )
@@ -61,12 +64,9 @@ func NewKeyService(db *gorm.DB, keyProvider *keypool.KeyProvider, keyValidator *
 // AddMultipleKeys handles the business logic of creating new keys from a text block.
 // deprecated: use KeyImportService for large imports
 func (s *KeyService) AddMultipleKeys(groupID uint, keysText string) (*AddKeysResult, error) {
-	keys := s.ParseKeysFromText(keysText)
-	if len(keys) > maxRequestKeys {
-		return nil, fmt.Errorf("batch size exceeds the limit of %d keys, got %d", maxRequestKeys, len(keys))
-	}
-	if len(keys) == 0 {
-		return nil, fmt.Errorf("no valid keys found in the input text")
+	keys, err := s.parseAndValidateKeys(keysText)
+	if err != nil {
+		return nil, err
 	}
 
 	addedCount, ignoredCount, err := s.processAndCreateKeys(groupID, keys, nil)
@@ -74,8 +74,8 @@ func (s *KeyService) AddMultipleKeys(groupID uint, keysText string) (*AddKeysRes
 		return nil, err
 	}
 
-	var totalInGroup int64
-	if err := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Count(&totalInGroup).Error; err != nil {
+	totalInGroup, err := s.countKeysInGroup(groupID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -167,7 +167,7 @@ func (s *KeyService) ParseKeysFromText(text string) []string {
 		return s.filterValidKeys(keys)
 	}
 
-	// 通用解析：通过分隔符分割文本，不使用复杂的正则表达式
+	// General parsing: split text by delimiters, no complex regex
 	delimiters := regexp.MustCompile(`[\s,;\n\r\t]+`)
 	splitKeys := delimiters.Split(strings.TrimSpace(text), -1)
 
@@ -200,38 +200,26 @@ func (s *KeyService) isValidKeyFormat(key string) bool {
 
 // RestoreMultipleKeys handles the business logic of restoring keys from a text block.
 func (s *KeyService) RestoreMultipleKeys(groupID uint, keysText string) (*RestoreKeysResult, error) {
-	keysToRestore := s.ParseKeysFromText(keysText)
-	if len(keysToRestore) > maxRequestKeys {
-		return nil, fmt.Errorf("batch size exceeds the limit of %d keys, got %d", maxRequestKeys, len(keysToRestore))
-	}
-	if len(keysToRestore) == 0 {
-		return nil, fmt.Errorf("no valid keys found in the input text")
+	keys, err := s.parseAndValidateKeys(keysText)
+	if err != nil {
+		return nil, err
 	}
 
-	var totalRestoredCount int64
-	for i := 0; i < len(keysToRestore); i += chunkSize {
-		end := i + chunkSize
-		if end > len(keysToRestore) {
-			end = len(keysToRestore)
-		}
-		chunk := keysToRestore[i:end]
-		restoredCount, err := s.KeyProvider.RestoreMultipleKeys(groupID, chunk)
-		if err != nil {
-			return nil, err
-		}
-		totalRestoredCount += restoredCount
+	totalRestoredCount, err := s.processBatchWithResult(keys, func(chunk []string) (int64, error) {
+		return s.KeyProvider.RestoreMultipleKeys(groupID, chunk)
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	ignoredCount := len(keysToRestore) - int(totalRestoredCount)
-
-	var totalInGroup int64
-	if err := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Count(&totalInGroup).Error; err != nil {
+	totalInGroup, err := s.countKeysInGroup(groupID)
+	if err != nil {
 		return nil, err
 	}
 
 	return &RestoreKeysResult{
 		RestoredCount: int(totalRestoredCount),
-		IgnoredCount:  ignoredCount,
+		IgnoredCount:  len(keys) - int(totalRestoredCount),
 		TotalInGroup:  totalInGroup,
 	}, nil
 }
@@ -253,38 +241,26 @@ func (s *KeyService) ClearAllKeys(groupID uint) (int64, error) {
 
 // DeleteMultipleKeys handles the business logic of deleting keys from a text block.
 func (s *KeyService) DeleteMultipleKeys(groupID uint, keysText string) (*DeleteKeysResult, error) {
-	keysToDelete := s.ParseKeysFromText(keysText)
-	if len(keysToDelete) > maxRequestKeys {
-		return nil, fmt.Errorf("batch size exceeds the limit of %d keys, got %d", maxRequestKeys, len(keysToDelete))
-	}
-	if len(keysToDelete) == 0 {
-		return nil, fmt.Errorf("no valid keys found in the input text")
+	keys, err := s.parseAndValidateKeys(keysText)
+	if err != nil {
+		return nil, err
 	}
 
-	var totalDeletedCount int64
-	for i := 0; i < len(keysToDelete); i += chunkSize {
-		end := i + chunkSize
-		if end > len(keysToDelete) {
-			end = len(keysToDelete)
-		}
-		chunk := keysToDelete[i:end]
-		deletedCount, err := s.KeyProvider.RemoveKeys(groupID, chunk)
-		if err != nil {
-			return nil, err
-		}
-		totalDeletedCount += deletedCount
+	totalDeletedCount, err := s.processBatchWithResult(keys, func(chunk []string) (int64, error) {
+		return s.KeyProvider.RemoveKeys(groupID, chunk)
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	ignoredCount := len(keysToDelete) - int(totalDeletedCount)
-
-	var totalInGroup int64
-	if err := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Count(&totalInGroup).Error; err != nil {
+	totalInGroup, err := s.countKeysInGroup(groupID)
+	if err != nil {
 		return nil, err
 	}
 
 	return &DeleteKeysResult{
 		DeletedCount: int(totalDeletedCount),
-		IgnoredCount: ignoredCount,
+		IgnoredCount: len(keys) - int(totalDeletedCount),
 		TotalInGroup: totalInGroup,
 	}, nil
 }
@@ -312,30 +288,24 @@ func (s *KeyService) ListKeysInGroupQuery(groupID uint, statusFilter string, sea
 }
 
 // TestMultipleKeys handles a one-off validation test for multiple keys.
-func (s *KeyService) TestMultipleKeys(group *models.Group, keysText string) ([]keypool.KeyTestResult, error) {
-	keysToTest := s.ParseKeysFromText(keysText)
-	if len(keysToTest) > maxRequestKeys {
-		return nil, fmt.Errorf("batch size exceeds the limit of %d keys, got %d", maxRequestKeys, len(keysToTest))
-	}
-	if len(keysToTest) == 0 {
-		return nil, fmt.Errorf("no valid keys found in the input text")
+// The model parameter is optional and overrides the group's test_model if provided.
+func (s *KeyService) TestMultipleKeys(group *models.Group, keysText string, model string) ([]keypool.KeyTestResult, error) {
+	keys, err := s.parseAndValidateKeys(keysText)
+	if err != nil {
+		return nil, err
 	}
 
 	var allResults []keypool.KeyTestResult
-	for i := 0; i < len(keysToTest); i += chunkSize {
-		end := i + chunkSize
-		if end > len(keysToTest) {
-			end = len(keysToTest)
-		}
-		chunk := keysToTest[i:end]
-		results, err := s.KeyValidator.TestMultipleKeys(group, chunk)
+	_, err = s.processBatch(keys, func(chunk []string) error {
+		results, err := s.KeyValidator.TestMultipleKeys(group, chunk, model)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		allResults = append(allResults, results...)
-	}
+		return nil
+	})
 
-	return allResults, nil
+	return allResults, err
 }
 
 // StreamKeysToWriter fetches keys from the database in batches and writes them to the provided writer.
@@ -366,4 +336,57 @@ func (s *KeyService) StreamKeysToWriter(groupID uint, statusFilter string, write
 	}).Error
 
 	return err
+}
+
+// parseAndValidateKeys parses and validates keys from text.
+func (s *KeyService) parseAndValidateKeys(keysText string) ([]string, error) {
+	keys := s.ParseKeysFromText(keysText)
+	if len(keys) > maxRequestKeys {
+		return nil, app_errors.NewServiceErrorf(app_errors.ErrBatchSizeExceedsLimit, "batch size exceeds the limit of %d keys, got %d", maxRequestKeys, len(keys))
+	}
+	if len(keys) == 0 {
+		return nil, app_errors.NewServiceError(app_errors.ErrNoValidKeysFound, "no valid keys found in the input text")
+	}
+	return keys, nil
+}
+
+// countKeysInGroup returns the total number of keys in a group.
+func (s *KeyService) countKeysInGroup(groupID uint) (int64, error) {
+	var totalInGroup int64
+	if err := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Count(&totalInGroup).Error; err != nil {
+		return 0, err
+	}
+	return totalInGroup, nil
+}
+
+// batchOperationFunc defines a batch operation that returns a count.
+type batchOperationFunc func(chunk []string) (int64, error)
+
+// processBatchWithResult processes items in batches and returns total count.
+func (s *KeyService) processBatchWithResult(items []string, operation batchOperationFunc) (int64, error) {
+	var totalCount int64
+	for i := 0; i < len(items); i += chunkSize {
+		end := min(i+chunkSize, len(items))
+		chunk := items[i:end]
+		count, err := operation(chunk)
+		if err != nil {
+			return totalCount, err
+		}
+		totalCount += count
+	}
+	return totalCount, nil
+}
+
+// batchFunc defines a batch operation without return value.
+type batchFunc func(chunk []string) error
+
+// processBatch processes items in batches.
+func (s *KeyService) processBatch(items []string, operation batchFunc) (int, error) {
+	for i := 0; i < len(items); i += chunkSize {
+		end := min(i+chunkSize, len(items))
+		if err := operation(items[i:end]); err != nil {
+			return i, err
+		}
+	}
+	return len(items), nil
 }

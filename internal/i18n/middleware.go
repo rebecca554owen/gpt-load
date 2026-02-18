@@ -6,25 +6,25 @@ import (
 )
 
 const (
-	// LocalizerKey 是 gin.Context 中存储 Localizer 的键
+	// LocalizerKey is the key for storing Localizer in gin.Context
 	LocalizerKey = "localizer"
-	// LangKey 是 gin.Context 中存储当前语言的键
+	// LangKey is the key for storing current language in gin.Context
 	LangKey = "lang"
 )
 
-// Middleware i18n 中间件
+// Middleware i18n middleware
 func Middleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 获取 Accept-Language 头
+		// Get Accept-Language header
 		acceptLang := c.GetHeader("Accept-Language")
 
-		// 获取 Localizer
+		// Get Localizer
 		localizer := GetLocalizer(acceptLang)
 
-		// 将 Localizer 存储到 Context 中
+		// Store Localizer in Context
 		c.Set(LocalizerKey, localizer)
 
-		// 存储当前语言
+		// Store current language
 		lang := normalizeLanguageCode(acceptLang)
 		c.Set(LangKey, lang)
 
@@ -32,18 +32,18 @@ func Middleware() gin.HandlerFunc {
 	}
 }
 
-// GetLocalizerFromContext 从 gin.Context 获取 Localizer
+// GetLocalizerFromContext gets Localizer from gin.Context
 func GetLocalizerFromContext(c *gin.Context) *i18n.Localizer {
 	if localizer, exists := c.Get(LocalizerKey); exists {
 		if l, ok := localizer.(*i18n.Localizer); ok {
 			return l
 		}
 	}
-	// 如果没有找到，返回默认的中文 Localizer
+	// If not found, return default Chinese Localizer
 	return GetLocalizer("zh-CN")
 }
 
-// GetLangFromContext 从 gin.Context 获取当前语言
+// GetLangFromContext gets current language from gin.Context
 func GetLangFromContext(c *gin.Context) string {
 	if lang, exists := c.Get(LangKey); exists {
 		if l, ok := lang.(string); ok {
@@ -53,7 +53,7 @@ func GetLangFromContext(c *gin.Context) string {
 	return "zh-CN"
 }
 
-// Success 返回成功响应（带国际化消息）
+// Success returns success response (with i18n message)
 func Success(c *gin.Context, msgID string, data any) {
 	localizer := GetLocalizerFromContext(c)
 	message := T(localizer, msgID)
@@ -66,7 +66,7 @@ func Success(c *gin.Context, msgID string, data any) {
 	})
 }
 
-// SuccessWithData 返回成功响应（带模板数据）
+// SuccessWithData returns success response (with template data)
 func SuccessWithData(c *gin.Context, msgID string, templateData map[string]any, data any) {
 	localizer := GetLocalizerFromContext(c)
 	message := T(localizer, msgID, templateData)
@@ -79,7 +79,7 @@ func SuccessWithData(c *gin.Context, msgID string, templateData map[string]any, 
 	})
 }
 
-// Error 返回错误响应（带国际化消息）
+// Error returns error response (with i18n message)
 func Error(c *gin.Context, code int, msgID string) {
 	localizer := GetLocalizerFromContext(c)
 	message := T(localizer, msgID)
@@ -91,7 +91,7 @@ func Error(c *gin.Context, code int, msgID string) {
 	})
 }
 
-// ErrorWithData 返回错误响应（带模板数据）
+// ErrorWithData returns error response (with template data)
 func ErrorWithData(c *gin.Context, code int, msgID string, templateData map[string]any) {
 	localizer := GetLocalizerFromContext(c)
 	message := T(localizer, msgID, templateData)
@@ -103,7 +103,7 @@ func ErrorWithData(c *gin.Context, code int, msgID string, templateData map[stri
 	})
 }
 
-// Message 获取国际化消息
+// Message gets i18n message
 func Message(c *gin.Context, msgID string, templateData ...map[string]any) string {
 	localizer := GetLocalizerFromContext(c)
 	return T(localizer, msgID, templateData...)

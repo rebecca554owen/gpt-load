@@ -31,6 +31,7 @@ type Server struct {
 	KeyImportService           *services.KeyImportService
 	KeyDeleteService           *services.KeyDeleteService
 	LogService                 *services.LogService
+	RequestLogService          *services.RequestLogService
 	CommonHandler              *CommonHandler
 	EncryptionSvc              encryption.Service
 }
@@ -50,6 +51,7 @@ type NewServerParams struct {
 	KeyImportService           *services.KeyImportService
 	KeyDeleteService           *services.KeyDeleteService
 	LogService                 *services.LogService
+	RequestLogService          *services.RequestLogService
 	CommonHandler              *CommonHandler
 	EncryptionSvc              encryption.Service
 }
@@ -69,6 +71,7 @@ func NewServer(params NewServerParams) *Server {
 		KeyImportService:           params.KeyImportService,
 		KeyDeleteService:           params.KeyDeleteService,
 		LogService:                 params.LogService,
+		RequestLogService:          params.RequestLogService,
 		CommonHandler:              params.CommonHandler,
 		EncryptionSvc:              params.EncryptionSvc,
 	}

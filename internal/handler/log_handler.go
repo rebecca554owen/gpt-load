@@ -6,7 +6,6 @@ import (
 	"gpt-load/internal/i18n"
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
-	"log"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,7 +29,7 @@ func (s *Server) GetLogs(c *gin.Context) {
 		return
 	}
 
-	// 解密所有日志中的密钥用于前端显示
+	// Decrypt all keys in logs for frontend display
 	for i := range logs {
 		if logs[i].KeyValue != "" {
 			decryptedValue, err := s.EncryptionSvc.Decrypt(logs[i].KeyValue)
@@ -56,7 +55,7 @@ func (s *Server) ExportLogs(c *gin.Context) {
 	// Stream the response
 	err := s.LogService.StreamLogKeysToCSV(c, c.Writer)
 	if err != nil {
-		log.Printf("Failed to stream log keys to CSV: %v", err)
+		logrus.WithError(err).Error("Failed to stream log keys to CSV")
 		c.JSON(500, gin.H{"error": i18n.Message(c, "error.export_logs")})
 		return
 	}

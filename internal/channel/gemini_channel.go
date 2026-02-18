@@ -1,14 +1,10 @@
 package channel
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
-	"gpt-load/internal/utils"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -49,32 +45,17 @@ func (ch *GeminiChannel) ModifyRequest(req *http.Request, apiKey *models.APIKey,
 
 // IsStreamRequest checks if the request is for a streaming response.
 func (ch *GeminiChannel) IsStreamRequest(c *gin.Context, bodyBytes []byte) bool {
-	path := c.Request.URL.Path
-	if strings.HasSuffix(path, ":streamGenerateContent") {
+	// Check for Gemini-specific streaming path
+	if strings.HasSuffix(c.Request.URL.Path, ":streamGenerateContent") {
 		return true
 	}
 
-	// Also check for standard streaming indicators as a fallback.
-	if strings.Contains(c.GetHeader("Accept"), "text/event-stream") {
-		return true
-	}
-	if c.Query("stream") == "true" {
-		return true
-	}
-
-	type streamPayload struct {
-		Stream bool `json:"stream"`
-	}
-	var p streamPayload
-	if err := json.Unmarshal(bodyBytes, &p); err == nil {
-		return p.Stream
-	}
-
-	return false
+	// Use base channel method for standard streaming indicators
+	return ch.BaseChannel.IsStreamRequest(c, bodyBytes)
 }
 
 func (ch *GeminiChannel) ExtractModel(c *gin.Context, bodyBytes []byte) string {
-	// gemini format
+	// gemini format: extract from URL path
 	path := c.Request.URL.Path
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
@@ -84,80 +65,41 @@ func (ch *GeminiChannel) ExtractModel(c *gin.Context, bodyBytes []byte) string {
 		}
 	}
 
-	// openai format
-	type modelPayload struct {
-		Model string `json:"model"`
-	}
-	var p modelPayload
-	if err := json.Unmarshal(bodyBytes, &p); err == nil && p.Model != "" {
-		return p.Model
-	}
-
-	return ""
+	// openai format: use base channel method
+	return ch.BaseChannel.ExtractModel(c, bodyBytes)
 }
 
 // ValidateKey checks if the given API key is valid by making a generateContent request.
-func (ch *GeminiChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group) (bool, error) {
-	upstreamURL := ch.getUpstreamURL()
-	if upstreamURL == nil {
-		return false, fmt.Errorf("no upstream URL configured for channel %s", ch.Name)
-	}
-
-	// Safely join the path segments
-	reqURL, err := url.JoinPath(upstreamURL.String(), "v1beta", "models", ch.TestModel+":generateContent")
-	if err != nil {
-		return false, fmt.Errorf("failed to create gemini validation path: %w", err)
-	}
-	reqURL += "?key=" + apiKey.KeyValue
-
-	payload := gin.H{
-		"contents": []gin.H{
-			{
-				"role": "user",
-				"parts": []gin.H{
-					{"text": "hi"},
+func (ch *GeminiChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error) {
+	return ch.validateKeyCommon(ctx, apiKey, group, model, ValidateKeyConfig{
+		BuildPayload: func(testModel string) (map[string]any, error) {
+			return gin.H{
+				"contents": []gin.H{
+					{
+						"role": "user",
+						"parts": []gin.H{
+							{"text": "hi"},
+						},
+					},
 				},
-			},
+			}, nil
 		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal validation payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewBuffer(body))
-	if err != nil {
-		return false, fmt.Errorf("failed to create validation request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Apply custom header rules if available
-	if len(group.HeaderRuleList) > 0 {
-		headerCtx := utils.NewHeaderVariableContext(group, apiKey)
-		utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
-	}
-
-	resp, err := ch.HTTPClient.Do(req)
-	if err != nil {
-		return false, fmt.Errorf("failed to send validation request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Any 2xx status code indicates the key is valid.
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, nil
-	}
-
-	// For non-200 responses, parse the body to provide a more specific error reason.
-	errorBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, fmt.Errorf("key is invalid (status %d), but failed to read error body: %w", resp.StatusCode, err)
-	}
-
-	// Use the new parser to extract a clean error message.
-	parsedError := app_errors.ParseUpstreamError(errorBody)
-
-	return false, fmt.Errorf("[status %d] %s", resp.StatusCode, parsedError)
+		SetAuthHeaders: func(req *http.Request, apiKey *models.APIKey) {
+			// Gemini adds API key as query parameter, not header
+		},
+		BuildRequestURL: func(upstreamURL *url.URL) (string, error) {
+			// Use provided model or fall back to channel's TestModel
+			testModel := model
+			if testModel == "" {
+				testModel = ch.TestModel
+			}
+			reqURL, err := url.JoinPath(upstreamURL.String(), "v1beta", "models", testModel+":generateContent")
+			if err != nil {
+				return "", fmt.Errorf("failed to create gemini validation path: %w", err)
+			}
+			return reqURL + "?key=" + apiKey.KeyValue, nil
+		},
+	})
 }
 
 // ApplyModelRedirect overrides the default implementation for Gemini channel.

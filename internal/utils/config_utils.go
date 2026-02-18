@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GenerateSettingsMetadata 使用反射从 SystemSettings 结构体动态生成元数据
+// GenerateSettingsMetadata generates metadata from SystemSettings struct using reflection
 func GenerateSettingsMetadata(s *types.SystemSettings) []models.SystemSettingInfo {
 	var settingsInfo []models.SystemSettingInfo
 	v := reflect.ValueOf(s).Elem()
@@ -65,7 +65,7 @@ func GenerateSettingsMetadata(s *types.SystemSettings) []models.SystemSettingInf
 	return settingsInfo
 }
 
-// DefaultSystemSettings 返回默认的系统配置
+// DefaultSystemSettings returns default system configuration
 func DefaultSystemSettings() types.SystemSettings {
 	s := types.SystemSettings{}
 	v := reflect.ValueOf(&s).Elem()

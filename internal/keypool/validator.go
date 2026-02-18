@@ -51,7 +51,8 @@ func NewKeyValidator(params KeyValidatorParams) *KeyValidator {
 }
 
 // ValidateSingleKey performs a validation check on a single API key.
-func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group) (bool, error) {
+// The model parameter is optional and overrides the channel's TestModel if provided.
+func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group, model string) (bool, error) {
 	if group.EffectiveConfig.AppUrl == "" {
 		group.EffectiveConfig = s.SettingsManager.GetEffectiveConfig(group.Config)
 	}
@@ -63,7 +64,7 @@ func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group
 		return false, fmt.Errorf("failed to get channel for group %s: %w", group.Name, err)
 	}
 
-	isValid, validationErr := ch.ValidateKey(ctx, key, group)
+	isValid, validationErr := ch.ValidateKey(ctx, key, group, model)
 
 	var errorMsg string
 	if !isValid && validationErr != nil {
@@ -89,7 +90,8 @@ func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group
 }
 
 // TestMultipleKeys performs a synchronous validation for a list of key values within a specific group.
-func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string) ([]KeyTestResult, error) {
+// The model parameter is optional and overrides the group's test_model if provided.
+func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string, model string) ([]KeyTestResult, error) {
 	results := make([]KeyTestResult, len(keyValues))
 
 	// Generate hashes for all key values
@@ -130,7 +132,7 @@ func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string)
 
 		apiKey.KeyValue = kv
 
-		isValid, validationErr := s.ValidateSingleKey(&apiKey, group)
+		isValid, validationErr := s.ValidateSingleKey(&apiKey, group, model)
 
 		results[i] = KeyTestResult{
 			KeyValue: kv,

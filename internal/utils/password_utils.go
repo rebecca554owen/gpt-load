@@ -8,16 +8,21 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-// ValidatePasswordStrength validates password strength with fixed minimum length of 16 characters
+// Common weak password patterns for security validation
+var WeakPasswordPatterns = []string{
+	"password", "sk-123456", "123456", "admin", "secret", "test", "demo",
+	"key", "token", "pass", "pwd", "qwerty", "abc", "default",
+	"user", "login", "auth", "temp",
+}
+
+// ValidatePasswordStrength validates password strength with minimum length of 16 characters
 func ValidatePasswordStrength(password, fieldName string) {
 	if len(password) < 16 {
 		logrus.Warnf("%s is shorter than 16 characters, consider using a longer password", fieldName)
 	}
 
 	lower := strings.ToLower(password)
-	weakPatterns := []string{"password", "sk-123456", "123456", "admin", "secret"}
-
-	for _, pattern := range weakPatterns {
+	for _, pattern := range WeakPasswordPatterns {
 		if strings.Contains(lower, pattern) {
 			logrus.Warnf("%s contains common weak patterns, consider using a stronger password", fieldName)
 			break

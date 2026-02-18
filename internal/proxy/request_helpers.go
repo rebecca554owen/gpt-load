@@ -27,7 +27,12 @@ func (ps *ProxyServer) applyParamOverrides(bodyBytes []byte, group *models.Group
 		requestData[key] = value
 	}
 
-	return json.Marshal(requestData)
+	finalBody, err := json.Marshal(requestData)
+	if err != nil {
+		return bodyBytes, err
+	}
+
+	return finalBody, nil
 }
 
 // logUpstreamError provides a centralized way to log errors from upstream interactions.

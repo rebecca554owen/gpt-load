@@ -100,6 +100,7 @@ type GroupCreateParams struct {
 	HeaderRules         []models.HeaderRule
 	ProxyKeys           string
 	SubGroups           []SubGroupInput
+	ModelMappings       json.RawMessage
 }
 
 // GroupUpdateParams captures updatable fields for a group.
@@ -118,10 +119,26 @@ type GroupUpdateParams struct {
 	ParamOverrides      map[string]any
 	ModelRedirectRules  map[string]string
 	ModelRedirectStrict *bool
+	ModelMappingStrict  *bool
 	Config              map[string]any
 	HeaderRules         *[]models.HeaderRule
 	ProxyKeys           *string
 	SubGroups           *[]SubGroupInput
+	ModelMappings       json.RawMessage
+	HasModelMappings    bool
+}
+
+// ModelMappingTargetInput captures a single target group in a model alias mapping.
+type ModelMappingTargetInput struct {
+	SubGroupID uint   `json:"sub_group_id"`
+	Weight     int    `json:"weight"`
+	Model      string `json:"model"`
+}
+
+// ModelMappingInput captures the mapping between a model alias and its candidate sub-groups.
+type ModelMappingInput struct {
+	Model   string                    `json:"model"`
+	Targets []ModelMappingTargetInput `json:"targets"`
 }
 
 // KeyStats captures aggregated API key statistics for a group.
@@ -242,6 +259,12 @@ func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams
 		ProxyKeys:           strings.TrimSpace(params.ProxyKeys),
 	}
 
+	modelMappings, err := s.processModelMappings(ctx, 0, groupType, params.ModelMappings, nil)
+	if err != nil {
+		return nil, err
+	}
+	group.ModelMappings = modelMappings
+
 	tx := s.db.WithContext(ctx).Begin()
 	if err := tx.Error; err != nil {
 		return nil, app_errors.ErrDatabase
@@ -270,6 +293,18 @@ func (s *GroupService) ListGroups(ctx context.Context) ([]models.Group, error) {
 		return nil, app_errors.ParseDBError(err)
 	}
 
+	// Parse model mappings JSON for each group
+	for i := range groups {
+		if len(groups[i].ModelMappings) > 0 {
+			if err := json.Unmarshal(groups[i].ModelMappings, &groups[i].ModelMappingList); err != nil {
+				logrus.WithError(err).WithField("group_name", groups[i].Name).Warn("Failed to parse model mappings for group")
+				groups[i].ModelMappingList = nil
+			}
+		} else {
+			groups[i].ModelMappingList = nil
+		}
+	}
+
 	return groups, nil
 }
 
@@ -286,129 +321,8 @@ func (s *GroupService) UpdateGroup(ctx context.Context, id uint, params GroupUpd
 	}
 	defer tx.Rollback()
 
-	if params.Name != nil {
-		cleanedName := strings.TrimSpace(*params.Name)
-		if !isValidGroupName(cleanedName) {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_group_name", nil)
-		}
-		group.Name = cleanedName
-	}
-
-	if params.DisplayName != nil {
-		group.DisplayName = strings.TrimSpace(*params.DisplayName)
-	}
-
-	if params.Description != nil {
-		group.Description = strings.TrimSpace(*params.Description)
-	}
-
-	if params.HasUpstreams {
-		cleanedUpstreams, err := s.validateAndCleanUpstreams(params.Upstreams)
-		if err != nil {
-			return nil, err
-		}
-		group.Upstreams = cleanedUpstreams
-	}
-
-	// Check if this group is used as a sub-group in aggregate groups before allowing critical changes
-	if group.GroupType != "aggregate" && (params.ChannelType != nil || params.ValidationEndpoint != nil) {
-		count, err := s.aggregateGroupService.CountAggregateGroupsUsingSubGroup(ctx, group.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		if count > 0 {
-			// Check if ChannelType is being changed
-			if params.ChannelType != nil {
-				cleanedChannelType := strings.TrimSpace(*params.ChannelType)
-				if group.ChannelType != cleanedChannelType {
-					return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
-						map[string]any{"count": count})
-				}
-			}
-
-			// Check if ValidationEndpoint is being changed
-			if params.ValidationEndpoint != nil {
-				cleanedValidationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
-				if group.ValidationEndpoint != cleanedValidationEndpoint {
-					return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
-						map[string]any{"count": count})
-				}
-			}
-		}
-	}
-
-	if params.ChannelType != nil && group.GroupType != "aggregate" {
-		cleanedChannelType := strings.TrimSpace(*params.ChannelType)
-		if !s.isValidChannelType(cleanedChannelType) {
-			supported := strings.Join(s.channelRegistry, ", ")
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_channel_type", map[string]any{"types": supported})
-		}
-		group.ChannelType = cleanedChannelType
-	}
-
-	if params.Sort != nil {
-		group.Sort = *params.Sort
-	}
-
-	if params.HasTestModel {
-		cleanedTestModel := strings.TrimSpace(params.TestModel)
-		if cleanedTestModel == "" {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.test_model_empty", nil)
-		}
-		group.TestModel = cleanedTestModel
-	}
-
-	if params.ParamOverrides != nil {
-		group.ParamOverrides = params.ParamOverrides
-	}
-
-	// Validate model redirect rules for aggregate groups
-	if group.GroupType == "aggregate" && params.ModelRedirectRules != nil && len(params.ModelRedirectRules) > 0 {
-		return nil, NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
-	}
-
-	// Validate model redirect rules format
-	if params.ModelRedirectRules != nil {
-		if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
-		}
-		group.ModelRedirectRules = convertToJSONMap(params.ModelRedirectRules)
-	}
-
-	if params.ModelRedirectStrict != nil {
-		group.ModelRedirectStrict = *params.ModelRedirectStrict
-	}
-
-	if params.ValidationEndpoint != nil {
-		validationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
-		if !isValidValidationEndpoint(validationEndpoint) {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_test_path", nil)
-		}
-		group.ValidationEndpoint = validationEndpoint
-	}
-
-	if params.Config != nil {
-		cleanedConfig, err := s.validateAndCleanConfig(params.Config)
-		if err != nil {
-			return nil, err
-		}
-		group.Config = cleanedConfig
-	}
-
-	if params.ProxyKeys != nil {
-		group.ProxyKeys = strings.TrimSpace(*params.ProxyKeys)
-	}
-
-	if params.HeaderRules != nil {
-		headerRulesJSON, err := s.normalizeHeaderRules(*params.HeaderRules)
-		if err != nil {
-			return nil, err
-		}
-		if headerRulesJSON == nil {
-			headerRulesJSON = datatypes.JSON("[]")
-		}
-		group.HeaderRules = headerRulesJSON
+	if err := s.validateAndUpdateGroupFields(ctx, &group, params, tx); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Save(&group).Error; err != nil {
@@ -426,8 +340,150 @@ func (s *GroupService) UpdateGroup(ctx context.Context, id uint, params GroupUpd
 	return &group, nil
 }
 
+// validateAndUpdateGroupFields validates and updates group fields based on the provided params.
+func (s *GroupService) validateAndUpdateGroupFields(ctx context.Context, group *models.Group, params GroupUpdateParams, tx *gorm.DB) error {
+	if params.Name != nil {
+		cleanedName := strings.TrimSpace(*params.Name)
+		if !isValidGroupName(cleanedName) {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_group_name", nil)
+		}
+		group.Name = cleanedName
+	}
+
+	if params.DisplayName != nil {
+		group.DisplayName = strings.TrimSpace(*params.DisplayName)
+	}
+
+	if params.Description != nil {
+		group.Description = strings.TrimSpace(*params.Description)
+	}
+
+	if params.HasUpstreams {
+		cleanedUpstreams, err := s.validateAndCleanUpstreams(params.Upstreams)
+		if err != nil {
+			return err
+		}
+		group.Upstreams = cleanedUpstreams
+	}
+
+	if err := s.validateChannelTypeUpdate(ctx, group, params, tx); err != nil {
+		return err
+	}
+
+	if params.Sort != nil {
+		group.Sort = *params.Sort
+	}
+
+	if params.HasTestModel {
+		cleanedTestModel := strings.TrimSpace(params.TestModel)
+		if cleanedTestModel == "" {
+			return NewI18nError(app_errors.ErrValidation, "validation.test_model_empty", nil)
+		}
+		group.TestModel = cleanedTestModel
+	}
+
+	if params.ParamOverrides != nil {
+		group.ParamOverrides = params.ParamOverrides
+	}
+
+	if err := s.validateModelRedirectRulesForUpdate(group, params); err != nil {
+		return err
+	}
+
+	if params.ValidationEndpoint != nil {
+		validationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
+		if !isValidValidationEndpoint(validationEndpoint) {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_test_path", nil)
+		}
+		group.ValidationEndpoint = validationEndpoint
+	}
+
+	if params.Config != nil {
+		cleanedConfig, err := s.validateAndCleanConfig(params.Config)
+		if err != nil {
+			return err
+		}
+		group.Config = cleanedConfig
+	}
+
+	if params.ProxyKeys != nil {
+		group.ProxyKeys = strings.TrimSpace(*params.ProxyKeys)
+	}
+
+	if params.HeaderRules != nil {
+		headerRulesJSON, err := s.normalizeHeaderRules(*params.HeaderRules)
+		if err != nil {
+			return err
+		}
+		if headerRulesJSON == nil {
+			headerRulesJSON = datatypes.JSON("[]")
+		}
+		group.HeaderRules = headerRulesJSON
+	}
+
+	if params.ModelMappingStrict != nil {
+		group.ModelMappingStrict = *params.ModelMappingStrict
+	}
+
+	if params.HasModelMappings {
+		modelMappings, err := s.processModelMappings(ctx, group.ID, group.GroupType, params.ModelMappings, tx)
+		if err != nil {
+			return err
+		}
+		group.ModelMappings = modelMappings
+	}
+
+	return nil
+}
+
+// validateChannelTypeUpdate validates channel type updates for non-aggregate groups.
+func (s *GroupService) validateChannelTypeUpdate(ctx context.Context, group *models.Group, params GroupUpdateParams, tx *gorm.DB) error {
+	if group.GroupType == "aggregate" || params.ChannelType == nil {
+		return nil
+	}
+
+	count, err := s.aggregateGroupService.CountAggregateGroupsUsingSubGroupTx(ctx, group.ID, tx)
+	if err != nil {
+		return err
+	}
+
+	cleanedChannelType := strings.TrimSpace(*params.ChannelType)
+	if count > 0 && group.ChannelType != cleanedChannelType {
+		return NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
+			map[string]any{"count": count})
+	}
+
+	if !s.isValidChannelType(cleanedChannelType) {
+		supported := strings.Join(s.channelRegistry, ", ")
+		return NewI18nError(app_errors.ErrValidation, "validation.invalid_channel_type", map[string]any{"types": supported})
+	}
+
+	group.ChannelType = cleanedChannelType
+	return nil
+}
+
+// validateModelRedirectRulesForUpdate validates model redirect rules during group update.
+func (s *GroupService) validateModelRedirectRulesForUpdate(group *models.Group, params GroupUpdateParams) error {
+	if group.GroupType == "aggregate" && params.ModelRedirectRules != nil && len(params.ModelRedirectRules) > 0 {
+		return NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
+	}
+
+	if params.ModelRedirectRules != nil {
+		if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
+		}
+		group.ModelRedirectRules = convertToJSONMap(params.ModelRedirectRules)
+	}
+
+	if params.ModelRedirectStrict != nil {
+		group.ModelRedirectStrict = *params.ModelRedirectStrict
+	}
+
+	return nil
+}
+
 // DeleteGroup removes a group and associated resources.
-func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
+func (s *GroupService) DeleteGroup(ctx context.Context, id uint) (err error) {
 	var apiKeys []models.APIKey
 	if err := s.db.WithContext(ctx).Where("group_id = ?", id).Find(&apiKeys).Error; err != nil {
 		return app_errors.ParseDBError(err)
@@ -439,11 +495,11 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	}
 
 	tx := s.db.WithContext(ctx).Begin()
-	if err := tx.Error; err != nil {
+	if tx.Error != nil {
 		return app_errors.ErrDatabase
 	}
 	defer func() {
-		if tx != nil {
+		if err != nil {
 			tx.Rollback()
 		}
 	}()
@@ -478,7 +534,6 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	if err := tx.Commit().Error; err != nil {
 		return app_errors.ErrDatabase
 	}
-	tx = nil
 
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache")
@@ -581,7 +636,7 @@ func (s *GroupService) GetGroupStats(ctx context.Context, groupID uint) (*GroupS
 		return nil, app_errors.ParseDBError(err)
 	}
 
-	// 根据分组类型选择不同的统计逻辑
+	// Select different statistics logic based on group type
 	if group.GroupType == "aggregate" {
 		return s.getAggregateGroupStats(ctx, groupID)
 	}
@@ -676,7 +731,7 @@ func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stat
 }
 
 func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
-	stats := &GroupStats{}
+	stats := new(GroupStats)
 	var allErrors []error
 
 	// Fetch key statistics (only for standard groups)
@@ -708,7 +763,7 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 }
 
 func (s *GroupService) getAggregateGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
-	stats := &GroupStats{}
+	stats := new(GroupStats)
 
 	// Aggregate groups only need request statistics, not key statistics
 	if errs := s.fetchRequestStats(ctx, groupID, stats); len(errs) > 0 {
@@ -991,6 +1046,170 @@ func convertToJSONMap(input map[string]string) datatypes.JSONMap {
 	return result
 }
 
+// subGroupMapBuilder builds a map of valid sub-group IDs for an aggregate group
+func (s *GroupService) subGroupMapBuilder(ctx context.Context, groupID uint, tx *gorm.DB) (map[uint]struct{}, error) {
+	var subGroups []models.GroupSubGroup
+	db := s.db
+	if tx != nil {
+		db = tx
+	}
+	if err := db.WithContext(ctx).Where("group_id = ?", groupID).Find(&subGroups).Error; err != nil {
+		return nil, app_errors.ParseDBError(err)
+	}
+
+	subGroupMap := make(map[uint]struct{}, len(subGroups))
+	for _, sg := range subGroups {
+		subGroupMap[sg.SubGroupID] = struct{}{}
+	}
+	return subGroupMap, nil
+}
+
+// validateModelAlias validates a model alias and checks for duplicates
+func validateModelAlias(alias string, aliasSet map[string]struct{}) (string, string, error) {
+	trimmed := strings.TrimSpace(alias)
+	if trimmed == "" {
+		return "", "", NewI18nError(app_errors.ErrValidation, "validation.model_mapping_alias_required", nil)
+	}
+
+	lowerAlias := strings.ToLower(trimmed)
+	if _, exists := aliasSet[lowerAlias]; exists {
+		return "", "", NewI18nError(app_errors.ErrValidation, "validation.model_mapping_duplicate_alias", map[string]any{"model": trimmed})
+	}
+
+	return trimmed, lowerAlias, nil
+}
+
+// validateAndNormalizeTargets validates and normalizes all targets for a model mapping
+func (s *GroupService) validateAndNormalizeTargets(
+	ctx context.Context,
+	groupID uint,
+	alias string,
+	targets []ModelMappingTargetInput,
+	subGroupMap map[uint]struct{},
+) ([]models.ModelMappingTarget, error) {
+	if len(targets) == 0 {
+		return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_targets_required", map[string]any{"model": alias})
+	}
+
+	normalizedTargets := make([]models.ModelMappingTarget, 0, len(targets))
+	targetSet := make(map[string]struct{}, len(targets))
+
+	for _, target := range targets {
+		if _, ok := subGroupMap[target.SubGroupID]; !ok {
+			logrus.WithContext(ctx).WithFields(logrus.Fields{
+				"group_id":             groupID,
+				"model_alias":          alias,
+				"invalid_sub_group_id": target.SubGroupID,
+			}).Warn("Model mapping target references invalid sub-group, allowing save for manual fix")
+		}
+
+		if target.Weight < 0 {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_invalid_weight",
+				map[string]any{"model": alias, "sub_group_id": target.SubGroupID})
+		}
+
+		modelName := strings.TrimSpace(target.Model)
+		if modelName == "" {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_target_model_required",
+				map[string]any{"model": alias})
+		}
+
+		compositeKey := fmt.Sprintf("%d:%s", target.SubGroupID, strings.ToLower(modelName))
+		if _, duplicated := targetSet[compositeKey]; duplicated {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_duplicate_target",
+				map[string]any{"model": alias})
+		}
+
+		normalizedTargets = append(normalizedTargets, models.ModelMappingTarget{
+			SubGroupID: target.SubGroupID,
+			Weight:     target.Weight,
+			Model:      modelName,
+		})
+		targetSet[compositeKey] = struct{}{}
+	}
+
+	return normalizedTargets, nil
+}
+
+// buildModelMappingList creates a list of normalized model mappings
+func (s *GroupService) buildModelMappingList(
+	ctx context.Context,
+	groupID uint,
+	inputs []ModelMappingInput,
+	subGroupMap map[uint]struct{},
+) ([]models.ModelMapping, error) {
+	result := make([]models.ModelMapping, 0, len(inputs))
+	aliasSet := make(map[string]struct{}, len(inputs))
+
+	for _, mapping := range inputs {
+		alias, lowerAlias, err := validateModelAlias(mapping.Model, aliasSet)
+		if err != nil {
+			return nil, err
+		}
+
+		normalizedTargets, err := s.validateAndNormalizeTargets(ctx, groupID, alias, mapping.Targets, subGroupMap)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, models.ModelMapping{
+			Model:   alias,
+			Targets: normalizedTargets,
+		})
+		aliasSet[lowerAlias] = struct{}{}
+	}
+
+	return result, nil
+}
+
+// processModelMappings validates and normalizes model mappings based on group type
+// For aggregate groups, it parses and normalizes the mappings.
+// For non-aggregate groups, it stores the raw JSON.
+// groupID is the ID of the group (use 0 for groups not yet created).
+func (s *GroupService) processModelMappings(ctx context.Context, groupID uint, groupType string, modelMappingsJSON json.RawMessage, tx *gorm.DB) (datatypes.JSON, error) {
+	if groupType == "aggregate" && modelMappingsJSON != nil {
+		var modelMappingInputs []ModelMappingInput
+		if err := json.Unmarshal(modelMappingsJSON, &modelMappingInputs); err != nil {
+			return nil, app_errors.NewAPIError(app_errors.ErrInvalidJSON, fmt.Sprintf("invalid model mappings format: %v", err))
+		}
+
+		normalizedMappings, err := s.normalizeModelMappings(ctx, groupID, modelMappingInputs, tx)
+		if err != nil {
+			return nil, err
+		}
+		return normalizedMappings, nil
+	}
+
+	if modelMappingsJSON != nil {
+		return datatypes.JSON(modelMappingsJSON), nil
+	}
+
+	return datatypes.JSON("[]"), nil
+}
+
+// normalizeModelMappings validates and normalizes model mappings for aggregate groups
+func (s *GroupService) normalizeModelMappings(ctx context.Context, groupID uint, inputs []ModelMappingInput, tx *gorm.DB) (datatypes.JSON, error) {
+	if len(inputs) == 0 {
+		return datatypes.JSON("[]"), nil
+	}
+
+	subGroupMap, err := s.subGroupMapBuilder(ctx, groupID, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.buildModelMappingList(ctx, groupID, inputs, subGroupMap)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("failed to marshal model mappings: %v", err))
+	}
+
+	return datatypes.JSON(bytes), nil
+}
 // validateModelRedirectRules validates the format and content of model redirect rules
 func validateModelRedirectRules(rules map[string]string) error {
 	if len(rules) == 0 {

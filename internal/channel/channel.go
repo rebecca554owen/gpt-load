@@ -14,6 +14,11 @@ type ChannelProxy interface {
 	// BuildUpstreamURL constructs the target URL for the upstream service.
 	BuildUpstreamURL(originalURL *url.URL, groupName string) (string, error)
 
+	// BuildUpstreamURLForAggregate constructs the target URL for aggregate group sub-groups.
+	// It uses the validation endpoint instead of the request path to ensure compatibility
+	// with different upstream endpoints.
+	BuildUpstreamURLForAggregate(originalURL *url.URL, groupName string) (string, error)
+
 	// IsConfigStale checks if the channel's configuration is stale compared to the provided group.
 	IsConfigStale(group *models.Group) bool
 
@@ -33,7 +38,8 @@ type ChannelProxy interface {
 	ExtractModel(c *gin.Context, bodyBytes []byte) string
 
 	// ValidateKey checks if the given API key is valid.
-	ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group) (bool, error)
+	// The model parameter is optional and overrides the channel's TestModel if provided.
+	ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error)
 
 	// ApplyModelRedirect applies model redirection based on the group's redirect rules.
 	ApplyModelRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error)

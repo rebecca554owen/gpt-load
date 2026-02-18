@@ -68,12 +68,6 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 	}
 
 	subGroupMap := make(map[uint]models.Group, len(subGroupModels))
-	var validationEndpoint string
-
-	// If there's an existing endpoint, use it as the expected endpoint
-	if existingEndpoint != "" {
-		validationEndpoint = existingEndpoint
-	}
 
 	for _, sg := range subGroupModels {
 		if sg.GroupType == "aggregate" {
@@ -83,12 +77,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 			return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_channel_mismatch", nil)
 		}
 
-		// If no existing endpoint, use the first sub-group's effective endpoint
-		if validationEndpoint == "" {
-			validationEndpoint = utils.GetValidationEndpoint(&sg)
-		} else if validationEndpoint != utils.GetValidationEndpoint(&sg) {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_validation_endpoint_mismatch", nil)
-		}
+		// Each sub-group uses its own endpoint configuration, no longer enforcing consistency
 		subGroupMap[sg.ID] = sg
 	}
 
@@ -104,7 +93,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 	}
 
 	return &AggregateValidationResult{
-		ValidationEndpoint: validationEndpoint,
+		ValidationEndpoint: "", // No longer using unified validation endpoint
 		SubGroups:          resultSubGroups,
 	}, nil
 }
@@ -183,34 +172,26 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 		return NewI18nError(app_errors.ErrBadRequest, "group.not_aggregate", nil)
 	}
 
-	// Check if there are existing sub groups and get their validation endpoint
-	var existingEndpoint string
+	// Check for existing sub-groups (for deduplication)
 	var existingSubGroups []models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("group_id = ?", groupID).Find(&existingSubGroups).Error; err != nil {
 		return err
 	}
 
-	if len(existingSubGroups) > 0 {
-		var existingGroup models.Group
-		if err := s.db.WithContext(ctx).First(&existingGroup, existingSubGroups[0].SubGroupID).Error; err == nil {
-			existingEndpoint = utils.GetValidationEndpoint(&existingGroup)
-		}
-	}
-
-	// Validate sub groups with existing endpoint for consistency
-	result, err := s.ValidateSubGroups(ctx, group.ChannelType, inputs, existingEndpoint)
+	// Validate sub-groups (no longer enforcing endpoint consistency)
+	result, err := s.ValidateSubGroups(ctx, group.ChannelType, inputs, "")
 	if err != nil {
 		return err
 	}
 
 	// Check for duplicates with existing sub groups
-	existingSubGroupIDs := make(map[uint]bool)
+	existingSubGroupIDs := utils.NewUintSet()
 	for _, sg := range existingSubGroups {
-		existingSubGroupIDs[sg.SubGroupID] = true
+		existingSubGroupIDs.Add(sg.SubGroupID)
 	}
 
 	for _, newSg := range result.SubGroups {
-		if existingSubGroupIDs[newSg.SubGroupID] {
+		if existingSubGroupIDs.Contains(newSg.SubGroupID) {
 			return NewI18nError(app_errors.ErrBadRequest, "group.sub_group_already_exists",
 				map[string]any{"sub_group_id": newSg.SubGroupID})
 		}
@@ -232,7 +213,7 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 		return err
 	}
 
-	// 触发缓存更新
+	// Trigger cache update
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after adding sub groups")
 	}
@@ -262,7 +243,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 		return NewI18nError(app_errors.ErrValidation, "validation.sub_group_weight_max_exceeded", nil)
 	}
 
-	// 检查子分组关联是否存在
+	// Check if sub-group association exists
 	var existingRecord models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("group_id = ? AND sub_group_id = ?", groupID, subGroupID).First(&existingRecord).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -284,7 +265,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 		return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
 	}
 
-	// 触发缓存更新
+	// Trigger cache update
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after updating sub group weight")
 	}
@@ -318,7 +299,7 @@ func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, sub
 		return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
 	}
 
-	// 触发缓存更新
+	// Trigger cache update
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after deleting sub group")
 	}
@@ -330,6 +311,21 @@ func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, sub
 func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroup(ctx context.Context, subGroupID uint) (int64, error) {
 	var count int64
 	err := s.db.WithContext(ctx).
+		Model(&models.GroupSubGroup{}).
+		Where("sub_group_id = ?", subGroupID).
+		Count(&count).Error
+
+	if err != nil {
+		return 0, app_errors.ParseDBError(err)
+	}
+
+	return count, nil
+}
+
+// CountAggregateGroupsUsingSubGroupTx returns number of aggregate groups that use specified group as a sub-group (transaction version)
+func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroupTx(ctx context.Context, subGroupID uint, tx *gorm.DB) (int64, error) {
+	var count int64
+	err := tx.WithContext(ctx).
 		Model(&models.GroupSubGroup{}).
 		Where("sub_group_id = ?", subGroupID).
 		Count(&count).Error

@@ -1,8 +1,8 @@
 package services
 
 import (
-	"fmt"
 	"gpt-load/internal/models"
+	app_errors "gpt-load/internal/errors"
 
 	"github.com/sirupsen/logrus"
 )
@@ -31,7 +31,7 @@ func NewKeyImportService(taskService *TaskService, keyService *KeyService) *KeyI
 func (s *KeyImportService) StartImportTask(group *models.Group, keysText string) (*TaskStatus, error) {
 	keys := s.KeyService.ParseKeysFromText(keysText)
 	if len(keys) == 0 {
-		return nil, fmt.Errorf("no valid keys found in the input text")
+		return nil, app_errors.NewServiceError(app_errors.ErrNoValidKeysFound, "no valid keys found in the input text")
 	}
 
 	initialStatus, err := s.TaskService.StartTask(TaskTypeKeyImport, group.Name, len(keys))

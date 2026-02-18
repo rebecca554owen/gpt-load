@@ -137,6 +137,10 @@ func (s *RedisStore) SPopN(key string, count int64) ([]string, error) {
 	return s.client.SPopN(context.Background(), s.prefixKey(key), count).Result()
 }
 
+func (s *RedisStore) SMembers(key string) ([]string, error) {
+	return s.client.SMembers(context.Background(), s.prefixKey(key)).Result()
+}
+
 // --- Pipeliner implementation ---
 
 type redisPipeliner struct {

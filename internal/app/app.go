@@ -76,13 +76,13 @@ func NewApp(params AppParams) *App {
 
 // Start runs the application, it is a non-blocking call.
 func (a *App) Start() error {
-	// 初始化 i18n
+	// Initialize i18n
 	if err := i18n.Init(); err != nil {
 		return fmt.Errorf("failed to initialize i18n: %w", err)
 	}
 	logrus.Info("i18n initialized successfully.")
-	
-	// Master 节点执行初始化
+
+	// Master node initialization
 	if a.configManager.IsMaster() {
 		logrus.Info("Starting as Master Node.")
 
@@ -90,7 +90,7 @@ func (a *App) Start() error {
 			return fmt.Errorf("cache cleanup failed: %w", err)
 		}
 
-		// 数据库迁移
+		// Database migration
 		db.HandleLegacyIndexes(a.db)
 		if err := a.db.AutoMigrate(
 			&models.SystemSetting{},
@@ -102,13 +102,13 @@ func (a *App) Start() error {
 		); err != nil {
 			return fmt.Errorf("database auto-migration failed: %w", err)
 		}
-		// 数据修复
+		// Data migration
 		if err := db.MigrateDatabase(a.db); err != nil {
 			return fmt.Errorf("database data migration failed: %w", err)
 		}
 		logrus.Info("Database auto-migration completed.")
 
-		// 初始化系统设置
+		// Initialize system settings
 		if err := a.settingsManager.EnsureSettingsInitialized(a.configManager.GetAuthConfig()); err != nil {
 			return fmt.Errorf("failed to initialize system settings: %w", err)
 		}
@@ -116,13 +116,13 @@ func (a *App) Start() error {
 
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 
-		// 从数据库加载密钥到 Redis
-		if err := a.keyPoolProvider.LoadKeysFromDB(); err != nil {
+		// Load keys from database to Redis
+		if err := a.keyPoolProvider.InitializeFromDatabase(); err != nil {
 			return fmt.Errorf("failed to load keys into key pool: %w", err)
 		}
 		logrus.Debug("API keys loaded into Redis cache by master.")
 
-		// 仅 Master 节点启动的服务
+		// Services only started on Master node
 		a.requestLogService.Start()
 		a.logCleanupService.Start()
 		a.cronChecker.Start()
@@ -131,7 +131,7 @@ func (a *App) Start() error {
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 	}
 
-	// 显示配置并启动所有后台服务
+	// Display configuration and start all background services
 	a.configManager.DisplayServerConfig()
 
 	a.groupManager.Initialize()
@@ -167,7 +167,7 @@ func (a *App) Stop(ctx context.Context) {
 	serverConfig := a.configManager.GetEffectiveServerConfig()
 	totalTimeout := time.Duration(serverConfig.GracefulShutdownTimeout) * time.Second
 
-	// 动态计算 HTTP 关机超时时间，为后台服务固定预留 5 秒
+	// Dynamically calculate HTTP shutdown timeout, reserve 5 seconds for background services
 	httpShutdownTimeout := totalTimeout - 5*time.Second
 	httpShutdownCtx, cancelHttpShutdown := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancelHttpShutdown()
@@ -181,7 +181,7 @@ func (a *App) Stop(ctx context.Context) {
 	}
 	logrus.Info("HTTP server has been shut down.")
 
-	// 使用原始的总超时 context 继续关闭其他后台服务
+	// Use original total timeout context to continue shutting down other background services
 	stoppableServices := []func(context.Context){
 		a.groupManager.Stop,
 		a.settingsManager.Stop,

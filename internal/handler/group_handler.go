@@ -60,6 +60,7 @@ type GroupCreateRequest struct {
 	Config              map[string]any      `json:"config"`
 	HeaderRules         []models.HeaderRule `json:"header_rules"`
 	ProxyKeys           string              `json:"proxy_keys"`
+	ModelMappings       json.RawMessage     `json:"model_mappings"`
 }
 
 // CreateGroup handles the creation of a new group.
@@ -86,6 +87,7 @@ func (s *Server) CreateGroup(c *gin.Context) {
 		Config:              req.Config,
 		HeaderRules:         req.HeaderRules,
 		ProxyKeys:           req.ProxyKeys,
+		ModelMappings:       req.ModelMappings,
 	}
 
 	group, err := s.GroupService.CreateGroup(c.Request.Context(), params)
@@ -126,9 +128,11 @@ type GroupUpdateRequest struct {
 	ParamOverrides      map[string]any      `json:"param_overrides"`
 	ModelRedirectRules  map[string]string   `json:"model_redirect_rules"`
 	ModelRedirectStrict *bool               `json:"model_redirect_strict"`
+	ModelMappingStrict  *bool               `json:"model_mapping_strict"`
 	Config              map[string]any      `json:"config"`
 	HeaderRules         []models.HeaderRule `json:"header_rules"`
 	ProxyKeys           *string             `json:"proxy_keys,omitempty"`
+	ModelMappings       json.RawMessage     `json:"model_mappings"`
 }
 
 // UpdateGroup handles updating an existing group.
@@ -156,6 +160,7 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 		ParamOverrides:      req.ParamOverrides,
 		ModelRedirectRules:  req.ModelRedirectRules,
 		ModelRedirectStrict: req.ModelRedirectStrict,
+		ModelMappingStrict:  req.ModelMappingStrict,
 		Config:              req.Config,
 		ProxyKeys:           req.ProxyKeys,
 	}
@@ -175,6 +180,11 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 		params.HeaderRules = &rules
 	}
 
+	if req.ModelMappings != nil {
+		params.ModelMappings = req.ModelMappings
+		params.HasModelMappings = true
+	}
+
 	group, err := s.GroupService.UpdateGroup(c.Request.Context(), uint(id), params)
 	if s.handleGroupError(c, err) {
 		return
@@ -185,26 +195,28 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 
 // GroupResponse defines the structure for a group response, excluding sensitive or large fields.
 type GroupResponse struct {
-	ID                  uint                `json:"id"`
-	Name                string              `json:"name"`
-	Endpoint            string              `json:"endpoint"`
-	DisplayName         string              `json:"display_name"`
-	Description         string              `json:"description"`
-	GroupType           string              `json:"group_type"`
-	Upstreams           datatypes.JSON      `json:"upstreams"`
-	ChannelType         string              `json:"channel_type"`
-	Sort                int                 `json:"sort"`
-	TestModel           string              `json:"test_model"`
-	ValidationEndpoint  string              `json:"validation_endpoint"`
-	ParamOverrides      datatypes.JSONMap   `json:"param_overrides"`
-	ModelRedirectRules  datatypes.JSONMap   `json:"model_redirect_rules"`
-	ModelRedirectStrict bool                `json:"model_redirect_strict"`
-	Config              datatypes.JSONMap   `json:"config"`
-	HeaderRules         []models.HeaderRule `json:"header_rules"`
-	ProxyKeys           string              `json:"proxy_keys"`
-	LastValidatedAt     *time.Time          `json:"last_validated_at"`
-	CreatedAt           time.Time           `json:"created_at"`
-	UpdatedAt           time.Time           `json:"updated_at"`
+	ID                  uint                      `json:"id"`
+	Name                string                    `json:"name"`
+	Endpoint            string                    `json:"endpoint"`
+	DisplayName         string                    `json:"display_name"`
+	Description         string                    `json:"description"`
+	GroupType           string                    `json:"group_type"`
+	Upstreams           datatypes.JSON            `json:"upstreams"`
+	ChannelType         string                    `json:"channel_type"`
+	Sort                int                       `json:"sort"`
+	TestModel           string                    `json:"test_model"`
+	ValidationEndpoint  string                    `json:"validation_endpoint"`
+	ParamOverrides      datatypes.JSONMap         `json:"param_overrides"`
+	ModelRedirectRules  datatypes.JSONMap         `json:"model_redirect_rules"`
+	ModelRedirectStrict bool                      `json:"model_redirect_strict"`
+	ModelMappingStrict  bool                      `json:"model_mapping_strict"`
+	Config              datatypes.JSONMap         `json:"config"`
+	HeaderRules         []models.HeaderRule       `json:"header_rules"`
+	ProxyKeys           string                    `json:"proxy_keys"`
+	ModelMappingList    []models.ModelMapping     `json:"model_mappings_list"`
+	LastValidatedAt     *time.Time                `json:"last_validated_at"`
+	CreatedAt           time.Time                 `json:"created_at"`
+	UpdatedAt           time.Time                 `json:"updated_at"`
 }
 
 // newGroupResponse creates a new GroupResponse from a models.Group.
@@ -243,9 +255,11 @@ func (s *Server) newGroupResponse(group *models.Group) *GroupResponse {
 		ParamOverrides:      group.ParamOverrides,
 		ModelRedirectRules:  group.ModelRedirectRules,
 		ModelRedirectStrict: group.ModelRedirectStrict,
+		ModelMappingStrict:  group.ModelMappingStrict,
 		Config:              group.Config,
 		HeaderRules:         headerRules,
 		ProxyKeys:           group.ProxyKeys,
+		ModelMappingList:    group.ModelMappingList,
 		LastValidatedAt:     group.LastValidatedAt,
 		CreatedAt:           group.CreatedAt,
 		UpdatedAt:           group.UpdatedAt,

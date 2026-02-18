@@ -48,10 +48,10 @@ func (gm *GroupManager) Initialize() error {
 			return nil, fmt.Errorf("failed to load groups from db: %w", err)
 		}
 
-		// Load all sub-group relationships for aggregate groups (only valid ones with weight > 0)
+		// Load all sub-group relationships for aggregate groups (only active ones with weight > 0)
 		var allSubGroups []models.GroupSubGroup
 		if err := gm.db.Where("weight > 0").Find(&allSubGroups).Error; err != nil {
-			return nil, fmt.Errorf("failed to load valid sub groups: %w", err)
+			return nil, fmt.Errorf("failed to load sub groups: %w", err)
 		}
 
 		// Group sub-groups by aggregate group ID
@@ -117,14 +117,45 @@ func (gm *GroupManager) Initialize() error {
 				}
 			}
 
+			// Parse model mappings for aggregate groups
+			if len(group.ModelMappings) > 0 {
+				if err := json.Unmarshal(group.ModelMappings, &g.ModelMappingList); err != nil {
+					logrus.WithError(err).WithField("group_name", g.Name).Warn("Failed to parse model mappings for group")
+					g.ModelMappingList = nil
+				}
+			} else {
+				g.ModelMappingList = nil
+			}
+
+			// Fill in sub-group names for model mappings
+			if len(g.ModelMappingList) > 0 && len(g.SubGroups) > 0 {
+				subGroupNameMap := make(map[uint]string, len(g.SubGroups))
+				for _, sg := range g.SubGroups {
+					name := sg.SubGroupName
+					if name == "" {
+						if subGroup, exists := groupByID[sg.SubGroupID]; exists {
+							name = subGroup.Name
+						}
+					}
+					subGroupNameMap[sg.SubGroupID] = name
+				}
+
+				for mi := range g.ModelMappingList {
+					for ti := range g.ModelMappingList[mi].Targets {
+						target := &g.ModelMappingList[mi].Targets[ti]
+						target.SubGroupName = subGroupNameMap[target.SubGroupID]
+					}
+				}
+			}
+
 			groupMap[g.Name] = &g
 			logrus.WithFields(logrus.Fields{
-				"group_name":               g.Name,
-				"effective_config":         g.EffectiveConfig,
-				"header_rules_count":       len(g.HeaderRuleList),
+				"group_name":                 g.Name,
+				"effective_config":           g.EffectiveConfig,
+				"header_rules_count":         len(g.HeaderRuleList),
 				"model_redirect_rules_count": len(g.ModelRedirectMap),
-				"model_redirect_strict":    g.ModelRedirectStrict,
-				"sub_group_count":          len(g.SubGroups),
+				"model_redirect_strict":      g.ModelRedirectStrict,
+				"sub_group_count":            len(g.SubGroups),
 			}).Debug("Loaded group with effective config")
 		}
 

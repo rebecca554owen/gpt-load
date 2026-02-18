@@ -12,7 +12,7 @@ type CommonHandler struct{}
 
 // NewCommonHandler creates a new CommonHandler.
 func NewCommonHandler() *CommonHandler {
-	return &CommonHandler{}
+	return new(CommonHandler)
 }
 
 // GetChannelTypes returns a list of available channel types.

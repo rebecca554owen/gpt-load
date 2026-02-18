@@ -1,12 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"fmt"
 	app_errors "gpt-load/internal/errors"
+	"gpt-load/internal/keypool"
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
 	"io"
-	"log"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -18,22 +19,36 @@ import (
 	"gorm.io/gorm"
 )
 
+// handleKeyServiceError handles common key service errors with consistent response.
+func handleKeyServiceError(c *gin.Context, err error) {
+	if errors.Is(err, app_errors.ErrBatchSizeExceedsLimit) || errors.Is(err, app_errors.ErrNoValidKeysFound) {
+		response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
+		return
+	}
+	response.Error(c, app_errors.ParseDBError(err))
+}
+
+// parseUintParam parses a uint from a string parameter.
+// Returns the parsed uint and true, or 0 and false if parsing fails (error is already sent to client).
+func parseUintParam(c *gin.Context, value string, i18nKey string) (uint, bool) {
+	if value == "" {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, i18nKey)
+		return 0, false
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, i18nKey)
+		return 0, false
+	}
+
+	return uint(parsed), true
+}
+
 // validateGroupIDFromQuery validates and parses group ID from a query parameter.
 // Returns 0 and false if validation fails (error is already sent to client)
 func validateGroupIDFromQuery(c *gin.Context) (uint, bool) {
-	groupIDStr := c.Query("group_id")
-	if groupIDStr == "" {
-		response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.group_id_required")
-		return 0, false
-	}
-
-	groupID, err := strconv.Atoi(groupIDStr)
-	if err != nil || groupID <= 0 {
-		response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.invalid_group_id_format")
-		return 0, false
-	}
-
-	return uint(groupID), true
+	return parseUintParam(c, c.Query("group_id"), "validation.group_id_required")
 }
 
 // validateKeysText validates the keys text input
@@ -65,6 +80,7 @@ func (s *Server) findGroupByID(c *gin.Context, groupID uint) (*models.Group, boo
 type KeyTextRequest struct {
 	GroupID  uint   `json:"group_id" binding:"required"`
 	KeysText string `json:"keys_text" binding:"required"`
+	Model    string `json:"model"` // Optional model override for testing
 }
 
 // GroupIDRequest defines a generic payload for operations requiring only a group ID.
@@ -96,13 +112,7 @@ func (s *Server) AddMultipleKeys(c *gin.Context) {
 
 	result, err := s.KeyService.AddMultipleKeys(req.GroupID, req.KeysText)
 	if err != nil {
-		if strings.Contains(err.Error(), "batch size exceeds the limit") {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else if err.Error() == "no valid keys found in the input text" {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else {
-			response.Error(c, app_errors.ParseDBError(err))
-		}
+		handleKeyServiceError(c, err)
 		return
 	}
 
@@ -118,19 +128,11 @@ func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 	contentType := c.ContentType()
 
 	if strings.Contains(contentType, "multipart/form-data") {
-		// Handle file upload
-		groupIDStr := c.PostForm("group_id")
-		if groupIDStr == "" {
-			response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.group_id_required")
+		parsedGroupID, ok := parseUintParam(c, c.PostForm("group_id"), "validation.group_id_required")
+		if !ok {
 			return
 		}
-
-		groupIDInt, err := strconv.Atoi(groupIDStr)
-		if err != nil || groupIDInt <= 0 {
-			response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.invalid_group_id_format")
-			return
-		}
-		groupID = uint(groupIDInt)
+		groupID = parsedGroupID
 
 		// Get uploaded file
 		file, err := c.FormFile("file")
@@ -255,13 +257,7 @@ func (s *Server) DeleteMultipleKeys(c *gin.Context) {
 
 	result, err := s.KeyService.DeleteMultipleKeys(req.GroupID, req.KeysText)
 	if err != nil {
-		if strings.Contains(err.Error(), "batch size exceeds the limit") {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else if err.Error() == "no valid keys found in the input text" {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else {
-			response.Error(c, app_errors.ParseDBError(err))
-		}
+		handleKeyServiceError(c, err)
 		return
 	}
 
@@ -312,13 +308,7 @@ func (s *Server) RestoreMultipleKeys(c *gin.Context) {
 
 	result, err := s.KeyService.RestoreMultipleKeys(req.GroupID, req.KeysText)
 	if err != nil {
-		if strings.Contains(err.Error(), "batch size exceeds the limit") {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else if err.Error() == "no valid keys found in the input text" {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else {
-			response.Error(c, app_errors.ParseDBError(err))
-		}
+		handleKeyServiceError(c, err)
 		return
 	}
 
@@ -349,21 +339,69 @@ func (s *Server) TestMultipleKeys(c *gin.Context) {
 	}
 
 	start := time.Now()
-	results, err := s.KeyService.TestMultipleKeys(group, req.KeysText)
+	results, err := s.KeyService.TestMultipleKeys(group, req.KeysText, req.Model)
 	duration := time.Since(start).Milliseconds()
 	if err != nil {
-		if strings.Contains(err.Error(), "batch size exceeds the limit") {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else if err.Error() == "no valid keys found in the input text" {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
-		} else {
-			response.Error(c, app_errors.ParseDBError(err))
-		}
+		handleKeyServiceError(c, err)
 		return
 	}
 
 	response.Success(c, gin.H{
 		"results":        results,
+		"total_duration": duration,
+	})
+}
+
+// TestNextKeyRequest defines the payload for testing the next key using round-robin.
+type TestNextKeyRequest struct {
+	GroupID uint   `json:"group_id" binding:"required"`
+	Model   string `json:"model"` // Optional model override for testing
+}
+
+// TestNextKey handles testing the next key from the pool using round-robin selection.
+func (s *Server) TestNextKey(c *gin.Context) {
+	var req TestNextKeyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, app_errors.NewAPIError(app_errors.ErrInvalidJSON, err.Error()))
+		return
+	}
+
+	groupDB, ok := s.findGroupByID(c, req.GroupID)
+	if !ok {
+		return
+	}
+
+	group, err := s.GroupManager.GetGroupByName(groupDB.Name)
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrResourceNotFound, "validation.group_not_found")
+		return
+	}
+
+	start := time.Now()
+
+	// Use round-robin mechanism to select next key
+	apiKey, err := s.KeyService.KeyProvider.SelectKey(group.ID)
+	if err != nil {
+		response.Error(c, app_errors.ErrNoActiveKeys)
+		return
+	}
+
+	// Execute validation
+	isValid, validationErr := s.KeyService.KeyValidator.ValidateSingleKey(apiKey, group, req.Model)
+
+	duration := time.Since(start).Milliseconds()
+
+	result := &keypool.KeyTestResult{
+		KeyValue: apiKey.KeyValue,
+		IsValid:  isValid,
+		Error:    "",
+	}
+	if validationErr != nil {
+		result.Error = validationErr.Error()
+	}
+
+	response.Success(c, gin.H{
+		"result":         result,
 		"total_duration": duration,
 	})
 }
@@ -494,7 +532,7 @@ func (s *Server) ExportKeys(c *gin.Context) {
 	c.Header("Content-Type", "text/plain; charset=utf-8")
 
 	if err := s.KeyService.StreamKeysToWriter(groupID, statusFilter, c.Writer); err != nil {
-		log.Printf("Failed to stream keys: %v", err)
+		logrus.WithError(err).Error("Failed to stream keys")
 	}
 }
 
@@ -505,10 +543,8 @@ type UpdateKeyNotesRequest struct {
 
 // UpdateKeyNotes handles updating the notes of a specific API key.
 func (s *Server) UpdateKeyNotes(c *gin.Context) {
-	keyIDStr := c.Param("id")
-	keyID, err := strconv.Atoi(keyIDStr)
-	if err != nil || keyID <= 0 {
-		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, "invalid key ID format"))
+	keyID, ok := parseUintParam(c, c.Param("id"), "validation.invalid_id_format")
+	if !ok {
 		return
 	}
 

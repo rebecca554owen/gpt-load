@@ -22,7 +22,7 @@ type Service interface {
 // NewService creates encryption service
 func NewService(encryptionKey string) (Service, error) {
 	if encryptionKey == "" {
-		return &noopService{}, nil
+		return new(noopService), nil
 	}
 
 	// Derive AES-256 key from user input and validate strength

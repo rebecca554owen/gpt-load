@@ -105,7 +105,7 @@ func (s *LogService) StreamLogKeysToCSV(c *gin.Context, writer io.Writer) error 
 
 	baseQuery := s.DB.Model(&models.RequestLog{}).Scopes(s.logFiltersScope(c)).Where("key_hash IS NOT NULL AND key_hash != ''")
 
-	// 使用窗口函数获取每个key_hash的最新记录（避免同一密钥因多次加密产生重复）
+	// Use window function to get latest record for each key_hash (avoid duplicates from multiple encryptions)
 	err := s.DB.Raw(`
 		SELECT
 			key_value,
@@ -128,9 +128,9 @@ func (s *LogService) StreamLogKeysToCSV(c *gin.Context, writer io.Writer) error 
 		return fmt.Errorf("failed to fetch log keys: %w", err)
 	}
 
-	// 解密并写入CSV数据
+	// Decrypt and write CSV data
 	for _, record := range results {
-		// 解密密钥用于CSV导出
+		// Decrypt key for CSV export
 		decryptedKey := record.KeyValue
 		if record.KeyValue != "" {
 			if decrypted, err := s.EncryptionSvc.Decrypt(record.KeyValue); err != nil {

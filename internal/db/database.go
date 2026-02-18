@@ -1,11 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	"gpt-load/internal/types"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,12 +30,12 @@ func NewDB(configManager types.ConfigManager) (*gorm.DB, error) {
 	var newLogger logger.Interface
 	if configManager.GetLogConfig().Level == "debug" {
 		newLogger = logger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
 			logger.Config{
-				SlowThreshold:             time.Second, // Slow SQL threshold
-				LogLevel:                  logger.Info, // Log level
-				IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
-				Colorful:                  true,        // Disable color
+				SlowThreshold:             GetSlowThreshold(),
+				LogLevel:                  logger.Info,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  true,
 			},
 		)
 	}
@@ -73,10 +75,42 @@ func NewDB(configManager types.ConfigManager) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
-	// Set connection pool parameters for all drivers
-	sqlDB.SetMaxIdleConns(50)
-	sqlDB.SetMaxOpenConns(500)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+
+	// Configure connection pool from environment variables
+	maxIdleConns := getEnvInt("DB_MAX_IDLE_CONNS", 50)
+	maxOpenConns := getEnvInt("DB_MAX_OPEN_CONNS", 500)
+	connMaxLifetime := time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME", 3600)) * time.Second
+
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetConnMaxLifetime(connMaxLifetime)
+
+	log.Printf("Database connection pool configured: MaxIdleConns=%d, MaxOpenConns=%d, ConnMaxLifetime=%v",
+		maxIdleConns, maxOpenConns, connMaxLifetime)
 
 	return DB, nil
+}
+
+// getEnvInt gets an integer value from environment variable with a default
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return defaultValue
+}
+
+// GetSlowThreshold returns the slow SQL threshold from environment variable
+func GetSlowThreshold() time.Duration {
+	threshold := getEnvInt("DB_SLOW_THRESHOLD", 1000)
+	return time.Duration(threshold) * time.Millisecond
+}
+
+// GetSQLDB returns the underlying sql.DB for advanced operations
+func GetSQLDB() (*sql.DB, error) {
+	if DB == nil {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return DB.DB()
 }
