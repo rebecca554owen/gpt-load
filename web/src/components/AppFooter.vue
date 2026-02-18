@@ -28,25 +28,24 @@ const versionInfo = ref<VersionInfo>({
 
 const isChecking = ref(false);
 
-// 版本状态配置
-const statusConfig = {
+const statusConfig: Record<string, { color: string; icon: typeof TimeOutline; text: string }> = {
   checking: {
-    color: "#0066cc",
+    color: "var(--version-checking)",
     icon: TimeOutline,
     text: t("footer.checking"),
   },
   latest: {
-    color: "#18a058",
+    color: "var(--version-latest)",
     icon: CheckmarkCircleOutline,
     text: t("footer.latestVersion"),
   },
   "update-available": {
-    color: "#f0a020",
+    color: "var(--version-update)",
     icon: WarningOutline,
     text: t("footer.updateAvailable"),
   },
   error: {
-    color: "#d03050",
+    color: "var(--version-error)",
     icon: WarningOutline,
     text: t("footer.checkFailed"),
   },
@@ -89,7 +88,7 @@ onMounted(() => {
 <template>
   <footer class="app-footer">
     <div class="footer-container">
-      <!-- 主要信息区 -->
+      <!-- Main info section -->
       <div class="footer-main">
         <span class="project-info">
           <a href="https://github.com/tbphp/gpt-load" target="_blank" rel="noopener noreferrer">
@@ -99,7 +98,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- 版本信息 -->
+        <!-- Version info -->
         <div
           class="version-container"
           :class="{
@@ -130,7 +129,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- 链接区 -->
+        <!-- Links section -->
         <div class="links-container">
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>
@@ -210,7 +209,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- 版权信息 -->
+        <!-- Copyright info -->
         <div class="copyright-container">
           <span class="copyright-text">
             © 2025 by
@@ -268,7 +267,7 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* 版本信息区域 */
+/* Version info area */
 .version-container {
   display: flex;
   align-items: center;
@@ -295,7 +294,8 @@ onMounted(() => {
 }
 
 .version-clickable:hover {
-  background: rgba(240, 160, 32, 0.1);
+  background: var(--version-update);
+  opacity: 0.1;
   transform: translateY(-1px);
 }
 
@@ -303,7 +303,7 @@ onMounted(() => {
   opacity: 0.7;
 }
 
-/* 链接区域 */
+/* Links area */
 .links-container {
   display: flex;
   align-items: center;
@@ -324,8 +324,8 @@ onMounted(() => {
 }
 
 .footer-link:hover {
-  color: var(--primary-color, #18a058);
-  background: rgba(24, 160, 88, 0.1);
+  color: var(--primary-color);
+  background: var(--hover-bg);
   transform: translateY(-1px);
 }
 
@@ -334,7 +334,7 @@ onMounted(() => {
   align-items: center;
 }
 
-/* 版权信息区域 */
+/* Copyright info area */
 .copyright-container {
   display: flex;
   align-items: center;
@@ -361,7 +361,7 @@ onMounted(() => {
   text-decoration: underline !important;
 }
 
-/* 响应式设计 */
+/* Responsive design */
 @media (max-width: 768px) {
   .app-footer {
     padding: 10px 16px;

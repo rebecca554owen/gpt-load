@@ -50,7 +50,7 @@ export default [
       "vue/max-attributes-per-line": "off",
       "vue/singleline-html-element-content-newline": "off",
       "vue/multiline-html-element-content-newline": "off",
-      "vue/html-indent": ["error", 2],
+      "vue/html-indent": "off", // Let Prettier handle Vue template indentation
       "vue/script-indent": [
         "error",
         2,

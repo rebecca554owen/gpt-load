@@ -33,13 +33,13 @@ interface Emits {
   (e: "switchToGroup", groupId: number): void;
 }
 
-// 配置项类型
+// Config item type
 interface ConfigItem {
   key: string;
   value: number | string | boolean;
 }
 
-// Header规则类型
+// Header rule type
 interface HeaderRuleItem {
   key: string;
   value: string;
@@ -61,19 +61,20 @@ const modelRedirectTip = `{
   "gemini-2.5-flash": "gemini-2.5-flash-preview-09-2025"
 }`;
 
-// 表单数据接口
+// Form data interface
 interface GroupFormData {
   name: string;
   display_name: string;
   description: string;
   upstreams: UpstreamInfo[];
-  channel_type: "anthropic" | "gemini" | "openai" | "openai-response";
+  channel_type: "anthropic" | "gemini" | "openai" | "openai-responses";
   sort: number;
   test_model: string;
   validation_endpoint: string;
   param_overrides: string;
   model_redirect_rules: string;
   model_redirect_strict: boolean;
+  model_mapping_strict: boolean;
   config: Record<string, number | string | boolean>;
   configItems: ConfigItem[];
   header_rules: HeaderRuleItem[];
@@ -81,7 +82,7 @@ interface GroupFormData {
   group_type?: string;
 }
 
-// 表单数据
+// Form data
 const formData = reactive<GroupFormData>({
   name: "",
   display_name: "",
@@ -99,6 +100,7 @@ const formData = reactive<GroupFormData>({
   param_overrides: "",
   model_redirect_rules: "",
   model_redirect_strict: false,
+  model_mapping_strict: false,
   config: {},
   configItems: [] as ConfigItem[],
   header_rules: [] as HeaderRuleItem[],
@@ -111,22 +113,22 @@ const configOptions = ref<GroupConfigOption[]>([]);
 const channelTypesFetched = ref(false);
 const configOptionsFetched = ref(false);
 
-// 跟踪用户是否已手动修改过字段（仅在新增模式下使用）
+// Track if user has manually modified fields (only used in create mode)
 const userModifiedFields = ref({
   test_model: false,
   upstream: false,
 });
 
-// 根据渠道类型动态生成占位符提示
+// Generate placeholder hints dynamically based on channel type
 const testModelPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
-    case "openai-response":
-      return "gpt-4.1-nano";
+    case "openai-responses":
+      return "gpt-5-mini";
     case "gemini":
-      return "gemini-2.0-flash-lite";
+      return "gemini-2.5-flash-lite";
     case "anthropic":
-      return "claude-3-haiku-20240307";
+      return "claude-haiku-4-5";
     default:
       return t("keys.enterModelName");
   }
@@ -135,7 +137,7 @@ const testModelPlaceholder = computed(() => {
 const upstreamPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
-    case "openai-response":
+    case "openai-responses":
       return "https://api.openai.com";
     case "gemini":
       return "https://generativelanguage.googleapis.com";
@@ -150,18 +152,18 @@ const validationEndpointPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
       return "/v1/chat/completions";
-    case "openai-response":
+    case "openai-responses":
       return "/v1/responses";
     case "anthropic":
       return "/v1/messages";
     case "gemini":
-      return ""; // Gemini 不显示此字段
+      return ""; // Gemini doesn't show this field
     default:
       return t("keys.enterValidationPath");
   }
 });
 
-// 表单验证规则
+// Form validation rules
 const rules: FormRules = {
   name: [
     {
@@ -199,7 +201,7 @@ const rules: FormRules = {
   ],
 };
 
-// 监听弹窗显示状态
+// Watch modal display state
 watch(
   () => props.show,
   show => {
@@ -218,13 +220,13 @@ watch(
   }
 );
 
-// 监听渠道类型变化，在新增模式下智能更新默认值
+// Watch channel type changes, smart update default values in create mode
 watch(
   () => formData.channel_type,
   (_newChannelType, oldChannelType) => {
     if (!props.group && oldChannelType) {
-      // 仅在新增模式且不是初始设置时处理
-      // 检查测试模型是否应该更新（为空或是旧渠道类型的默认值）
+      // Only process in create mode and not during initial setup
+      // Check if test model should update (empty or old channel type's default)
       if (
         !userModifiedFields.value.test_model ||
         formData.test_model === getOldDefaultTestModel(oldChannelType)
@@ -233,7 +235,7 @@ watch(
         userModifiedFields.value.test_model = false;
       }
 
-      // 检查第一个上游地址是否应该更新
+      // Check if first upstream address should update
       if (
         formData.upstreams.length > 0 &&
         (!userModifiedFields.value.upstream ||
@@ -246,16 +248,16 @@ watch(
   }
 );
 
-// 获取旧渠道类型的默认值（用于比较）
+// Get default value for old channel type (for comparison)
 function getOldDefaultTestModel(channelType: string): string {
   switch (channelType) {
     case "openai":
-    case "openai-response":
-      return "gpt-4.1-nano";
+    case "openai-responses":
+      return "gpt-5-mini";
     case "gemini":
-      return "gemini-2.0-flash-lite";
+      return "gemini-2.5-flash-lite";
     case "anthropic":
-      return "claude-3-haiku-20240307";
+      return "claude-haiku-4-5";
     default:
       return "";
   }
@@ -264,7 +266,7 @@ function getOldDefaultTestModel(channelType: string): string {
 function getOldDefaultUpstream(channelType: string): string {
   switch (channelType) {
     case "openai":
-    case "openai-response":
+    case "openai-responses":
       return "https://api.openai.com";
     case "gemini":
       return "https://generativelanguage.googleapis.com";
@@ -275,12 +277,12 @@ function getOldDefaultUpstream(channelType: string): string {
   }
 }
 
-// 重置表单
+// Reset form
 function resetForm() {
   const isCreateMode = !props.group;
   const defaultChannelType = "openai";
 
-  // 先设置渠道类型，这样 computed 属性能正确计算默认值
+  // Set channel type first so computed properties calculate default values correctly
   formData.channel_type = defaultChannelType;
 
   Object.assign(formData, {
@@ -307,7 +309,7 @@ function resetForm() {
     group_type: "standard",
   });
 
-  // 重置用户修改状态追踪
+  // Reset user modification status tracking
   if (isCreateMode) {
     userModifiedFields.value = {
       test_model: false,
@@ -316,7 +318,7 @@ function resetForm() {
   }
 }
 
-// 加载分组数据（编辑模式）
+// Load group data (edit mode)
 function loadGroupData() {
   if (!props.group) {
     return;
@@ -342,6 +344,7 @@ function loadGroupData() {
     param_overrides: JSON.stringify(props.group.param_overrides || {}, null, 2),
     model_redirect_rules: JSON.stringify(props.group.model_redirect_rules || {}, null, 2),
     model_redirect_strict: props.group.model_redirect_strict || false,
+    model_mapping_strict: props.group.model_mapping_strict || false,
     config: {},
     configItems,
     header_rules: (props.group.header_rules || []).map((rule: HeaderRuleItem) => ({
@@ -364,7 +367,7 @@ async function fetchChannelTypes() {
   channelTypesFetched.value = true;
 }
 
-// 添加上游地址
+// Add upstream address
 function addUpstream() {
   formData.upstreams.push({
     url: "",
@@ -372,7 +375,7 @@ function addUpstream() {
   });
 }
 
-// 删除上游地址
+// Remove upstream address
 function removeUpstream(index: number) {
   if (formData.upstreams.length > 1) {
     formData.upstreams.splice(index, 1);
@@ -387,7 +390,7 @@ async function fetchGroupConfigOptions() {
   configOptionsFetched.value = true;
 }
 
-// 添加配置项
+// Add config item
 function addConfigItem() {
   formData.configItems.push({
     key: "",
@@ -395,12 +398,12 @@ function addConfigItem() {
   });
 }
 
-// 删除配置项
+// Remove config item
 function removeConfigItem(index: number) {
   formData.configItems.splice(index, 1);
 }
 
-// 添加Header规则
+// Add header rule
 function addHeaderRule() {
   formData.header_rules.push({
     key: "",
@@ -409,12 +412,12 @@ function addHeaderRule() {
   });
 }
 
-// 删除Header规则
+// Remove header rule
 function removeHeaderRule(index: number) {
   formData.header_rules.splice(index, 1);
 }
 
-// 规范化Header Key到Canonical格式（模拟HTTP标准）
+// Normalize header key to canonical format (simulate HTTP standard)
 function canonicalHeaderKey(key: string): string {
   if (!key) {
     return key;
@@ -425,7 +428,7 @@ function canonicalHeaderKey(key: string): string {
     .join("-");
 }
 
-// 验证Header Key唯一性（使用Canonical格式对比）
+// Validate header key uniqueness (use canonical format comparison)
 function validateHeaderKeyUniqueness(
   rules: HeaderRuleItem[],
   currentIndex: number,
@@ -441,7 +444,7 @@ function validateHeaderKeyUniqueness(
   );
 }
 
-// 当配置项的key改变时，设置默认值
+// Set default value when config item's key changes
 function handleConfigKeyChange(index: number, key: string) {
   const option = configOptions.value.find(opt => opt.key === key);
   if (option) {
@@ -453,12 +456,12 @@ const getConfigOption = (key: string) => {
   return configOptions.value.find(opt => opt.key === key);
 };
 
-// 关闭弹窗
+// Close modal
 function handleClose() {
   emit("update:show", false);
 }
 
-// 提交表单
+// Submit form
 async function handleSubmit() {
   if (loading.value) {
     return;
@@ -469,7 +472,7 @@ async function handleSubmit() {
 
     loading.value = true;
 
-    // 验证 JSON 格式
+    // Validate JSON format
     let paramOverrides = {};
     if (formData.param_overrides) {
       try {
@@ -480,7 +483,7 @@ async function handleSubmit() {
       }
     }
 
-    // 验证模型重定向规则 JSON 格式
+    // Validate model redirect rules JSON format
     let modelRedirectRules = {};
     if (formData.model_redirect_rules) {
       try {
@@ -503,7 +506,7 @@ async function handleSubmit() {
       }
     }
 
-    // 将configItems转换为config对象
+    // Convert configItems to config object
     const config: Record<string, number | string | boolean> = {};
     formData.configItems.forEach((item: ConfigItem) => {
       if (item.key && item.key.trim()) {
@@ -517,7 +520,7 @@ async function handleSubmit() {
       }
     });
 
-    // 构建提交数据
+    // Build submit data
     const submitData = {
       name: formData.name,
       display_name: formData.display_name,
@@ -530,6 +533,7 @@ async function handleSubmit() {
       param_overrides: paramOverrides,
       model_redirect_rules: modelRedirectRules,
       model_redirect_strict: formData.model_redirect_strict,
+      model_mapping_strict: formData.model_mapping_strict,
       config,
       header_rules: formData.header_rules
         .filter((rule: HeaderRuleItem) => rule.key.trim())
@@ -543,10 +547,10 @@ async function handleSubmit() {
 
     let res: Group;
     if (props.group?.id) {
-      // 编辑模式
+      // Edit mode
       res = await keysApi.updateGroup(props.group.id, submitData);
     } else {
-      // 新建模式
+      // Create mode
       res = await keysApi.createGroup(submitData);
     }
 
@@ -563,9 +567,15 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <n-modal :show="show" @update:show="handleClose" class="group-form-modal">
+  <n-modal
+    :show="show"
+    @update:show="handleClose"
+    class="group-form-modal modal-mask"
+    :mask-closable="true"
+    :closable="false"
+  >
     <n-card
-      class="group-form-card"
+      class="group-form-card modal-card modal-wide"
       :title="group ? t('keys.editGroup') : t('keys.createGroup')"
       :bordered="false"
       size="huge"
@@ -573,7 +583,7 @@ async function handleSubmit() {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleClose">
+        <n-button quaternary circle @click="handleClose" class="modal-close">
           <template #icon>
             <n-icon :component="Close" />
           </template>
@@ -589,7 +599,7 @@ async function handleSubmit() {
         require-mark-placement="right-hanging"
         class="group-form"
       >
-        <!-- 基础信息 -->
+        <!-- Basic info -->
         <div class="form-section">
           <h4 class="section-title">{{ t("keys.basicInfo") }}</h4>
 
@@ -707,8 +717,6 @@ async function handleSubmit() {
                       <br />
                       • OpenAI: /v1/chat/completions
                       <br />
-                      • OpenAI Response: /v1/responses
-                      <br />
                       • Anthropic: /v1/messages
                       <br />
                       {{ t("keys.testPathTooltip2") }}
@@ -823,8 +831,7 @@ async function handleSubmit() {
                 <n-button
                   v-if="formData.upstreams.length > 1"
                   @click="removeUpstream(index)"
-                  type="error"
-                  quaternary
+                  class="btn-delete"
                   circle
                   size="small"
                 >
@@ -837,7 +844,7 @@ async function handleSubmit() {
           </n-form-item>
 
           <n-form-item>
-            <n-button @click="addUpstream" dashed style="width: 100%">
+            <n-button @click="addUpstream" dashed class="btn-dashed" style="width: 100%">
               <template #icon>
                 <n-icon :component="Add" />
               </template>
@@ -934,8 +941,7 @@ async function handleSubmit() {
                       <div class="config-actions">
                         <n-button
                           @click="removeConfigItem(index)"
-                          type="error"
-                          quaternary
+                          class="btn-delete"
                           circle
                           size="small"
                         >
@@ -952,6 +958,7 @@ async function handleSubmit() {
                   <n-button
                     @click="addConfigItem"
                     dashed
+                    class="btn-dashed"
                     style="width: 100%"
                     :disabled="formData.configItems.length >= configOptions.length"
                   >
@@ -1059,8 +1066,7 @@ async function handleSubmit() {
                       <div class="header-actions">
                         <n-button
                           @click="removeHeaderRule(index)"
-                          type="error"
-                          quaternary
+                          class="btn-delete"
                           circle
                           size="small"
                         >
@@ -1074,7 +1080,7 @@ async function handleSubmit() {
                 </div>
 
                 <div style="margin-top: 12px; padding-left: 120px">
-                  <n-button @click="addHeaderRule" dashed style="width: 100%">
+                  <n-button @click="addHeaderRule" dashed class="btn-dashed" style="width: 100%">
                     <template #icon>
                       <n-icon :component="Add" />
                     </template>
@@ -1099,7 +1105,7 @@ async function handleSubmit() {
                   </template>
                   <div style="display: flex; align-items: center; gap: 12px">
                     <n-switch v-model:value="formData.model_redirect_strict" />
-                    <span style="font-size: 14px; color: #666">
+                    <span style="font-size: 14px; color: var(--text-hint)">
                       {{
                         formData.model_redirect_strict
                           ? t("keys.modelRedirectStrictMode")
@@ -1108,11 +1114,14 @@ async function handleSubmit() {
                     </span>
                   </div>
                   <template #feedback>
-                    <div style="font-size: 12px; color: #999; margin: 4px 0">
-                      <div v-if="formData.model_redirect_strict" style="color: #f5a623">
+                    <div style="font-size: 12px; color: var(--text-placeholder); margin: 4px 0">
+                      <div
+                        v-if="formData.model_redirect_strict"
+                        style="color: var(--warning-color)"
+                      >
                         ⚠️ {{ t("keys.modelRedirectStrictWarning") }}
                       </div>
-                      <div v-else style="color: #52c41a">
+                      <div v-else style="color: var(--success-color)">
                         ✅ {{ t("keys.modelRedirectLooseInfo") }}
                       </div>
                     </div>
@@ -1138,8 +1147,45 @@ async function handleSubmit() {
                     :rows="4"
                   />
                   <template #feedback>
-                    <div style="font-size: 14px; color: #999">
+                    <div style="font-size: 14px; color: var(--text-placeholder)">
                       {{ t("keys.modelRedirectRulesDescription") }}
+                    </div>
+                  </template>
+                </n-form-item>
+              </div>
+
+              <!-- 模型映射严格模式配置 (仅聚合组) -->
+              <div v-if="formData.group_type === 'aggregate'" class="config-section">
+                <n-form-item path="model_mapping_strict">
+                  <template #label>
+                    <div class="form-label-with-tooltip">
+                      {{ t("groups.modelMappingStrict") }}
+                      <n-tooltip trigger="hover" placement="top">
+                        <template #trigger>
+                          <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
+                        </template>
+                        {{ t("groups.modelMappingStrictTip") }}
+                      </n-tooltip>
+                    </div>
+                  </template>
+                  <div style="display: flex; align-items: center; gap: 12px">
+                    <n-switch v-model:value="formData.model_mapping_strict" />
+                    <span style="font-size: 14px; color: var(--text-hint)">
+                      {{
+                        formData.model_mapping_strict
+                          ? t("groups.modelMappingStrictEnabled")
+                          : t("groups.modelMappingStrictDisabled")
+                      }}
+                    </span>
+                  </div>
+                  <template #feedback>
+                    <div style="font-size: 12px; color: var(--text-placeholder); margin: 4px 0">
+                      <div v-if="formData.model_mapping_strict" style="color: var(--warning-color)">
+                        ⚠️ {{ t("groups.modelMappingStrictWarning") }}
+                      </div>
+                      <div v-else style="color: var(--success-color)">
+                        ✅ {{ t("groups.modelMappingLooseInfo") }}
+                      </div>
                     </div>
                   </template>
                 </n-form-item>
@@ -1172,9 +1218,13 @@ async function handleSubmit() {
       </n-form>
 
       <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 12px">
-          <n-button @click="handleClose">{{ t("common.cancel") }}</n-button>
-          <n-button type="primary" @click="handleSubmit" :loading="loading">
+        <div class="modal-footer">
+          <n-button @click="handleClose" class="btn-cancel">{{ t("common.cancel") }}</n-button>
+          <n-button
+            @click="handleSubmit"
+            :loading="loading"
+            :class="group ? 'btn-update' : 'btn-create'"
+          >
             {{ group ? t("common.update") : t("common.create") }}
           </n-button>
         </div>
@@ -1185,20 +1235,26 @@ async function handleSubmit() {
 
 <style scoped>
 .group-form-modal {
-  width: 800px;
+  /* 继承 modal-mask 样式 */
+}
+
+.group-form-card {
+  /* 继承 modal-card 和 modal-wide 样式 */
 }
 
 .form-section {
-  margin-top: 20px;
+  margin-bottom: 24px;
 }
 
 .section-title {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--n-text-color);
   margin: 0 0 16px 0;
   padding-bottom: 8px;
-  border-bottom: 2px solid var(--border-color);
+  border-bottom: 1px solid var(--n-border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 :deep(.n-form-item-label) {
@@ -1229,11 +1285,6 @@ async function handleSubmit() {
 :deep(.n-card__content) {
   max-height: calc(100vh - 68px - 61px - 50px);
   overflow-y: auto;
-}
-
-:deep(.n-card__footer) {
-  border-top: 1px solid var(--border-color);
-  padding: 10px 15px;
 }
 
 :deep(.n-form-item-feedback-wrapper) {
@@ -1565,5 +1616,67 @@ async function handleSubmit() {
   .header-actions {
     justify-content: flex-end;
   }
+}
+
+/* 极光青绿配色系统 - 按钮样式 */
+.btn-create {
+  background: var(--btn-create-bg);
+  color: white;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-create:hover {
+  background: var(--btn-create-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.btn-edit {
+  background: var(--btn-edit-bg);
+  color: white;
+  border: none;
+  transition: all 0.2s;
+}
+
+.btn-edit:hover {
+  background: var(--btn-edit-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
+}
+
+.btn-view {
+  background: var(--btn-view-bg);
+  color: var(--btn-view-color);
+  border: 1px solid var(--btn-view-border);
+  transition: all 0.2s;
+}
+
+.btn-view:hover {
+  background: var(--btn-view-hover);
+  border-color: var(--btn-view-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.btn-dashed {
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.btn-dashed:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-icon-delete {
+  background: var(--btn-delete-bg);
+  color: white;
+  border: none;
+}
+
+.btn-icon-delete:hover {
+  background: var(--btn-delete-hover);
 }
 </style>

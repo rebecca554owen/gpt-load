@@ -5,71 +5,104 @@ import EncryptionMismatchAlert from "@/components/EncryptionMismatchAlert.vue";
 import LineChart from "@/components/LineChart.vue";
 import SecurityAlert from "@/components/SecurityAlert.vue";
 import type { DashboardStatsResponse } from "@/types/models";
+import type { TimeRangeHours } from "@/composables/useChartData";
 import { NSpace } from "naive-ui";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
+
+// View type: request | token
+const viewType = ref<"request" | "token">("token");
+
+// Time range in hours: 1/5/168/720
+const timeRange = ref<TimeRangeHours>(1);
+
+// Convert hours to days for stats API
+const hoursToDays = (hours: number): number => {
+  if (hours <= 5) {
+    return 1;
+  }
+  if (hours <= 168) {
+    return 7;
+  }
+  return 30;
+};
 
 const dashboardStats = ref<DashboardStatsResponse | null>(null);
 
-onMounted(async () => {
+// Load statistics
+const loadStats = async () => {
   try {
-    const response = await getDashboardStats();
+    // Use days for stats API (1/3/7 days)
+    const days = hoursToDays(timeRange.value);
+    const response = await getDashboardStats(days);
     dashboardStats.value = response.data;
   } catch (error) {
     console.error("Failed to load dashboard stats:", error);
   }
+};
+
+// Watch time range changes
+watch(timeRange, () => {
+  loadStats();
+});
+
+onMounted(() => {
+  loadStats();
 });
 </script>
 
 <template>
   <div class="dashboard-container">
-    <n-space vertical size="large" style="gap: 0 16px">
-      <!-- 加密配置错误警告（优先级最高） -->
+    <n-space vertical :size="16">
+      <!-- Encryption config error alert (highest priority) -->
       <encryption-mismatch-alert />
 
-      <!-- 安全警告横幅 -->
+      <!-- Security warning banner -->
       <security-alert
         v-if="dashboardStats?.security_warnings"
         :warnings="dashboardStats.security_warnings"
       />
 
       <base-info-card :stats="dashboardStats" />
-      <line-chart class="dashboard-chart" />
+      <line-chart
+        class="dashboard-chart"
+        :view-type="viewType"
+        :time-range="timeRange"
+        @update:view-type="viewType = $event"
+        @update:time-range="timeRange = $event"
+      />
     </n-space>
   </div>
 </template>
 
 <style scoped>
+.dashboard-container {
+  width: 100%;
+}
+
 .dashboard-header-card {
   background: var(--card-bg);
-  border-radius: var(--border-radius-lg);
-  border: 1px solid var(--border-color-light);
-  animation: fadeInUp 0.2s ease-out;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--card-border);
+  animation: slideUp var(--transition-base) ease-out;
 }
 
 .dashboard-title {
-  font-size: 2.25rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
 }
 
 .dashboard-subtitle {
   font-size: 1.1rem;
   font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .dashboard-chart {
-  animation: fadeInUp 0.2s ease-out 0.2s both;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  animation: slideUp var(--transition-slower) ease-out 0.1s both;
 }
 </style>

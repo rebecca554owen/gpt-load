@@ -2,24 +2,28 @@ import type { ChartData, DashboardStatsResponse, Group } from "@/types/models";
 import http from "@/utils/http";
 
 /**
- * 获取仪表盘基础统计数据
+ * Get dashboard basic statistics
+ * @param days Time range (1/7/30 days)
  */
-export const getDashboardStats = () => {
-  return http.get<DashboardStatsResponse>("/dashboard/stats");
-};
-
-/**
- * 获取仪表盘图表数据
- * @param groupId 可选的分组ID
- */
-export const getDashboardChart = (groupId?: number) => {
-  return http.get<ChartData>("/dashboard/chart", {
-    params: groupId ? { groupId } : {},
+export const getDashboardStats = (days: number = 1) => {
+  return http.get<DashboardStatsResponse>("/dashboard/stats", {
+    params: { days },
   });
 };
 
 /**
- * 获取用于筛选的分组列表
+ * Get dashboard chart data
+ * @param view View type (request/token)
+ * @param hours Time range in hours (1/3/6/24/72/168)
+ */
+export const getDashboardChart = (view: "request" | "token" = "token", hours: number = 24) => {
+  return http.get<ChartData>("/dashboard/chart", {
+    params: { view, hours },
+  });
+};
+
+/**
+ * Get group list for filtering
  */
 export const getGroupList = () => {
   return http.get<Group[]>("/groups/list");

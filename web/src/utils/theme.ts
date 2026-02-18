@@ -1,22 +1,22 @@
 import { computed, ref, watch } from "vue";
 
-// 主题模式类型
+// Theme mode type
 export type ThemeMode = "auto" | "light" | "dark";
 export type ActualTheme = "light" | "dark";
 
-// 存储键名
+// Storage key name
 const THEME_KEY = "gpt-load-theme-mode";
 
-// 获取初始主题模式
+// Get initial theme mode
 function getInitialThemeMode(): ThemeMode {
   const stored = localStorage.getItem(THEME_KEY);
   if (stored && ["auto", "light", "dark"].includes(stored)) {
     return stored as ThemeMode;
   }
-  return "auto"; // 默认使用自动模式
+  return "auto"; // Default to auto mode
 }
 
-// 检测系统主题偏好
+// Detect system theme preference
 function getSystemTheme(): ActualTheme {
   if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
     return "dark";
@@ -24,13 +24,13 @@ function getSystemTheme(): ActualTheme {
   return "light";
 }
 
-// 主题模式（用户选择）
+// Theme mode (user selection)
 export const themeMode = ref<ThemeMode>(getInitialThemeMode());
 
-// 系统主题（自动检测）
+// System theme (auto-detected)
 const systemTheme = ref<ActualTheme>(getSystemTheme());
 
-// 实际使用的主题
+// Actual theme in use
 export const actualTheme = computed<ActualTheme>(() => {
   if (themeMode.value === "auto") {
     return systemTheme.value;
@@ -38,16 +38,16 @@ export const actualTheme = computed<ActualTheme>(() => {
   return themeMode.value as ActualTheme;
 });
 
-// 是否为暗黑模式
+// Is dark mode
 export const isDark = computed(() => actualTheme.value === "dark");
 
-// 切换主题模式
+// Switch theme mode
 export function setThemeMode(mode: ThemeMode) {
   themeMode.value = mode;
   localStorage.setItem(THEME_KEY, mode);
 }
 
-// 循环切换主题（用于按钮）
+// Toggle theme (for button)
 export function toggleTheme() {
   const modes: ThemeMode[] = ["auto", "light", "dark"];
   const currentIndex = modes.indexOf(themeMode.value);
@@ -55,25 +55,20 @@ export function toggleTheme() {
   setThemeMode(modes[nextIndex]);
 }
 
-// 监听系统主题变化
+// Listen for system theme changes
 if (window.matchMedia) {
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-  // 更新系统主题
+  // Update system theme
   const updateSystemTheme = (e: MediaQueryListEvent | MediaQueryList) => {
     systemTheme.value = e.matches ? "dark" : "light";
   };
 
-  // 添加监听器
-  if (mediaQuery.addEventListener) {
-    mediaQuery.addEventListener("change", updateSystemTheme);
-  } else if (mediaQuery.addListener) {
-    // 兼容旧版浏览器
-    mediaQuery.addListener(updateSystemTheme as (event: MediaQueryListEvent) => void);
-  }
+  // Add listener
+  mediaQuery.addEventListener("change", updateSystemTheme);
 }
 
-// 更新 HTML 根元素的 class（用于 CSS 变量切换）
+// Update HTML root element class (for CSS variable switching)
 watch(
   actualTheme,
   theme => {

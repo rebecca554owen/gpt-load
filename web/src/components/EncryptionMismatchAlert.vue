@@ -4,7 +4,7 @@ import { NAlert, NButton, NCollapse, NCollapseItem } from "naive-ui";
 import { computed, onMounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 
-// 加密状态响应接口
+// Encryption status response interface
 interface EncryptionStatusResponse {
   has_mismatch: boolean;
   scenario_type: string;
@@ -12,21 +12,21 @@ interface EncryptionStatusResponse {
   suggestion: string;
 }
 
-// 是否显示警告
+// Whether to show alert
 const showAlert = ref(false);
 
-// 警告信息
+// Alert info
 const message = ref("");
 const suggestion = ref("");
 const scenarioType = ref("");
 
-// 本次会话是否已关闭
+// Whether closed in current session
 const isClosedThisSession = ref(false);
 
-// 是否显示详情
+// Whether to show details
 const showDetails = ref<string[]>([]);
 
-// 是否应该显示
+// Whether should show
 const shouldShow = computed(() => {
   return showAlert.value && !isClosedThisSession.value;
 });
@@ -34,7 +34,7 @@ const shouldShow = computed(() => {
 // i18n
 const { t } = useI18n();
 
-// 检查加密状态
+// Check encryption status
 const checkEncryptionStatus = async () => {
   try {
     const response = await http.get<EncryptionStatusResponse>("/dashboard/encryption-status");
@@ -49,17 +49,17 @@ const checkEncryptionStatus = async () => {
   }
 };
 
-// 关闭警告（仅本次会话）
+// Close alert (current session only)
 const handleClose = () => {
   isClosedThisSession.value = true;
 };
 
-// 打开文档
+// Open docs
 const openDocs = () => {
   window.open("https://www.gpt-load.com/docs/configuration/security", "_blank");
 };
 
-// 组件挂载时检查状态
+// Check status when component mounts
 onMounted(() => {
   checkEncryptionStatus();
 });
@@ -89,7 +89,7 @@ onMounted(() => {
             class="solution-content"
             style="padding: 16px; border-radius: 6px; font-size: 13px; line-height: 1.6"
           >
-            <!-- 场景A: 已配置 ENCRYPTION_KEY 但数据未加密 -->
+            <!-- Scenario A: ENCRYPTION_KEY configured but data not encrypted -->
             <template v-if="scenarioType === 'data_not_encrypted'">
               <p style="margin: 0 0 8px 0">
                 1. {{ t("encryptionAlert.scenario.dataNotEncrypted.step1") }}
@@ -114,7 +114,7 @@ docker compose run --rm gpt-load migrate-keys --to "your-encryption-key"</pre
               </p>
             </template>
 
-            <!-- 场景C: 密钥不匹配 -->
+            <!-- Scenario C: Key mismatch -->
             <template v-else-if="scenarioType === 'key_mismatch'">
               <div style="margin-bottom: 16px">
                 <strong style="color: var(--primary-color)">
@@ -171,7 +171,7 @@ docker compose run --rm gpt-load migrate-keys --from "old-key" --to "new-key"</p
               </div>
             </template>
 
-            <!-- 场景B: 数据已加密但未配置 ENCRYPTION_KEY -->
+            <!-- Scenario B: Data encrypted but ENCRYPTION_KEY not configured -->
             <template v-else-if="scenarioType === 'key_not_configured'">
               <div style="margin-bottom: 16px">
                 <strong style="color: var(--primary-color)">
@@ -242,36 +242,36 @@ docker compose run --rm gpt-load migrate-keys --from "old-key"</pre
 </template>
 
 <style scoped>
-/* 解决方案内容背景 */
+/* Solution content background */
 .solution-content {
   background: #f7f9fc;
   border: 1px solid #e1e4e8;
 }
 
-/* 浅色模式下的代码块 */
+/* Light theme code blocks */
 .solution-content pre {
   background: #f0f2f5;
   border: 1px solid #d6dae0;
 }
 
-/* 暗黑模式下的解决方案背景 */
+/* Dark theme solution background */
 :root.dark .solution-content {
   background: #1a1a1a;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* 暗黑模式下的代码块 */
+/* Dark theme code blocks */
 :root.dark .solution-content pre {
   background: #0d0d0d !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* 按钮样式 */
+/* Button style */
 .encryption-docs-btn {
   font-weight: 600;
 }
 
-/* 暗黑模式下的按钮优化 */
+/* Dark mode button optimization */
 :root.dark .encryption-docs-btn {
   background: #d32f2f !important;
   color: white !important;
@@ -283,7 +283,7 @@ docker compose run --rm gpt-load migrate-keys --from "old-key"</pre
   color: white !important;
 }
 
-/* 亮色模式下的按钮 */
+/* Light theme button */
 :root:not(.dark) .encryption-docs-btn {
   background: #d32f2f !important;
   color: white !important;

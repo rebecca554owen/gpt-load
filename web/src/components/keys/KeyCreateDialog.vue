@@ -131,7 +131,7 @@ function isSubmitDisabled() {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleClose">
+        <n-button quaternary circle @click="handleClose" class="modal-close">
           <template #icon>
             <n-icon :component="Close" />
           </template>
@@ -159,24 +159,25 @@ function isSubmitDisabled() {
         style="margin-top: 20px"
       >
         <div class="upload-area">
-          <n-icon size="48" :component="CloudUploadOutline" style="color: #18a058" />
+          <n-icon size="48" :component="CloudUploadOutline" style="color: var(--success-color)" />
           <div class="upload-text">{{ t("keys.clickOrDragFile") }}</div>
           <div class="upload-hint">{{ t("keys.onlyTxtFileSupported") }}</div>
         </div>
       </n-upload>
 
       <template #footer>
-        <div style="display: flex; justify-content: space-between; align-items: center">
+        <div class="modal-footer" style="justify-content: space-between">
           <n-button @click="toggleInputMode" secondary>
             {{ inputMode === "text" ? t("keys.uploadFile") : t("keys.manualInput") }}
           </n-button>
           <div style="display: flex; gap: 12px">
-            <n-button @click="handleClose">{{ t("common.cancel") }}</n-button>
+            <n-button @click="handleClose" class="btn-cancel">{{ t("common.cancel") }}</n-button>
             <n-button
               type="primary"
               @click="handleSubmit"
               :loading="loading"
               :disabled="isSubmitDisabled()"
+              class="btn-confirm"
             >
               {{ t("common.add") }}
             </n-button>
@@ -204,11 +205,6 @@ function isSubmitDisabled() {
 :deep(.n-card__content) {
   max-height: calc(100vh - 68px - 61px - 50px);
   overflow-y: auto;
-}
-
-:deep(.n-card__footer) {
-  border-top: 1px solid rgba(239, 239, 245, 0.8);
-  padding: 10px 15px;
 }
 
 .upload-area {

@@ -36,9 +36,9 @@ const handleLogout = () => {
 }
 
 .logout-button:hover {
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--logout-hover-color);
+  background: var(--logout-hover-bg);
+  border-color: var(--logout-hover-border);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }

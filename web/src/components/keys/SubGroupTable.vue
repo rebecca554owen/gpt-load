@@ -29,7 +29,7 @@ import EditSubGroupWeightModal from "./EditSubGroupWeightModal.vue";
 
 const { t } = useI18n();
 
-// 获取子分组状态
+// Get sub-group status
 function getSubGroupStatus(subGroup: SubGroupInfo): {
   status: "active" | "disabled" | "unavailable";
   text: string;
@@ -69,11 +69,11 @@ const addModalShow = ref(false);
 const editModalShow = ref(false);
 const editingSubGroup = ref<SubGroupInfo | null>(null);
 
-// 搜索和过滤状态
+// Search and filter state
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "disabled" | "unavailable">("all");
 
-// 状态过滤选项
+// Status filter options
 const statusOptions = [
   { label: t("common.all"), value: "all" },
   { label: t("subGroups.statusActive"), value: "active" },
@@ -81,7 +81,7 @@ const statusOptions = [
   { label: t("subGroups.statusUnavailable"), value: "unavailable" },
 ];
 
-// 计算带百分比的子分组数据并按权重排序
+// Calculate sub-group data with percentage and sort by weight
 const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
   if (!props.subGroups) {
     return [];
@@ -92,15 +92,15 @@ const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
     percentage: total > 0 ? Math.round((sg.weight / total) * 100) : 0,
   }));
 
-  // 按权重降序排序
+  // Sort by weight descending
   return withPercentage.sort((a, b) => b.weight - a.weight);
 });
 
-// 过滤后的子分组（应用搜索和状态过滤）
+// Filtered sub-groups (apply search and status filtering)
 const filteredSubGroups = computed<SubGroupRow[]>(() => {
   let filtered = sortedSubGroupsWithPercentage.value;
 
-  // 名称搜索过滤（不区分大小写）
+  // Name search filter (case-insensitive)
   if (searchText.value.trim()) {
     const searchLower = searchText.value.trim().toLowerCase();
     filtered = filtered.filter(sg => {
@@ -110,7 +110,7 @@ const filteredSubGroups = computed<SubGroupRow[]>(() => {
     });
   }
 
-  // 状态过滤
+  // Status filter
   if (statusFilter.value !== "all") {
     filtered = filtered.filter(sg => {
       const status = getSubGroupStatus(sg).status;
@@ -177,10 +177,10 @@ function formatNumber(num: number): string {
 
 <template>
   <div class="key-table-container">
-    <!-- 工具栏 -->
+    <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <n-button type="info" size="small" @click="addModalShow = true">
+        <n-button class="btn-create" size="small" @click="addModalShow = true">
           <template #icon>
             <n-icon :component="Add" />
           </template>
@@ -209,7 +209,7 @@ function formatNumber(num: number): string {
       </div>
     </div>
 
-    <!-- 子分组卡片网格 -->
+    <!-- Sub-group card grid -->
     <div class="keys-grid-container">
       <n-spin :show="props.loading || false">
         <div v-if="!props.subGroups || props.subGroups.length === 0" class="empty-container">
@@ -237,7 +237,7 @@ function formatNumber(num: number): string {
               </div>
             </div>
 
-            <!-- 权重显示 -->
+            <!-- Weight display -->
             <div class="weight-display">
               <div class="weight-bar-container">
                 <span class="weight-label">
@@ -258,7 +258,7 @@ function formatNumber(num: number): string {
               </div>
             </div>
 
-            <!-- 密钥统计 -->
+            <!-- Key statistics -->
             <div class="key-stats-row">
               <div class="stats-left">
                 <span class="stat-item">
@@ -278,7 +278,7 @@ function formatNumber(num: number): string {
               </n-tag>
             </div>
 
-            <!-- 操作按钮行 -->
+            <!-- Action buttons row -->
             <div class="key-bottom">
               <div class="key-stats">
                 <n-tooltip trigger="hover" placement="top">
@@ -290,7 +290,7 @@ function formatNumber(num: number): string {
                     </n-button>
                   </template>
                   <div class="sub-group-info-tooltip">
-                    <!-- 分组名称和状态 -->
+                    <!-- Group name and status -->
                     <div class="info-header">
                       <div class="info-title">{{ getGroupDisplayName(subGroup) }}</div>
                       <n-tag :type="getSubGroupStatus(subGroup).type" size="small">
@@ -298,7 +298,7 @@ function formatNumber(num: number): string {
                       </n-tag>
                     </div>
 
-                    <!-- 详细信息 -->
+                    <!-- Detailed information -->
                     <div class="info-details">
                       <div class="info-row">
                         <span class="info-label">{{ t("keys.testModel") }}:</span>
@@ -311,7 +311,7 @@ function formatNumber(num: number): string {
                         </span>
                       </div>
 
-                      <!-- 上游地址 -->
+                      <!-- Upstream addresses -->
                       <div
                         class="info-row"
                         v-if="subGroup.group.upstreams && subGroup.group.upstreams.length > 0"
@@ -335,7 +335,7 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
-                  type="default"
+                  class="btn-view"
                   size="tiny"
                   @click="subGroup.group.id && goToGroupInfo(subGroup.group.id)"
                   :title="t('subGroups.viewSubGroup')"
@@ -348,7 +348,7 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
-                  type="info"
+                  class="btn-edit"
                   size="tiny"
                   @click="openEditModal(subGroup)"
                   :title="t('subGroups.editWeight')"
@@ -361,8 +361,8 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
+                  class="btn-delete"
                   size="tiny"
-                  type="error"
                   @click="deleteSubGroup(subGroup)"
                   :title="t('subGroups.removeSubGroup')"
                 >
@@ -378,7 +378,7 @@ function formatNumber(num: number): string {
       </n-spin>
     </div>
 
-    <!-- 底部信息 -->
+    <!-- Footer information -->
     <div class="pagination-container">
       <div class="pagination-info">
         <span>
@@ -395,7 +395,7 @@ function formatNumber(num: number): string {
       </div>
     </div>
 
-    <!-- 添加子分组弹窗 -->
+    <!-- Add sub-group modal -->
     <add-sub-group-modal
       v-if="selectedGroup?.id"
       v-model:show="addModalShow"
@@ -405,7 +405,7 @@ function formatNumber(num: number): string {
       @success="handleSuccess"
     />
 
-    <!-- 编辑权重弹窗 -->
+    <!-- Edit weight modal -->
     <edit-sub-group-weight-modal
       v-if="editingSubGroup && selectedGroup?.id"
       v-model:show="editModalShow"
@@ -423,7 +423,7 @@ function formatNumber(num: number): string {
 </template>
 
 <style scoped>
-/* 直接复用KeyTable的所有样式 */
+/* Directly reuse all styles from KeyTable */
 .key-table-container {
   background: var(--card-bg-solid);
   border-radius: 8px;
@@ -500,20 +500,14 @@ function formatNumber(num: number): string {
   border-width: 1.5px;
 }
 
-/* 子分组专用样式 - 蓝色主题 */
+/* Sub-group specific styles - aurora teal color system */
 .key-card.status-sub-group {
-  border-color: #2080f0;
-  background: #f0f7ff;
+  border-color: var(--sub-group-border);
+  background: var(--sub-group-bg);
   border-width: 1.5px;
 }
 
-/* 暗黑模式下的子分组样式 */
-:root.dark .key-card.status-sub-group {
-  border-color: #4098fc;
-  background: #1a2332;
-}
-
-/* 子分组名称样式 */
+/* Sub-group name styles */
 .sub-group-names {
   display: flex;
   align-items: baseline;
@@ -534,22 +528,16 @@ function formatNumber(num: number): string {
 .group-name {
   font-size: 13px;
   font-weight: 500;
-  color: #2080f0;
+  color: var(--sub-group-primary);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  background: #e6f4ff;
+  background: var(--sub-group-bg);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-/* 暗黑模式下的分组名样式 */
-:root.dark .group-name {
-  background: #0f1419;
-  color: #4098fc;
-}
-
-/* 权重显示样式 */
+/* Weight display styles */
 .weight-display {
   margin: 4px 0;
 }
@@ -673,13 +661,13 @@ function formatNumber(num: number): string {
   transition: width 0.3s ease;
 }
 
-/* Active state - green gradient */
+/* Active state - blue gradient */
 .key-card .weight-fill-active {
-  background: linear-gradient(90deg, #0e7a43, #18a058, #36ad6a, #5fd299) !important;
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4, #38bdf8) !important;
 }
 
 :root.dark .key-card .weight-fill-active {
-  background: linear-gradient(90deg, #4aba7d, #63e2b7, #7fe7c4, #a3f5d0) !important;
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4, #38bdf8) !important;
 }
 
 /* Unavailable state - striped pattern (red/orange warning) */
@@ -817,7 +805,7 @@ function formatNumber(num: number): string {
   }
 }
 
-/* 禁用状态样式 - 与密钥列表中禁用密钥的样式一致 */
+/* Disabled state styles - consistent with disabled keys in key list */
 .key-card.disabled {
   opacity: 0.6;
   background: var(--bg-secondary);
@@ -837,7 +825,7 @@ function formatNumber(num: number): string {
   background: var(--color-disabled);
 }
 
-/* Tooltip 样式 */
+/* Tooltip styles */
 .sub-group-info-tooltip {
   min-width: 450px;
   max-width: 600px;

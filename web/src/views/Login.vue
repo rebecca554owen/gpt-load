@@ -31,7 +31,7 @@ const handleLogin = async () => {
 
 <template>
   <div class="login-container">
-    <!-- 语言切换器 -->
+    <!-- Language switcher -->
     <div class="language-selector-wrapper">
       <language-selector />
     </div>
@@ -213,9 +213,9 @@ const handleLogin = async () => {
 }
 
 .login-btn:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: var(--primary-color-hover);
   transform: translateY(-1px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 25px rgba(13, 148, 136, 0.25);
 }
 
 :deep(.n-input) {
@@ -239,7 +239,7 @@ const handleLogin = async () => {
   padding-top: 0;
 }
 
-/* 暗黑模式适配 */
+/* Dark mode adaptation */
 :root.dark .login-decoration {
   opacity: 0.05;
 }
@@ -254,7 +254,7 @@ const handleLogin = async () => {
 }
 
 :root.dark .login-btn:hover {
-  background: linear-gradient(135deg, #7c8aac 0%, #8b94c0 100%);
-  box-shadow: 0 8px 25px rgba(139, 157, 245, 0.2);
+  background: var(--primary-color-hover);
+  box-shadow: 0 8px 25px rgba(20, 184, 166, 0.25);
 }
 </style>

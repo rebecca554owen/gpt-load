@@ -21,24 +21,24 @@ interface Props {
 
 const props = defineProps<Props>();
 
-// 本地存储键名
+// Local storage key name
 const STORAGE_KEY = "security-alert-dismissed";
 
-// 检查是否已经被用户设置为不再提醒
+// Check if user has permanently dismissed it
 const isDismissedPermanently = ref(localStorage.getItem(STORAGE_KEY) === "true");
 
-// 本次会话是否已关闭
+// Whether closed in current session
 const isClosedThisSession = ref(false);
 
-// 是否显示详情
+// Whether to show details
 const showDetails = ref<string[]>([]);
 
-// 是否显示警告
+// Whether to show warning
 const shouldShow = computed(() => {
   return props.warnings.length > 0 && !isDismissedPermanently.value && !isClosedThisSession.value;
 });
 
-// 获取最高严重级别
+// Get highest severity level
 const highestSeverity = computed(() => {
   if (!props.warnings.length) {
     return "low";
@@ -52,7 +52,7 @@ const highestSeverity = computed(() => {
   }, "low");
 });
 
-// 获取警告类型的映射（调整为更温和的颜色）
+// Get warning type mapping (adjusted for gentler colors)
 const alertType = computed(() => {
   switch (highestSeverity.value) {
     case "high":
@@ -64,7 +64,7 @@ const alertType = computed(() => {
   }
 });
 
-// 生成警告摘要文本
+// Generate warning summary text
 const warningText = computed(() => {
   const count = props.warnings.length;
   const highCount = props.warnings.filter(w => w.severity === "high").length;
@@ -76,7 +76,7 @@ const warningText = computed(() => {
   }
 });
 
-// 获取严重程度标签类型
+// Get severity label type
 const getSeverityTagType = (severity: string) => {
   switch (severity) {
     case "high":
@@ -88,7 +88,7 @@ const getSeverityTagType = (severity: string) => {
   }
 };
 
-// 获取严重程度中文
+// Get severity text
 const getSeverityText = (severity: string) => {
   switch (severity) {
     case "high":
@@ -100,18 +100,18 @@ const getSeverityText = (severity: string) => {
   }
 };
 
-// 关闭警告（仅本次会话）
+// Close warning (current session only)
 const handleClose = () => {
   isClosedThisSession.value = true;
 };
 
-// 不再提醒
+// Don't remind again
 const handleDismissPermanently = () => {
   localStorage.setItem(STORAGE_KEY, "true");
   isDismissedPermanently.value = true;
 };
 
-// 打开安全配置文档
+// Open security config docs
 const openSecurityDocs = () => {
   window.open("https://www.gpt-load.com/docs/configuration/security", "_blank");
 };
@@ -135,7 +135,7 @@ const openSecurityDocs = () => {
         {{ warningText }}
       </div>
 
-      <!-- 问题详情列表 -->
+      <!-- Issue details list -->
       <n-collapse v-model:expanded-names="showDetails" style="margin-bottom: 12px">
         <n-collapse-item name="details" :title="t('security.viewDetails')">
           <n-list style="padding-top: 8px; margin-left: 0">
@@ -198,7 +198,7 @@ const openSecurityDocs = () => {
 </template>
 
 <style scoped>
-/* 安全提醒按钮样式优化 */
+/* Security alert button style optimization */
 .security-primary-btn {
   font-weight: 600;
 }
@@ -207,7 +207,7 @@ const openSecurityDocs = () => {
   font-weight: 500;
 }
 
-/* 暗黑模式下的按钮优化 */
+/* Dark mode button optimization */
 :root.dark .security-primary-btn {
   background: var(--primary-color) !important;
   color: white !important;

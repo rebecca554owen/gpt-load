@@ -3,7 +3,7 @@ import { useAuthService } from "@/services/auth";
 import axios from "axios";
 import { appState } from "./app-state";
 
-// 定义不需要显示 loading 的 API 地址列表
+// Define list of API URLs that don't need loading indicator
 const noLoadingUrls = ["/tasks/status"];
 
 declare module "axios" {
@@ -18,9 +18,9 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// 请求拦截器
+// Request interceptor
 http.interceptors.request.use(config => {
-  // 检查当前请求的 URL 是否在屏蔽列表中
+  // Check if current request URL is in the blocklist
   if (config.url && !noLoadingUrls.includes(config.url)) {
     appState.loading = true;
   }
@@ -28,13 +28,13 @@ http.interceptors.request.use(config => {
   if (authKey) {
     config.headers.Authorization = `Bearer ${authKey}`;
   }
-  // 添加语言头
+  // Add language header
   const locale = localStorage.getItem("locale") || "zh-CN";
   config.headers["Accept-Language"] = locale;
   return config;
 });
 
-// 响应拦截器
+// Response interceptor
 http.interceptors.response.use(
   response => {
     appState.loading = false;

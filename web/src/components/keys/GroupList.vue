@@ -30,7 +30,7 @@ const emit = defineEmits<Emits>();
 
 const searchText = ref("");
 const showGroupModal = ref(false);
-// 存储分组项 DOM 元素的引用
+// Store references to group item DOM elements
 const groupItemRefs = ref(new Map());
 const showAggregateGroupModal = ref(false);
 
@@ -46,7 +46,7 @@ const filteredGroups = computed(() => {
   );
 });
 
-// 监听选中项 ID 的变化，并自动滚动到该项
+// Watch for changes in selected item ID and auto-scroll to that item
 watch(
   () => props.selectedGroup?.id,
   id => {
@@ -57,14 +57,14 @@ watch(
     const element = groupItemRefs.value.get(id);
     if (element) {
       element.scrollIntoView({
-        behavior: "smooth", // 平滑滚动
-        block: "nearest", // 将元素滚动到最近的边缘
+        behavior: "smooth", // Smooth scrolling
+        block: "nearest", // Scroll element to nearest edge
       });
     }
   },
   {
-    flush: "post", // 确保在 DOM 更新后执行回调
-    immediate: true, // 立即执行一次以处理初始加载
+    flush: "post", // Ensure callback is executed after DOM update
+    immediate: true, // Execute once immediately to handle initial load
   }
 );
 
@@ -72,16 +72,16 @@ function handleGroupClick(group: Group) {
   emit("group-select", group);
 }
 
-// 获取渠道类型的标签颜色
+// Get tag color for channel type
 function getChannelTagType(channelType: string) {
   switch (channelType) {
     case "openai":
-    case "openai-response":
+    case "openai-responses":
       return "success";
     case "gemini":
-      return "info";
+      return "warning"; // Orange
     case "anthropic":
-      return "warning";
+      return "error"; // Red
     default:
       return "default";
   }
@@ -107,7 +107,7 @@ function handleGroupCreated(group: Group) {
 <template>
   <div class="group-list-container">
     <n-card class="group-list-card modern-card" :bordered="false" size="small">
-      <!-- 搜索框 -->
+      <!-- Search box -->
       <div class="search-section">
         <n-input
           v-model:value="searchText"
@@ -121,7 +121,7 @@ function handleGroupCreated(group: Group) {
         </n-input>
       </div>
 
-      <!-- 分组列表 -->
+      <!-- Group list -->
       <div class="groups-section">
         <n-spin :show="loading" size="small">
           <div v-if="filteredGroups.length === 0 && !loading" class="empty-container">
@@ -149,7 +149,6 @@ function handleGroupCreated(group: Group) {
               <div class="group-icon">
                 <span v-if="group.group_type === 'aggregate'">🔗</span>
                 <span v-else-if="group.channel_type === 'openai'">🤖</span>
-                <span v-else-if="group.channel_type === 'openai-response'">🔁</span>
                 <span v-else-if="group.channel_type === 'gemini'">💎</span>
                 <span v-else-if="group.channel_type === 'anthropic'">🧠</span>
                 <span v-else>🔧</span>
@@ -173,15 +172,15 @@ function handleGroupCreated(group: Group) {
         </n-spin>
       </div>
 
-      <!-- 添加分组按钮 -->
+      <!-- Add group button -->
       <div class="add-section">
-        <n-button type="success" size="small" block @click="openCreateGroupModal">
+        <n-button class="btn-create" size="small" block @click="openCreateGroupModal">
           <template #icon>
             <n-icon :component="Add" />
           </template>
           {{ t("keys.createGroup") }}
         </n-button>
-        <n-button type="info" size="small" block @click="openCreateAggregateGroupModal">
+        <n-button class="btn-aggregate" size="small" block @click="openCreateAggregateGroupModal">
           <template #icon>
             <n-icon :component="LinkOutline" />
           </template>
@@ -263,15 +262,15 @@ function handleGroupCreated(group: Group) {
   position: relative;
 }
 
-/* 聚合分组样式 */
+/* Aggregate group style */
 .group-item.aggregate {
   border-style: dashed;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.02) 0%, rgba(102, 126, 234, 0.05) 100%);
+  background: linear-gradient(135deg, var(--primary-color-suppl) 0%, rgba(13, 148, 136, 0.08) 100%);
 }
 
 :root.dark .group-item.aggregate {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(102, 126, 234, 0.1) 100%);
-  border-color: rgba(102, 126, 234, 0.2);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.08) 0%, rgba(20, 184, 166, 0.12) 100%);
+  border-color: rgba(20, 184, 166, 0.2);
 }
 
 .group-item:hover,
@@ -281,18 +280,18 @@ function handleGroupCreated(group: Group) {
 }
 
 .group-item.aggregate:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(102, 126, 234, 0.1) 100%);
+  background: linear-gradient(135deg, var(--primary-color-suppl) 0%, rgba(13, 148, 136, 0.12) 100%);
   border-style: dashed;
 }
 
 :root.dark .group-item:hover {
-  background: rgba(102, 126, 234, 0.1);
-  border-color: rgba(102, 126, 234, 0.3);
+  background: var(--primary-color-suppl);
+  border-color: var(--primary-color);
 }
 
 :root.dark .group-item.aggregate:hover {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(102, 126, 234, 0.15) 100%);
-  border-color: rgba(102, 126, 234, 0.4);
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.12) 0%, rgba(20, 184, 166, 0.18) 100%);
+  border-color: var(--primary-color);
 }
 
 .group-item.aggregate.active {
@@ -368,7 +367,7 @@ function handleGroupCreated(group: Group) {
   gap: 8px;
 }
 
-/* 滚动条样式 */
+/* Scrollbar style */
 .groups-list::-webkit-scrollbar {
   width: 4px;
 }
@@ -386,7 +385,7 @@ function handleGroupCreated(group: Group) {
   background: var(--border-color);
 }
 
-/* 暗黑模式特殊样式 */
+/* Dark mode special styles */
 :root.dark .group-item {
   border-color: rgba(255, 255, 255, 0.05);
 }
@@ -398,19 +397,27 @@ function handleGroupCreated(group: Group) {
 
 :root.dark .search-section :deep(.n-input) {
   --n-border: 1px solid rgba(255, 255, 255, 0.08);
-  --n-border-hover: 1px solid rgba(102, 126, 234, 0.4);
+  --n-border-hover: 1px solid var(--primary-color);
   --n-border-focus: 1px solid var(--primary-color);
   background: rgba(255, 255, 255, 0.03);
 }
 
-/* 标签样式优化 */
+/* Tag style optimization */
 :root.dark .group-meta :deep(.n-tag) {
-  background: rgba(102, 126, 234, 0.15);
-  border: 1px solid rgba(102, 126, 234, 0.3);
+  background: var(--primary-color-suppl);
+  border: 1px solid var(--primary-color);
+}
+
+/* Selected state tag - invert text color, no background */
+.group-item.active .group-meta :deep(.n-tag) {
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.6);
+  color: white;
 }
 
 :root.dark .group-item.active .group-meta :deep(.n-tag) {
-  background: rgba(255, 255, 255, 0.2);
-  border-color: rgba(255, 255, 255, 0.3);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.4);
+  color: white;
 }
 </style>

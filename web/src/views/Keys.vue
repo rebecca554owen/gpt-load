@@ -5,7 +5,8 @@ import GroupInfoCard from "@/components/keys/GroupInfoCard.vue";
 import GroupList from "@/components/keys/GroupList.vue";
 import KeyTable from "@/components/keys/KeyTable.vue";
 import SubGroupTable from "@/components/keys/SubGroupTable.vue";
-import type { Group, SubGroupInfo } from "@/types/models";
+import ModelMappingTable from "@/components/keys/ModelMappingTable.vue";
+import type { Group, ModelMapping, SubGroupInfo } from "@/types/models";
 import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
@@ -25,7 +26,7 @@ async function loadGroups() {
   try {
     loading.value = true;
     groups.value = await keysApi.getGroups();
-    // 选择默认分组
+    // Select default group
     if (groups.value.length > 0 && !selectedGroup.value) {
       const groupId = route.query.groupId;
       const found = groups.value.find(g => String(g.id) === String(groupId));
@@ -37,7 +38,7 @@ async function loadGroups() {
     }
   } catch (error) {
     console.error("Failed to load groups:", error);
-    window.$message?.error("加载分组列表失败");
+    window.$message?.error("Failed to load group list");
   } finally {
     loading.value = false;
   }
@@ -54,14 +55,14 @@ async function loadSubGroups() {
     subGroups.value = await keysApi.getSubGroups(selectedGroup.value.id);
   } catch (error) {
     console.error("Failed to load sub groups:", error);
-    window.$message?.error("加载子分组失败");
+    window.$message?.error("Failed to load subgroups");
     subGroups.value = [];
   } finally {
     loadingSubGroups.value = false;
   }
 }
 
-// 监听选中分组变化，加载子分组数据
+// Watch selected group changes, load subgroup data
 watch(selectedGroup, async newGroup => {
   if (newGroup?.group_type === "aggregate") {
     await loadSubGroups();
@@ -104,7 +105,7 @@ async function refreshGroupsAndSelect(targetGroupId?: number, selectFirst = true
   }
 }
 
-// 处理子分组选择，跳转到对应的分组
+// Handle subgroup selection, navigate to corresponding group
 function handleSubGroupSelect(groupId: number) {
   const targetGroup = groups.value.find(g => g.id === groupId);
   if (targetGroup) {
@@ -112,18 +113,35 @@ function handleSubGroupSelect(groupId: number) {
   }
 }
 
-// 处理聚合分组跳转，跳转到对应的聚合分组
+// Handle aggregate group navigation, navigate to corresponding aggregate group
 function handleNavigateToGroup(groupId: number) {
   const targetGroup = groups.value.find(g => g.id === groupId);
   if (targetGroup) {
     handleGroupSelect(targetGroup);
   }
 }
+
+// Use API response data directly to update selectedGroup
+function updateSelectedGroupFromResponse(updatedGroup: Group) {
+  if (selectedGroup.value?.id === updatedGroup.id) {
+    // Replace the entire object to ensure reactive update
+    // Note: Backend returns model_mappings (array), need to map it to model_mappings_list
+    const groupWithMappingsList = {
+      ...selectedGroup.value,
+      ...updatedGroup,
+      // If backend returns model_mappings array, set it as model_mappings_list
+      model_mappings_list:
+        (updatedGroup.model_mappings as ModelMapping[] | undefined) ||
+        updatedGroup.model_mappings_list,
+    };
+    selectedGroup.value = groupWithMappingsList;
+  }
+}
 </script>
 
 <template>
   <div>
-    <!-- 加密配置错误警告 -->
+    <!-- Encryption config error alert -->
     <encryption-mismatch-alert style="margin-bottom: 16px" />
 
     <div class="keys-container">
@@ -138,9 +156,9 @@ function handleNavigateToGroup(groupId: number) {
         />
       </div>
 
-      <!-- 右侧主内容区域，占80% -->
+      <!-- Main content area on the right, 80% width -->
       <div class="main-content">
-        <!-- 分组信息卡片，更紧凑 -->
+        <!-- Group info card, more compact -->
         <div class="group-info">
           <group-info-card
             :group="selectedGroup"
@@ -153,24 +171,40 @@ function handleNavigateToGroup(groupId: number) {
           />
         </div>
 
-        <!-- 密钥表格区域 / 子分组列表区域 -->
+        <!-- Key table area / Subgroup list area / Model mapping area -->
         <div class="key-table-section">
-          <!-- 标准分组显示密钥列表 -->
+          <!-- Standard group shows key list -->
           <key-table
             v-if="!selectedGroup || selectedGroup.group_type !== 'aggregate'"
             :selected-group="selectedGroup"
           />
 
-          <!-- 聚合分组显示子分组列表 -->
-          <sub-group-table
-            v-else
-            :selected-group="selectedGroup"
-            :sub-groups="subGroups"
-            :groups="groups"
-            :loading="loadingSubGroups"
-            @refresh="loadSubGroups"
-            @group-select="handleSubGroupSelect"
-          />
+          <!-- Aggregate group shows both subgroup list and model mapping list -->
+          <template v-else>
+            <!-- Subgroup table -->
+            <sub-group-table
+              :selected-group="selectedGroup"
+              :sub-groups="subGroups"
+              :groups="groups"
+              :loading="loadingSubGroups"
+              @refresh="loadSubGroups"
+              @group-select="handleSubGroupSelect"
+            />
+
+            <!-- Model mapping list -->
+            <div class="model-mapping-section">
+              <model-mapping-table
+                :selected-group="selectedGroup"
+                :model-mappings="selectedGroup.model_mappings_list"
+                :sub-groups="subGroups"
+                :groups="groups"
+                :loading="loadingSubGroups"
+                @refresh="() => refreshGroupsAndSelect(selectedGroup?.id)"
+                @group-select="handleSubGroupSelect"
+                @group-updated="updateSelectedGroupFromResponse"
+              />
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -181,7 +215,7 @@ function handleNavigateToGroup(groupId: number) {
 .keys-container {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -194,7 +228,7 @@ function handleNavigateToGroup(groupId: number) {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
 }
 
 .group-info {
@@ -208,9 +242,15 @@ function handleNavigateToGroup(groupId: number) {
   min-height: 0;
 }
 
+.model-mapping-section {
+  margin-top: 16px;
+  flex-shrink: 0;
+}
+
 @media (min-width: 768px) {
   .keys-container {
     flex-direction: row;
+    gap: 16px;
   }
 
   .sidebar {

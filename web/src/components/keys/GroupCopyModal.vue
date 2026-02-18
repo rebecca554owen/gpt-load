@@ -112,9 +112,15 @@ function handleCancel() {
 </script>
 
 <template>
-  <n-modal :show="modalVisible" @update:show="handleCancel" class="group-copy-modal">
+  <n-modal
+    :show="modalVisible"
+    @update:show="handleCancel"
+    class="group-copy-modal modal-mask"
+    :mask-closable="true"
+    :closable="false"
+  >
     <n-card
-      class="group-copy-card"
+      class="group-copy-card modal-card modal-narrow"
       :title="
         t('keys.copyGroupTitle', { groupName: sourceGroup ? getGroupDisplayName(sourceGroup) : '' })
       "
@@ -124,7 +130,7 @@ function handleCancel() {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleCancel">
+        <n-button quaternary circle @click="handleCancel" class="modal-close">
           <template #icon>
             <n-icon :component="CloseOutline" />
           </template>
@@ -158,9 +164,11 @@ function handleCancel() {
       </div>
 
       <template #footer>
-        <div class="modal-actions">
-          <n-button @click="handleCancel" :disabled="loading">{{ t("common.cancel") }}</n-button>
-          <n-button type="primary" @click="handleCopy" :loading="loading">
+        <div class="modal-footer">
+          <n-button @click="handleCancel" :disabled="loading" class="btn-cancel">
+            {{ t("common.cancel") }}
+          </n-button>
+          <n-button @click="handleCopy" :loading="loading" class="btn-confirm">
             <template #icon>
               <n-icon :component="CopyOutline" />
             </template>
@@ -174,9 +182,11 @@ function handleCancel() {
 
 <style scoped>
 .group-copy-modal {
-  width: 450px;
-  max-width: 90vw;
-  --n-color: var(--modal-color);
+  /* 继承 modal-mask 样式 */
+}
+
+.group-copy-card {
+  /* 继承 modal-card 和 modal-narrow 样式 */
 }
 
 .modal-content {
@@ -247,11 +257,6 @@ function handleCancel() {
 
 :deep(.n-card__content) {
   padding: 16px 20px;
-}
-
-:deep(.n-card__footer) {
-  border-top: 1px solid var(--border-color);
-  padding: 10px 15px;
 }
 
 :deep(.n-form-item-feedback-wrapper) {

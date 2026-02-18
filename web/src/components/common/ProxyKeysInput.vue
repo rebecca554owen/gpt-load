@@ -25,12 +25,12 @@ const emit = defineEmits<Emits>();
 
 const message = useMessage();
 
-// 密钥生成弹窗相关
+// Key generator modal related state
 const showKeyGeneratorModal = ref(false);
 const keyCount = ref(1);
 const isGenerating = ref(false);
 
-// 生成随机字符串
+// Generate random string
 function generateRandomString(length: number): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   let result = "";
@@ -40,7 +40,7 @@ function generateRandomString(length: number): string {
   return result;
 }
 
-// 生成密钥
+// Generate keys
 function generateKeys(): string[] {
   const keys: string[] = [];
   for (let i = 0; i < keyCount.value; i++) {
@@ -49,13 +49,13 @@ function generateKeys(): string[] {
   return keys;
 }
 
-// 打开密钥生成器弹窗
+// Open key generator modal
 function openKeyGenerator() {
   showKeyGeneratorModal.value = true;
   keyCount.value = 1;
 }
 
-// 确认生成密钥
+// Confirm generate keys
 function confirmGenerateKeys() {
   if (isGenerating.value) {
     return;
@@ -68,12 +68,12 @@ function confirmGenerateKeys() {
 
     let updatedValue = currentValue.trim();
 
-    // 处理逗号兼容情况
+    // Handle comma compatibility
     if (updatedValue && !updatedValue.endsWith(",")) {
       updatedValue += ",";
     }
 
-    // 添加新生成的密钥
+    // Add newly generated keys
     if (updatedValue) {
       updatedValue += newKeys.join(",");
     } else {
@@ -89,7 +89,7 @@ function confirmGenerateKeys() {
   }
 }
 
-// 复制代理密钥
+// Copy proxy keys
 async function copyProxyKeys() {
   const proxyKeys = props.modelValue || "";
   if (!proxyKeys.trim()) {
@@ -97,7 +97,7 @@ async function copyProxyKeys() {
     return;
   }
 
-  // 将逗号分隔的密钥转换为换行分隔
+  // Convert comma-separated keys to newline-separated
   const formattedKeys = proxyKeys
     .split(",")
     .map(key => key.trim())
@@ -112,7 +112,7 @@ async function copyProxyKeys() {
   }
 }
 
-// 处理输入框值变化
+// Handle input value change
 function handleInput(value: string) {
   emit("update:modelValue", value);
 }
@@ -145,7 +145,7 @@ function handleInput(value: string) {
       </template>
     </n-input>
 
-    <!-- 密钥生成器弹窗 -->
+    <!-- Key generator modal -->
     <n-modal
       v-model:show="showKeyGeneratorModal"
       preset="dialog"
@@ -157,7 +157,7 @@ function handleInput(value: string) {
     >
       <n-space vertical :size="16">
         <div>
-          <p style="margin: 0 0 8px 0; color: #666; font-size: 14px">
+          <p style="margin: 0 0 8px 0; color: var(--text-hint); font-size: 14px">
             {{ t("keys.enterKeysCount") }}
           </p>
           <n-input-number
@@ -169,7 +169,7 @@ function handleInput(value: string) {
             :disabled="isGenerating"
           />
         </div>
-        <div style="color: #999; font-size: 12px; line-height: 1.4">
+        <div style="color: var(--text-placeholder); font-size: 12px; line-height: 1.4">
           <p>{{ t("keys.generatedKeysWillAppend") }}</p>
         </div>
       </n-space>

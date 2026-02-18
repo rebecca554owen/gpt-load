@@ -24,7 +24,7 @@ export const appState = reactive<AppState>({
   syncOperationTrigger: 0,
 });
 
-// 触发同步操作后的数据刷新
+// Trigger data refresh after sync operation
 export function triggerSyncOperationRefresh(groupName: string, operationType: string) {
   appState.lastSyncOperation = {
     groupName,

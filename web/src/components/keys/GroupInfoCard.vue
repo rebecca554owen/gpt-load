@@ -8,9 +8,16 @@ import type {
   SubGroupInfo,
 } from "@/types/models";
 import { appState } from "@/utils/app-state";
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { getGroupDisplayName, maskProxyKeys } from "@/utils/display";
-import { CopyOutline, EyeOffOutline, EyeOutline, Pencil, Trash } from "@vicons/ionicons5";
+import {
+  CopyOutline,
+  EyeOffOutline,
+  EyeOutline,
+  HelpCircleOutline,
+  Pencil,
+  Trash,
+} from "@vicons/ionicons5";
 import {
   NButton,
   NButtonGroup,
@@ -35,6 +42,7 @@ import GroupCopyModal from "./GroupCopyModal.vue";
 import GroupFormModal from "./GroupFormModal.vue";
 
 const { t } = useI18n();
+const { copyWithFeedback } = useCopy();
 
 interface Props {
   group: Group | null;
@@ -66,6 +74,10 @@ const configOptions = ref<GroupConfigOption[]>([]);
 const showProxyKeys = ref(false);
 const parentAggregateGroups = ref<ParentAggregateGroup[]>([]);
 
+function countSubGroupsBy(filter: (sg: SubGroupInfo) => boolean): number {
+  return props.subGroups?.filter(filter).length || 0;
+}
+
 const proxyKeysDisplay = computed(() => {
   if (!props.group?.proxy_keys) {
     return "-";
@@ -89,32 +101,20 @@ const isAggregateGroup = computed(() => {
   return props.group?.group_type === "aggregate";
 });
 
-// 计算有效子分组数（weight > 0 且有可用密钥）
-const activeSubGroupsCount = computed(() => {
-  return props.subGroups?.filter(sg => sg.weight > 0 && sg.active_keys > 0).length || 0;
-});
-
-// 计算禁用子分组数（weight = 0）
-const disabledSubGroupsCount = computed(() => {
-  return props.subGroups?.filter(sg => sg.weight === 0).length || 0;
-});
-
-// 计算无效子分组数（weight > 0 但无可用密钥）
-const unavailableSubGroupsCount = computed(() => {
-  return props.subGroups?.filter(sg => sg.weight > 0 && sg.active_keys === 0).length || 0;
-});
+const activeSubGroupsCount = computed(() =>
+  countSubGroupsBy(sg => sg.weight > 0 && sg.active_keys > 0)
+);
+const disabledSubGroupsCount = computed(() => countSubGroupsBy(sg => sg.weight === 0));
+const unavailableSubGroupsCount = computed(() =>
+  countSubGroupsBy(sg => sg.weight > 0 && sg.active_keys === 0)
+);
 
 async function copyProxyKeys() {
   if (!props.group?.proxy_keys) {
     return;
   }
   const keysToCopy = props.group.proxy_keys.replace(/,/g, "\n");
-  const success = await copy(keysToCopy);
-  if (success) {
-    window.$message.success(t("keys.proxyKeysCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(keysToCopy, "keys.proxyKeysCopied", "keys.copyFailed");
 }
 
 onMounted(() => {
@@ -319,12 +319,7 @@ async function copyUrl(url: string) {
   if (!url) {
     return;
   }
-  const success = await copy(url);
-  if (success) {
-    window.$message.success(t("keys.urlCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(url, "keys.urlCopied", "keys.copyFailed");
 }
 
 function resetPage() {
@@ -685,14 +680,11 @@ function resetPage() {
                         <template #trigger>
                           <span class="config-label">
                             {{ getConfigDisplayName(key) }}:
-                            <n-icon size="14" class="config-help-icon">
-                              <svg viewBox="0 0 24 24">
-                                <path
-                                  fill="currentColor"
-                                  d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,17A1.5,1.5 0 0,1 10.5,15.5A1.5,1.5 0 0,1 12,14A1.5,1.5 0 0,1 13.5,15.5A1.5,1.5 0 0,1 12,17M12,10.5C10.07,10.5 8.5,8.93 8.5,7A3.5,3.5 0 0,1 12,3.5A3.5,3.5 0 0,1 15.5,7C15.5,8.93 13.93,10.5 12,10.5Z"
-                                />
-                              </svg>
-                            </n-icon>
+                            <n-icon
+                              :component="HelpCircleOutline"
+                              size="14"
+                              class="config-help-icon"
+                            />
                           </span>
                         </template>
                         <div class="config-tooltip">

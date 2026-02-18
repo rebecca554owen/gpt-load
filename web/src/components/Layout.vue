@@ -76,7 +76,7 @@ const toggleMenu = () => {
     <app-footer />
   </n-layout>
 
-  <!-- 全局任务进度条 -->
+  <!-- Global task progress bar -->
   <global-task-progress-bar />
 </template>
 
@@ -91,8 +91,9 @@ const toggleMenu = () => {
 .layout-header {
   background: var(--header-bg);
   backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border-color-light);
-  box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-xs);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -103,7 +104,7 @@ const toggleMenu = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 0;
+  padding: 10px 0;
   overflow-x: auto;
   max-width: 1200px;
   margin: 0 auto;
@@ -120,7 +121,7 @@ const toggleMenu = () => {
 .header-brand {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
   z-index: 2;
 }
@@ -129,8 +130,8 @@ const toggleMenu = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 35px;
-  height: 35px;
+  width: 36px;
+  height: 36px;
   img {
     height: 100%;
     width: 100%;
@@ -138,14 +139,15 @@ const toggleMenu = () => {
 }
 
 .brand-title {
-  font-size: 1.4rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
   font-weight: 700;
   background: var(--primary-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.03em;
 }
 
 .header-actions {
@@ -158,7 +160,7 @@ const toggleMenu = () => {
 
 .mobile-actions {
   padding: 16px;
-  border-top: 1px solid var(--border-color-light);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   align-items: stretch;

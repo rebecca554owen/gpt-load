@@ -3,17 +3,17 @@ import type { ApiResponse, Group, LogFilter, LogsResponse } from "@/types/models
 import http from "@/utils/http";
 
 export const logApi = {
-  // 获取日志列表
+  // Get logs list
   getLogs: (params: LogFilter): Promise<ApiResponse<LogsResponse>> => {
     return http.get("/logs", { params });
   },
 
-  // 获取分组列表（用于筛选）
+  // Get groups list (for filtering)
   getGroups: (): Promise<ApiResponse<Group[]>> => {
     return http.get("/groups");
   },
 
-  // 导出日志
+  // Export logs
   exportLogs: (params: Omit<LogFilter, "page" | "page_size">) => {
     const authKey = localStorage.getItem("authKey");
     if (!authKey) {

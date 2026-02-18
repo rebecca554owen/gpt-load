@@ -78,7 +78,7 @@ async function handleSubmit() {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleClose">
+        <n-button quaternary circle @click="handleClose" class="modal-close">
           <template #icon>
             <n-icon :component="Close" />
           </template>
@@ -94,9 +94,14 @@ async function handleSubmit() {
       />
 
       <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 12px">
-          <n-button @click="handleClose">{{ t("common.cancel") }}</n-button>
-          <n-button type="error" @click="handleSubmit" :loading="loading" :disabled="!keysText">
+        <div class="modal-footer">
+          <n-button @click="handleClose" class="btn-cancel">{{ t("common.cancel") }}</n-button>
+          <n-button
+            @click="handleSubmit"
+            :loading="loading"
+            :disabled="!keysText"
+            class="btn-delete"
+          >
             {{ t("common.delete") }}
           </n-button>
         </div>
@@ -122,10 +127,5 @@ async function handleSubmit() {
 :deep(.n-card__content) {
   max-height: calc(100vh - 68px - 61px - 50px);
   overflow-y: auto;
-}
-
-:deep(.n-card__footer) {
-  border-top: 1px solid rgba(239, 239, 245, 0.8);
-  padding: 10px 15px;
 }
 </style>

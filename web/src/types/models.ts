@@ -1,20 +1,20 @@
-// 通用 API 响应结构
+// Generic API response structure
 export interface ApiResponse<T> {
   code: number;
   message: string;
   data: T;
 }
 
-// 密钥状态
+// Key status
 export type KeyStatus = "active" | "invalid" | undefined;
 
-// 分组类型
+// Group type
 export type GroupType = "standard" | "aggregate";
 
-// 渠道类型
-export type ChannelType = "openai" | "openai-response" | "gemini" | "anthropic";
+// Channel type
+export type ChannelType = "openai" | "openai-responses" | "gemini" | "anthropic";
 
-// 数据模型定义
+// Data model definition
 export interface APIKey {
   id: number;
   group_id: number;
@@ -39,13 +39,13 @@ export interface HeaderRule {
   action: "set" | "remove";
 }
 
-// 子分组配置（创建/更新时使用）
+// Subgroup configuration (for create/update)
 export interface SubGroupConfig {
   group_id: number;
   weight: number;
 }
 
-// 子分组信息（展示时使用）
+// Subgroup information (for display)
 export interface SubGroupInfo {
   group: Group;
   weight: number;
@@ -54,12 +54,27 @@ export interface SubGroupInfo {
   invalid_keys: number;
 }
 
-// 父聚合分组信息（展示时使用）
+// Parent aggregate group information (for display)
 export interface ParentAggregateGroup {
   group_id: number;
   name: string;
   display_name: string;
   weight: number;
+}
+
+// Model mapping target configuration
+export interface ModelMappingTarget {
+  sub_group_id: number;
+  weight: number;
+  sub_group_name?: string;
+  model: string;
+  models?: string[];
+}
+
+// Model mapping configuration
+export interface ModelMapping {
+  model: string;
+  targets: ModelMappingTarget[];
 }
 
 export interface Group {
@@ -78,11 +93,14 @@ export interface Group {
   param_overrides: Record<string, unknown>;
   model_redirect_rules: Record<string, string>;
   model_redirect_strict: boolean;
+  model_mapping_strict?: boolean;
   header_rules?: HeaderRule[];
   proxy_keys: string;
   group_type?: GroupType;
-  sub_groups?: SubGroupInfo[]; // 子分组列表（仅聚合分组）
-  sub_group_ids?: number[]; // 子分组ID列表
+  sub_groups?: SubGroupInfo[]; // Subgroup list (aggregate groups only)
+  sub_group_ids?: number[]; // Subgroup ID list
+  model_mappings?: string | ModelMapping[]; // JSON string or array (pass array for update)
+  model_mappings_list?: ModelMapping[]; // Parsed array
   created_at?: string;
   updated_at?: string;
 }
@@ -164,9 +182,15 @@ export interface RequestLog {
   parent_group_name?: string;
   key_value?: string;
   model: string;
+  original_model?: string; // Original requested model name
   upstream_addr: string;
   is_stream: boolean;
   request_body?: string;
+  // Token statistics fields
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cached_tokens: number;
 }
 
 export interface Pagination {
@@ -209,7 +233,7 @@ export interface GroupRequestStat {
   request_count: number;
 }
 
-// 仪表盘统计卡片数据
+// Dashboard statistics card data
 export interface StatCard {
   value: number;
   sub_value?: number;
@@ -218,31 +242,36 @@ export interface StatCard {
   trend_is_growth: boolean;
 }
 
-// 安全警告信息
+// Security warning information
 export interface SecurityWarning {
-  type: string; // 警告类型：auth_key, encryption_key 等
-  message: string; // 警告信息
-  severity: string; // 严重程度：low, medium, high
-  suggestion: string; // 建议解决方案
+  type: string; // Warning type: auth_key, encryption_key, etc.
+  message: string; // Warning message
+  severity: string; // Severity: low, medium, high
+  suggestion: string; // Suggested solution
 }
 
-// 仪表盘基础统计响应
+// Dashboard basic statistics response
 export interface DashboardStatsResponse {
-  key_count: StatCard;
-  rpm: StatCard;
-  request_count: StatCard;
-  error_rate: StatCard;
-  security_warnings: SecurityWarning[];
+  key_count: StatCard
+  token_consumption: StatCard
+  prompt_tokens: StatCard
+  cached_tokens: StatCard
+  completion_tokens: StatCard
+  total_tokens: StatCard
+  rpm: StatCard
+  request_count: StatCard
+  error_rate: StatCard
+  security_warnings: SecurityWarning[]
 }
 
-// 图表数据集
+// Chart dataset
 export interface ChartDataset {
   label: string;
+  label_key?: string;
   data: number[];
-  color: string;
 }
 
-// 图表数据
+// Chart data
 export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];

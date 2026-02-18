@@ -4,6 +4,8 @@ import type { APIKey, Group, KeyStatus } from "@/types/models";
 import { appState, triggerSyncOperationRefresh } from "@/utils/app-state";
 import { copy } from "@/utils/clipboard";
 import { getGroupDisplayName, maskKey } from "@/utils/display";
+import { formatDuration } from "@/utils/format";
+import { PAGINATION } from "@/constants/chart";
 import {
   AddCircleOutline,
   AlertCircleOutline,
@@ -28,7 +30,7 @@ import {
   useDialog,
   type MessageReactive,
 } from "naive-ui";
-import { h, ref, watch } from "vue";
+import { h, ref, watch, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import KeyCreateDialog from "./KeyCreateDialog.vue";
 import KeyDeleteDialog from "./KeyDeleteDialog.vue";
@@ -50,20 +52,20 @@ const loading = ref(false);
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "invalid">("all");
 const currentPage = ref(1);
-const pageSize = ref(12);
+const pageSize = ref<12 | 24 | 60 | 120>(PAGINATION.defaultPageSize);
 const total = ref(0);
 const totalPages = ref(0);
 const dialog = useDialog();
 const confirmInput = ref("");
 
-// 状态过滤选项
+// Status filter options
 const statusOptions = [
   { label: t("common.all"), value: "all" },
   { label: t("keys.valid"), value: "active" },
   { label: t("keys.invalid"), value: "invalid" },
 ];
 
-// 更多操作下拉菜单选项
+// More options dropdown menu options
 const moreOptions = [
   { label: t("keys.exportAllKeys"), key: "copyAll" },
   { label: t("keys.exportValidKeys"), key: "copyValid" },
@@ -73,12 +75,12 @@ const moreOptions = [
   {
     label: t("keys.clearAllInvalidKeys"),
     key: "clearInvalid",
-    props: { style: { color: "#d03050" } },
+    props: { style: { color: "var(--error-color)" } },
   },
   {
     label: t("keys.clearAllKeys"),
     key: "clearAll",
-    props: { style: { color: "red", fontWeight: "bold" } },
+    props: { style: { color: "var(--error-color)", fontWeight: "bold" } },
   },
   { type: "divider" },
   { label: t("keys.validateAllKeys"), key: "validateAll" },
@@ -93,7 +95,7 @@ const isRestoring = ref(false);
 const createDialogShow = ref(false);
 const deleteDialogShow = ref(false);
 
-// 备注编辑相关
+// Notes editing related
 const notesDialogShow = ref(false);
 const editingKey = ref<KeyRow | null>(null);
 const editingNotes = ref("");
@@ -102,10 +104,10 @@ watch(
   () => props.selectedGroup,
   async newGroup => {
     if (newGroup) {
-      // 检查重置页面是否会触发分页观察者。
+      // Check if resetting page will trigger pagination watcher
       const willWatcherTrigger = currentPage.value !== 1 || statusFilter.value !== "all";
       resetPage();
-      // 如果分页观察者不触发，则手动加载。
+      // If pagination watcher doesn't trigger, manually load
       if (!willWatcherTrigger) {
         await loadKeys();
       }
@@ -126,29 +128,35 @@ watch(statusFilter, async () => {
   }
 });
 
-// 监听任务完成事件，自动刷新密钥列表
+// Watch task completion events, auto-refresh key list
 watch(
-  () => appState.groupDataRefreshTrigger,
-  () => {
-    // 检查是否需要刷新当前分组的密钥列表
-    if (appState.lastCompletedTask && props.selectedGroup) {
-      // 通过分组名称匹配
-      const isCurrentGroup = appState.lastCompletedTask.groupName === props.selectedGroup.name;
+  () => [appState.groupDataRefreshTrigger, appState.syncOperationTrigger],
+  async () => {
+    if (props.selectedGroup) {
+      // Check if need to refresh current group's key list
+      const isCurrentGroupTask =
+        appState.lastCompletedTask &&
+        appState.lastCompletedTask.groupName === props.selectedGroup.name;
+
+      const isCurrentGroupSync =
+        appState.lastSyncOperation &&
+        appState.lastSyncOperation.groupName === props.selectedGroup.name;
 
       const shouldRefresh =
-        appState.lastCompletedTask.taskType === "KEY_VALIDATION" ||
-        appState.lastCompletedTask.taskType === "KEY_IMPORT" ||
-        appState.lastCompletedTask.taskType === "KEY_DELETE";
+        (isCurrentGroupTask &&
+          ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
+            appState.lastCompletedTask?.taskType || ""
+          )) ||
+        isCurrentGroupSync;
 
-      if (isCurrentGroup && shouldRefresh) {
-        // 刷新当前分组的密钥列表
-        loadKeys();
+      if (shouldRefresh) {
+        await loadKeys();
       }
     }
   }
 );
 
-// 处理搜索输入的防抖
+// Handle search input debouncing
 function handleSearchInput() {
   if (currentPage.value !== 1) {
     currentPage.value = 1;
@@ -157,7 +165,7 @@ function handleSearchInput() {
   }
 }
 
-// 处理更多操作菜单
+// Handle more options menu
 function handleMoreAction(key: string) {
   switch (key) {
     case "copyAll":
@@ -212,10 +220,10 @@ async function loadKeys() {
   }
 }
 
-// 处理批量删除成功后的刷新
+// Handle batch delete success refresh
 async function handleBatchDeleteSuccess() {
   await loadKeys();
-  // 触发同步操作刷新
+  // Trigger sync operation refresh
   if (props.selectedGroup) {
     triggerSyncOperationRefresh(props.selectedGroup.name, "BATCH_DELETE");
   }
@@ -253,9 +261,11 @@ async function testKey(_key: KeyRow) {
         closable: true,
       });
     }
-    await loadKeys();
-    // 触发同步操作刷新
+    // Trigger sync operation refresh first
     triggerSyncOperationRefresh(props.selectedGroup.name, "TEST_SINGLE");
+    // Then wait for reactive update to complete before refreshing data
+    await nextTick();
+    await loadKeys();
   } catch (_error) {
     console.error("Test failed");
   } finally {
@@ -264,34 +274,11 @@ async function testKey(_key: KeyRow) {
   }
 }
 
-function formatDuration(ms: number): string {
-  if (ms < 0) {
-    return "0ms";
-  }
-
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const milliseconds = ms % 1000;
-
-  let result = "";
-  if (minutes > 0) {
-    result += `${minutes}m`;
-  }
-  if (seconds > 0) {
-    result += `${seconds}s`;
-  }
-  if (milliseconds > 0 || result === "") {
-    result += `${milliseconds}ms`;
-  }
-
-  return result;
-}
-
 function toggleKeyVisibility(key: KeyRow) {
   key.is_visible = !key.is_visible;
 }
 
-// 获取要显示的值（备注优先，否则显示密钥）
+// Get value to display (notes priority, otherwise show key)
 function getDisplayValue(key: KeyRow): string {
   if (key.notes && !key.is_visible) {
     return key.notes;
@@ -299,14 +286,14 @@ function getDisplayValue(key: KeyRow): string {
   return key.is_visible ? key.key_value : maskKey(key.key_value);
 }
 
-// 编辑密钥备注
+// Edit key notes
 function editKeyNotes(key: KeyRow) {
   editingKey.value = key;
   editingNotes.value = key.notes || "";
   notesDialogShow.value = true;
 }
 
-// 保存备注
+// Save notes
 async function saveKeyNotes() {
   if (!editingKey.value) {
     return;
@@ -344,7 +331,7 @@ async function restoreKey(key: KeyRow) {
       try {
         await keysApi.restoreKeys(props.selectedGroup.id, key.key_value);
         await loadKeys();
-        // 触发同步操作刷新
+        // Trigger sync operation refresh
         triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_SINGLE");
       } catch (_error) {
         console.error("Restore failed");
@@ -377,7 +364,7 @@ async function deleteKey(key: KeyRow) {
       try {
         await keysApi.deleteKeys(props.selectedGroup.id, key.key_value);
         await loadKeys();
-        // 触发同步操作刷新
+        // Trigger sync operation refresh
         triggerSyncOperationRefresh(props.selectedGroup.name, "DELETE_SINGLE");
       } catch (_error) {
         console.error("Delete failed");
@@ -470,7 +457,7 @@ async function restoreAllInvalid() {
       try {
         await keysApi.restoreAllInvalidKeys(props.selectedGroup.id);
         await loadKeys();
-        // 触发同步操作刷新
+        // Trigger sync operation refresh
         triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_ALL_INVALID");
       } catch (_error) {
         console.error("Restore failed");
@@ -531,7 +518,7 @@ async function clearAllInvalid() {
         const { data } = await keysApi.clearAllInvalidKeys(props.selectedGroup.id);
         window.$message.success(data?.message || t("keys.clearSuccess"));
         await loadKeys();
-        // 触发同步操作刷新
+        // Trigger sync operation refresh
         triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL_INVALID");
       } catch (_error) {
         console.error("Delete failed");
@@ -563,7 +550,7 @@ async function clearAll() {
               t("keys.dangerousOperationWarning1"),
               h("strong", null, t("common.all")),
               t("keys.dangerousOperationWarning2"),
-              h("strong", { style: { color: "#d03050" } }, props.selectedGroup?.name),
+              h("strong", { style: { color: "var(--error-color)" } }, props.selectedGroup?.name),
               t("keys.toConfirm"),
             ]),
             h(NInput, {
@@ -608,7 +595,7 @@ function changePage(page: number) {
   currentPage.value = page;
 }
 
-function changePageSize(size: number) {
+function changePageSize(size: 12 | 24 | 60 | 120) {
   pageSize.value = size;
   currentPage.value = 1;
 }
@@ -625,13 +612,13 @@ function resetPage() {
     <!-- 工具栏 -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <n-button type="success" size="small" @click="createDialogShow = true">
+        <n-button class="btn-create" size="small" @click="createDialogShow = true">
           <template #icon>
             <n-icon :component="AddCircleOutline" />
           </template>
           {{ t("keys.addKey") }}
         </n-button>
-        <n-button type="error" size="small" @click="deleteDialogShow = true">
+        <n-button class="btn-delete" size="small" @click="deleteDialogShow = true">
           <template #icon>
             <n-icon :component="RemoveCircleOutline" />
           </template>
@@ -757,9 +744,7 @@ function resetPage() {
               </div>
               <n-button-group class="key-actions">
                 <n-button
-                  round
-                  tertiary
-                  type="info"
+                  class="btn-test"
                   size="tiny"
                   @click="testKey(key)"
                   :title="t('keys.testKey')"
@@ -768,19 +753,16 @@ function resetPage() {
                 </n-button>
                 <n-button
                   v-if="key.status !== 'active'"
-                  tertiary
+                  class="btn-view"
                   size="tiny"
                   @click="restoreKey(key)"
                   :title="t('keys.restoreKey')"
-                  type="warning"
                 >
                   {{ t("keys.restoreShort") }}
                 </n-button>
                 <n-button
-                  round
-                  tertiary
+                  class="btn-delete"
                   size="tiny"
-                  type="error"
                   @click="deleteKey(key)"
                   :title="t('keys.deleteKey')"
                 >
@@ -799,12 +781,12 @@ function resetPage() {
         <span>{{ t("keys.totalRecords", { total }) }}</span>
         <n-select
           v-model:value="pageSize"
-          :options="[
-            { label: t('keys.recordsPerPage', { count: 12 }), value: 12 },
-            { label: t('keys.recordsPerPage', { count: 24 }), value: 24 },
-            { label: t('keys.recordsPerPage', { count: 60 }), value: 60 },
-            { label: t('keys.recordsPerPage', { count: 120 }), value: 120 },
-          ]"
+          :options="
+            PAGINATION.keyPageSizes.map(size => ({
+              label: t('keys.recordsPerPage', { count: size }),
+              value: size,
+            }))
+          "
           size="small"
           style="width: 100px; margin-left: 12px"
           @update:value="changePageSize"
@@ -855,8 +837,12 @@ function resetPage() {
       show-count
     />
     <template #action>
-      <n-button @click="notesDialogShow = false">{{ t("common.cancel") }}</n-button>
-      <n-button type="primary" @click="saveKeyNotes">{{ t("common.save") }}</n-button>
+      <n-button @click="notesDialogShow = false" class="btn-cancel">
+        {{ t("common.cancel") }}
+      </n-button>
+      <n-button @click="saveKeyNotes" class="btn-confirm">
+        {{ t("common.save") }}
+      </n-button>
     </template>
   </n-modal>
 </template>
@@ -936,25 +922,25 @@ function resetPage() {
   text-align: left;
   cursor: pointer;
   font-size: 14px;
-  color: #333;
+  color: var(--text-primary);
   transition: background-color 0.2s;
 }
 
 .menu-item:hover {
-  background: #f8f9fa;
+  background: var(--hover-bg);
 }
 
 .menu-item.danger {
-  color: #dc3545;
+  color: var(--error-color);
 }
 
 .menu-item.danger:hover {
-  background: #f8d7da;
+  background: var(--error-bg);
 }
 
 .menu-divider {
   height: 1px;
-  background: #e9ecef;
+  background: var(--border-color);
   margin: 4px 0;
 }
 
@@ -979,21 +965,21 @@ function resetPage() {
 }
 
 .btn-primary {
-  background: #007bff;
+  background: var(--info-color);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
+  background: var(--primary-color-hover);
 }
 
 .btn-secondary {
-  background: #6c757d;
+  background: var(--text-secondary);
   color: white;
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #545b62;
+  background: var(--text-tertiary);
 }
 
 .more-icon {
@@ -1005,7 +991,7 @@ function resetPage() {
 .search-input,
 .page-size-select {
   padding: 4px 8px;
-  border: 1px solid #ced4da;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   font-size: 12px;
 }
@@ -1018,8 +1004,8 @@ function resetPage() {
 .search-input:focus,
 .page-size-select:focus {
   outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--info-color);
+  box-shadow: var(--focus-ring);
 }
 
 /* 密钥卡片网格 */
@@ -1132,8 +1118,8 @@ function resetPage() {
 
 /* 浅色主题 */
 :root:not(.dark) .key-text {
-  color: #495057;
-  background: #f8f9fa;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
 }
 
 /* 暗黑主题 */
@@ -1165,7 +1151,7 @@ function resetPage() {
 
 /* 浅色主题 */
 :root:not(.dark) .quick-btn:hover {
-  background: #e9ecef;
+  background: var(--bg-tertiary);
 }
 
 /* 暗黑主题 */
@@ -1203,22 +1189,22 @@ function resetPage() {
 }
 
 .action-btn.secondary {
-  border-color: #6c757d;
-  color: #6c757d;
+  border-color: var(--text-tertiary);
+  color: var(--text-tertiary);
 }
 
 .action-btn.secondary:hover {
-  background: #6c757d;
+  background: var(--text-tertiary);
   color: white;
 }
 
 .action-btn.danger {
-  border-color: #dc3545;
-  color: #dc3545;
+  border-color: var(--error-color);
+  color: var(--error-color);
 }
 
 .action-btn.danger:hover {
-  background: #dc3545;
+  background: var(--error-color);
   color: white;
 }
 
@@ -1229,7 +1215,7 @@ function resetPage() {
   justify-content: center;
   align-items: center;
   height: 200px;
-  color: #6c757d;
+  color: var(--text-secondary);
 }
 
 .loading-spinner {
