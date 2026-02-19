@@ -124,6 +124,10 @@ export default {
     total_tokens: "总量",
     success_requests: "成功请求",
     failed_requests: "失败请求",
+    // 图表时间轴标签
+    minutesAgo: "{value}分钟前",
+    hoursAgo: "{value}小时前",
+    daysAgo: "{value}天前",
   },
   keys: {
     title: "密钥管理",
@@ -550,6 +554,8 @@ export default {
     completionTokens: "输出",
     cachedTokens: "缓存",
     totalTokens: "总计",
+    requestModel: "请求模型",
+    actualModel: "实际模型",
   },
   settings: {
     title: "系统设置",

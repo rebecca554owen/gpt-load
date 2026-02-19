@@ -21,6 +21,54 @@ export function useApi() {
   const { t } = useI18n();
 
   /**
+   * Parse response data error
+   * @param data Response data
+   * @returns Parsed error message string or null
+   */
+  function parseResponseDataError(
+    data: ErrorResponseData | ErrorResponseData[] | unknown
+  ): string | null {
+    // If array, take first element
+    const errorData = Array.isArray(data) ? data[0] : data;
+
+    if (errorData && typeof errorData === "object" && "message" in errorData) {
+      return (errorData as ErrorResponseData).message || "";
+    }
+
+    // If string, return directly
+    if (typeof errorData === "string") {
+      return errorData;
+    }
+
+    // Otherwise return JSON string
+    try {
+      return JSON.stringify(errorData);
+    } catch {
+      return String(errorData);
+    }
+  }
+
+  /**
+   * Parse error object
+   * @param errorObj Error object
+   * @returns Parsed error message string or null
+   */
+  function parseErrorObject(errorObj: Partial<AxiosError>): string | null {
+    // Check message property of object
+    if (errorObj.message) {
+      return errorObj.message;
+    }
+
+    // Check status code related errors
+    if (errorObj.response?.status) {
+      const status = errorObj.response.status;
+      return t("common.requestFailed", { status });
+    }
+
+    return null;
+  }
+
+  /**
    * Parse API error message
    * @param error Error object
    * @returns Parsed error message string
@@ -39,37 +87,16 @@ export function useApi() {
 
       // Check message in response data
       if (errorObj.response?.data) {
-        const data = errorObj.response.data;
-
-        // If array, take first element
-        const errorData = Array.isArray(data) ? data[0] : data;
-
-        if (errorData && typeof errorData === "object" && "message" in errorData) {
-          return (errorData as ErrorResponseData).message || "";
-        }
-
-        // If string, return directly
-        if (typeof errorData === "string") {
-          return errorData;
-        }
-
-        // Otherwise return JSON string
-        try {
-          return JSON.stringify(errorData);
-        } catch {
-          return String(errorData);
+        const responseError = parseResponseDataError(errorObj.response.data);
+        if (responseError) {
+          return responseError;
         }
       }
 
-      // Check message property of object
-      if (errorObj.message) {
-        return errorObj.message;
-      }
-
-      // Check status code related errors
-      if (errorObj.response?.status) {
-        const status = errorObj.response.status;
-        return t("common.requestFailed", { status });
+      // Check error object properties
+      const objectError = parseErrorObject(errorObj);
+      if (objectError) {
+        return objectError;
       }
     }
 

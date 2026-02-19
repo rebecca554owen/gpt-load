@@ -124,6 +124,10 @@ export default {
     total_tokens: "Total",
     success_requests: "Success Requests",
     failed_requests: "Failed Requests",
+    // Chart time axis labels
+    minutesAgo: "{value}m ago",
+    hoursAgo: "{value}h ago",
+    daysAgo: "{value}d ago",
   },
   keys: {
     title: "Key Management",
@@ -586,6 +590,8 @@ export default {
     completionTokens: "Completion",
     cachedTokens: "Cached",
     totalTokens: "Total",
+    requestModel: "Request Model",
+    actualModel: "Actual Model",
   },
   settings: {
     title: "Settings",

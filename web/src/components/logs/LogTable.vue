@@ -772,11 +772,11 @@ const deselectAllColumns = () => {
                 <span class="detail-value-compact">{{ selectedLog.group_name }}</span>
               </div>
               <div class="detail-item-compact">
-                <span class="detail-label-compact">Request Model:</span>
+                <span class="detail-label-compact">{{ t("logs.requestModel") }}:</span>
                 <span class="detail-value-compact">{{ selectedLog.original_model || "-" }}</span>
               </div>
               <div class="detail-item-compact">
-                <span class="detail-label-compact">Actual Model:</span>
+                <span class="detail-label-compact">{{ t("logs.actualModel") }}:</span>
                 <span class="detail-value-compact">{{ selectedLog.model || "-" }}</span>
               </div>
               <div class="detail-item-compact">

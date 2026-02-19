@@ -4,6 +4,16 @@ import type { ChartData } from "@/types/models";
 import type { TimeRangeHours } from "./useChartData";
 import { CHART_CONFIG, Y_AXIS, NUMBER_FORMAT } from "@/constants/chart";
 
+const PRECISION_MULTIPLIER = 1000000;
+
+const LABEL_COUNTS: Record<TimeRangeHours, number> = {
+  1: 6,
+  5: 6,
+  24: 6,
+  168: 6,
+  720: 6,
+} as const;
+
 interface Padding {
   top: number;
   right: number;
@@ -52,7 +62,11 @@ export function useChartRendering(
     const range = max - min;
     const step = range / (Y_AXIS.tickCount - 1);
 
-    return Array.from({ length: Y_AXIS.tickCount }, (_, i) => min + i * step);
+    return Array.from({ length: Y_AXIS.tickCount }, (_, i) => {
+      const tickValue = min + i * step;
+      // Round to avoid floating point precision issues
+      return Math.round(tickValue * PRECISION_MULTIPLIER) / PRECISION_MULTIPLIER;
+    });
   });
 
   const formatTimeLabel = (_isoString: string, index: number, totalLabels: number) => {
@@ -97,41 +111,41 @@ export function useChartRendering(
   };
 
   // Get the number of labels to show based on time range
-  const getLabelCount = (rangeHours: TimeRangeHours): number => {
-    if (rangeHours === 1) return 6; // 60min, 50min, 40min, 30min, 20min, 10min, realtime
-    if (rangeHours === 5) return 5; // 5h, 4h, 3h, 2h, realtime
-    if (rangeHours === 24) return 7; // 24h, 20h, 16h, 12h, 8h, 4h, realtime
-    if (rangeHours === 168) return 7; // 6d, 5d, 4d, 3d, 2d, 1d, realtime
-    return 6; // 30d, 24d, 18d, 12d, 6d, realtime
-  };
+  const getLabelCount = (rangeHours: TimeRangeHours): number =>
+    LABEL_COUNTS[rangeHours] ?? 6;
 
   // Generate label text based on position
+  // All ranges have 6 labels total, with 5 time intervals + realtime
   const generateLabelText = (positionIndex: number, totalLabels: number, rangeHours: TimeRangeHours): string => {
     const isRealtime = positionIndex === totalLabels - 1;
     if (isRealtime) {
       return "realtime";
     }
 
+    // 5 intervals (index 0-4), calculate value based on range
+    const intervalIndex = totalLabels - 1 - positionIndex; // 5, 4, 3, 2, 1 for index 0-4
+
     if (rangeHours === 1) {
-      // 1 hour range: show minutes (60, 50, 40, 30, 20, 10)
-      const minutesFromEnd = (totalLabels - 1 - positionIndex) * 10;
-      return `${minutesFromEnd}分钟前`;
+      // 1 hour range: 6 data points, 6 labels (1:1 mapping)
+      // Labels at index 0,1,2,3,4,5
+      const minutesFromEnd = (5 - positionIndex) * 10;
+      return t("dashboard.minutesAgo", { value: minutesFromEnd });
     } else if (rangeHours === 5) {
-      // 5 hour range: show hours (5, 4, 3, 2)
-      const hoursFromEnd = totalLabels - 1 - positionIndex;
-      return `${hoursFromEnd}小时前`;
+      // 5 hour range: 5, 4, 3, 2, 1 hours
+      const hoursFromEnd = intervalIndex;
+      return t("dashboard.hoursAgo", { value: hoursFromEnd });
     } else if (rangeHours === 24) {
-      // 24 hour range: show hours (24, 20, 16, 12, 8, 4)
-      const hoursFromEnd = Math.floor((totalLabels - 1 - positionIndex) * 4);
-      return `${hoursFromEnd}小时前`;
+      // 24 hour range: 20, 16, 12, 8, 4 hours
+      const hoursFromEnd = intervalIndex * 4;
+      return t("dashboard.hoursAgo", { value: hoursFromEnd });
     } else if (rangeHours === 168) {
-      // 1 week range: show days (6, 5, 4, 3, 2, 1)
-      const daysFromEnd = totalLabels - 1 - positionIndex;
-      return `${daysFromEnd}天前`;
+      // 1 week range: 5, 4, 3, 2, 1 days
+      const daysFromEnd = intervalIndex;
+      return t("dashboard.daysAgo", { value: daysFromEnd });
     } else {
-      // 1 month range: show days (30, 24, 18, 12, 6)
-      const daysFromEnd = Math.floor((totalLabels - 1 - positionIndex) * 6);
-      return `${daysFromEnd}天前`;
+      // 1 month range: 25, 20, 15, 10, 5 days
+      const daysFromEnd = intervalIndex * 5;
+      return t("dashboard.daysAgo", { value: daysFromEnd });
     }
   };
 
@@ -164,7 +178,11 @@ export function useChartRendering(
 
   const getYPosition = (value: number): number => {
     const { min, max } = dataRange.value;
-    const ratio = (value - min) / (max - min);
+    const range = max - min;
+    if (range === 0) {
+      return padding.top + plotHeight / 2;
+    }
+    const ratio = (value - min) / range;
     return padding.top + (1 - ratio) * plotHeight;
   };
 
@@ -244,15 +262,25 @@ export function useChartRendering(
       return "0";
     }
 
-    if (value < 1000) {
-      return value.toString();
+    // Fix floating point precision issues
+    const roundedValue = Math.round(value * PRECISION_MULTIPLIER) / PRECISION_MULTIPLIER;
+
+    if (roundedValue < 1000) {
+      // For small values, show appropriate decimal places
+      if (roundedValue < 10) {
+        return roundedValue.toFixed(2);
+      }
+      if (roundedValue < 100) {
+        return roundedValue.toFixed(1);
+      }
+      return Math.round(roundedValue).toString();
     }
 
-    if (value < NUMBER_FORMAT.million) {
-      return `${(value / 1000).toFixed(1)}K`;
+    if (roundedValue < NUMBER_FORMAT.million) {
+      return `${(roundedValue / 1000).toFixed(1)}K`;
     }
 
-    return `${(value / NUMBER_FORMAT.million).toFixed(1)}M`;
+    return `${(roundedValue / NUMBER_FORMAT.million).toFixed(1)}M`;
   };
 
   return {

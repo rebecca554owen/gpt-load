@@ -1,9 +1,9 @@
 # GPT-Load
 
-English | [中文](README_CN.md) | [日本語](README_JP.md)
+[English](README.md) | [中文](README_CN.md) | [日本語](README_JP.md)
 
 [![Release](https://img.shields.io/github/v/release/tbphp/gpt-load)](https://github.com/tbphp/gpt-load/releases)
-![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)
+![Go Version](https://img.shields.io/badge/Go-1.26+-blue.svg)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 A high-performance, enterprise-grade AI API transparent proxy service designed specifically for enterprises and developers who need to integrate multiple AI services. Built with Go, featuring intelligent key management, load balancing, and comprehensive monitoring capabilities, designed for high-concurrency production environments.
@@ -39,7 +39,7 @@ GPT-Load serves as a transparent proxy service, completely preserving the native
 
 ### System Requirements
 
-- Go 1.24+ (for source builds)
+- Go 1.26+ (for source builds)
 - Docker (for containerized deployment)
 - MySQL, PostgreSQL, or SQLite (for database storage)
 - Redis (for caching and distributed coordination, optional)
@@ -140,7 +140,7 @@ Cluster deployment requires all nodes to connect to the same MySQL (or PostgreSQ
 - All nodes must configure identical `AUTH_KEY`, `DATABASE_DSN`, `REDIS_DSN`
 - Leader-follower architecture where follower nodes must configure environment variable: `IS_SLAVE=true`
 
-For details, please refer to [Cluster Deployment Documentation](https://www.gpt-load.com/docs/cluster?lang=en)
+For details, please refer to [Cluster Deployment Documentation](https://www.gpt-load.com/docs/deployment/cluster?lang=en)
 
 ## Configuration System
 
@@ -196,7 +196,7 @@ GPT-Load adopts a dual-layer configuration architecture:
 | Setting                 | Environment Variable      | Default                       | Description                                     |
 | ----------------------- | ------------------------- | ----------------------------- | ----------------------------------------------- |
 | Max Concurrent Requests | `MAX_CONCURRENT_REQUESTS` | 100                           | Maximum concurrent requests allowed by system   |
-| Enable CORS             | `ENABLE_CORS`             | false                          | Whether to enable Cross-Origin Resource Sharing |
+| Enable CORS             | `ENABLE_CORS`             | false                         | Whether to enable Cross-Origin Resource Sharing |
 | Allowed Origins         | `ALLOWED_ORIGINS`         | -                             | Allowed origins, comma-separated                |
 | Allowed Methods         | `ALLOWED_METHODS`         | `GET,POST,PUT,DELETE,OPTIONS` | Allowed HTTP methods                            |
 | Allowed Headers         | `ALLOWED_HEADERS`         | `*`                           | Allowed request headers, comma-separated        |
@@ -418,7 +418,7 @@ Assuming a group named `openai` was created:
 curl -X POST https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer sk-your-openai-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "gpt-5-mini", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **Proxy invocation:**
@@ -427,7 +427,7 @@ curl -X POST https://api.openai.com/v1/chat/completions \
 curl -X POST http://localhost:3001/proxy/openai/v1/chat/completions \
   -H "Authorization: Bearer your-proxy-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "gpt-5-mini", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **Changes required:**
@@ -441,7 +441,7 @@ curl -X POST http://localhost:3001/proxy/openai/v1/chat/completions \
 curl -X POST http://localhost:3001/proxy/openai-response/v1/responses \
   -H "Authorization: Bearer your-proxy-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "input": "Hello"}'
+  -d '{"model": "gpt-5-mini", "input": "Hello"}'
 ```
 
 ### 4. Gemini Interface Example
@@ -451,7 +451,7 @@ Assuming a group named `gemini` was created:
 **Original invocation:**
 
 ```bash
-curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=your-gemini-key \
+curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=your-gemini-key \
   -H "Content-Type: application/json" \
   -d '{"contents": [{"parts": [{"text": "Hello"}]}]}'
 ```
@@ -459,7 +459,7 @@ curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
 **Proxy invocation:**
 
 ```bash
-curl -X POST http://localhost:3001/proxy/gemini/v1beta/models/gemini-2.5-pro:generateContent?key=your-proxy-key \
+curl -X POST http://localhost:3001/proxy/gemini/v1beta/models/gemini-3-flash-preview:generateContent?key=your-proxy-key \
   -H "Content-Type: application/json" \
   -d '{"contents": [{"parts": [{"text": "Hello"}]}]}'
 ```
@@ -480,7 +480,7 @@ curl -X POST https://api.anthropic.com/v1/messages \
   -H "x-api-key: sk-ant-api03-your-anthropic-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
-  -d '{"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "claude-3-5-sonnet-latest", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **Proxy invocation:**
@@ -490,7 +490,7 @@ curl -X POST http://localhost:3001/proxy/anthropic/v1/messages \
   -H "x-api-key: your-proxy-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
-  -d '{"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "claude-3-5-sonnet-latest", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **Changes required:**
@@ -539,7 +539,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-4.1-mini",
+    model="gpt-5-mini",
     messages=[{"role": "user", "content": "Hello"}]
 )
 ```
@@ -555,7 +555,7 @@ genai.configure(
     client_options={"api_endpoint": "http://localhost:3001/proxy/gemini"}
 )
 
-model = genai.GenerativeModel('gemini-2.5-pro')
+model = genai.GenerativeModel('gemini-3-flash-preview')
 response = model.generate_content("Hello")
 ```
 
@@ -570,7 +570,7 @@ client = Anthropic(
 )
 
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-3-5-sonnet-latest",
     messages=[{"role": "user", "content": "Hello"}]
 )
 ```

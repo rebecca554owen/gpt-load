@@ -124,6 +124,10 @@ export default {
     total_tokens: "合計",
     success_requests: "成功リクエスト",
     failed_requests: "失敗リクエスト",
+    // グラフ時間軸ラベル
+    minutesAgo: "{value}分前",
+    hoursAgo: "{value}時間前",
+    daysAgo: "{value}日前",
   },
   keys: {
     title: "キー管理",
@@ -587,6 +591,8 @@ export default {
     completionTokens: "完了",
     cachedTokens: "キャッシュ",
     totalTokens: "合計",
+    requestModel: "リクエストモデル",
+    actualModel: "実際のモデル",
   },
   settings: {
     title: "システム設定",

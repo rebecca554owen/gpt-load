@@ -77,6 +77,7 @@ func (b *BaseChannel) getUpstreamURL() *url.URL {
 
 	selected := utils.SelectByWeightedRoundRobin(items)
 	if selected == nil {
+		logrus.WithField("channel", b.Name).Warn("Weighted selection failed, using first upstream as fallback")
 		return b.Upstreams[0].URL
 	}
 

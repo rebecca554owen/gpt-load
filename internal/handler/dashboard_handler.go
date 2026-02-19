@@ -59,6 +59,25 @@ func parseHoursParameter(hoursStr string) int {
 	}
 }
 
+// parseStatsHoursParameter converts hours string to hours integer for stats API
+// Supports: 1, 5, 24, 168, 720 hours
+func parseStatsHoursParameter(hoursStr string) int {
+	switch hoursStr {
+	case "1":
+		return 1
+	case "5":
+		return 5
+	case "24":
+		return 24
+	case "168":
+		return 168
+	case "720":
+		return 720
+	default:
+		return 1 // default to 1 hour
+	}
+}
+
 type trendResult struct {
 	value       float64
 	isGrowth     bool
@@ -90,7 +109,16 @@ func calculateErrorRateTrend(currentErrorRate, previousErrorRate float64, hasCur
 
 // Stats Get dashboard statistics
 func (s *Server) Stats(c *gin.Context) {
-	days := parseDaysParameter(c.DefaultQuery("days", "1"))
+	// Support both 'hours' and 'days' parameters for backward compatibility
+	// Priority: hours > days
+	hoursStr := c.Query("hours")
+	var hours int
+	if hoursStr != "" {
+		hours = parseStatsHoursParameter(hoursStr)
+	} else {
+		days := parseDaysParameter(c.DefaultQuery("days", "1"))
+		hours = days * 24
+	}
 
 	now := time.Now()
 	rpmStats, err := s.getRPMStats(now)
@@ -99,8 +127,8 @@ func (s *Server) Stats(c *gin.Context) {
 		return
 	}
 
-	// Calculate time ranges based on days
-	currentDuration := time.Duration(days*24) * time.Hour
+	// Calculate time ranges based on hours
+	currentDuration := time.Duration(hours) * time.Hour
 	previousDuration := currentDuration
 
 	currentStart := now.Add(-currentDuration)
@@ -263,7 +291,7 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 	var intervalMinutes int
 	switch {
 	case totalHours <= 1: // 1 hour
-		intervalMinutes = 5 // 12 points
+		intervalMinutes = 10 // 6 points (matches 6 labels exactly)
 	case totalHours <= 5: // 1-5 hours
 		intervalMinutes = 15 // 20 points
 	case totalHours <= 24: // 5-24 hours
@@ -467,7 +495,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	var intervalMinutes int
 	switch {
 	case totalHours <= 1: // 1 hour
-		intervalMinutes = 5 // 12 points
+		intervalMinutes = 10 // 6 points (matches 6 labels exactly)
 	case totalHours <= 5: // 1-5 hours
 		intervalMinutes = 15 // 20 points
 	case totalHours <= 24: // 5-24 hours

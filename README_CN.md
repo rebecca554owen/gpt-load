@@ -1,6 +1,6 @@
 # GPT-Load
 
-[English](README.md) | 中文 | [日本語](README_JP.md)
+[English](README.md) | [中文](README_CN.md) | [日本語](README_JP.md)
 
 [![Release](https://img.shields.io/github/v/release/tbphp/gpt-load)](https://github.com/tbphp/gpt-load/releases)
 ![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)
@@ -418,7 +418,7 @@ GPT-Load 当前支持两种 OpenAI 兼容分组类型：
 curl -X POST https://api.openai.com/v1/chat/completions \
   -H "Authorization: Bearer sk-your-openai-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "gpt-5-mini", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **代理调用方式：**
@@ -427,7 +427,7 @@ curl -X POST https://api.openai.com/v1/chat/completions \
 curl -X POST http://localhost:3001/proxy/openai/v1/chat/completions \
   -H "Authorization: Bearer your-proxy-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "gpt-5-mini", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **变更说明：**
@@ -441,7 +441,7 @@ curl -X POST http://localhost:3001/proxy/openai/v1/chat/completions \
 curl -X POST http://localhost:3001/proxy/openai-response/v1/responses \
   -H "Authorization: Bearer your-proxy-key" \
   -H "Content-Type: application/json" \
-  -d '{"model": "gpt-4.1-mini", "input": "Hello"}'
+  -d '{"model": "gpt-5-mini", "input": "Hello"}'
 ```
 
 ### 4. Gemini 接口调用示例
@@ -451,7 +451,7 @@ curl -X POST http://localhost:3001/proxy/openai-response/v1/responses \
 **原始调用方式：**
 
 ```bash
-curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=your-gemini-key \
+curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=your-gemini-key \
   -H "Content-Type: application/json" \
   -d '{"contents": [{"parts": [{"text": "Hello"}]}]}'
 ```
@@ -459,7 +459,7 @@ curl -X POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-
 **代理调用方式：**
 
 ```bash
-curl -X POST http://localhost:3001/proxy/gemini/v1beta/models/gemini-2.5-pro:generateContent?key=your-proxy-key \
+curl -X POST http://localhost:3001/proxy/gemini/v1beta/models/gemini-3-flash-preview:generateContent?key=your-proxy-key \
   -H "Content-Type: application/json" \
   -d '{"contents": [{"parts": [{"text": "Hello"}]}]}'
 ```
@@ -480,7 +480,7 @@ curl -X POST https://api.anthropic.com/v1/messages \
   -H "x-api-key: sk-ant-api03-your-anthropic-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
-  -d '{"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "claude-3-5-sonnet-latest", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **代理调用方式：**
@@ -490,7 +490,7 @@ curl -X POST http://localhost:3001/proxy/anthropic/v1/messages \
   -H "x-api-key: your-proxy-key" \
   -H "anthropic-version: 2023-06-01" \
   -H "Content-Type: application/json" \
-  -d '{"model": "claude-sonnet-4-20250514", "messages": [{"role": "user", "content": "Hello"}]}'
+  -d '{"model": "claude-3-5-sonnet-latest", "messages": [{"role": "user", "content": "Hello"}]}'
 ```
 
 **变更说明：**
@@ -539,7 +539,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gpt-4.1-mini",
+    model="gpt-5-mini",
     messages=[{"role": "user", "content": "Hello"}]
 )
 ```
@@ -555,7 +555,7 @@ genai.configure(
     client_options={"api_endpoint": "http://localhost:3001/proxy/gemini"}
 )
 
-model = genai.GenerativeModel('gemini-2.5-pro')
+model = genai.GenerativeModel('gemini-3-flash-preview')
 response = model.generate_content("Hello")
 ```
 
@@ -570,7 +570,7 @@ client = Anthropic(
 )
 
 response = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-3-5-sonnet-latest",
     messages=[{"role": "user", "content": "Hello"}]
 )
 ```

@@ -15,25 +15,13 @@ const viewType = ref<"request" | "token">("token");
 // Time range in hours: 1/5/168/720
 const timeRange = ref<TimeRangeHours>(1);
 
-// Convert hours to days for stats API
-const hoursToDays = (hours: number): number => {
-  if (hours <= 5) {
-    return 1;
-  }
-  if (hours <= 168) {
-    return 7;
-  }
-  return 30;
-};
-
 const dashboardStats = ref<DashboardStatsResponse | null>(null);
 
 // Load statistics
 const loadStats = async () => {
   try {
-    // Use days for stats API (1/3/7 days)
-    const days = hoursToDays(timeRange.value);
-    const response = await getDashboardStats(days);
+    // Use hours directly for stats API (1/5/24/168/720 hours)
+    const response = await getDashboardStats(timeRange.value);
     dashboardStats.value = response.data;
   } catch (error) {
     console.error("Failed to load dashboard stats:", error);

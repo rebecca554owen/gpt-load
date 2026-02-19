@@ -8,15 +8,11 @@ import (
 type TokenUsage struct {
 	PromptTokens     int64
 	CompletionTokens int64
-	TotalTokens      int64
 	CachedTokens     int64
 }
 
-func (u *TokenUsage) Validate() {
-	if u.CachedTokens > u.PromptTokens {
-		u.CachedTokens = u.PromptTokens
-	}
-	u.TotalTokens = u.PromptTokens + u.CompletionTokens
+func (u *TokenUsage) Total() int64 {
+	return u.PromptTokens + u.CompletionTokens
 }
 
 func extractTokenFields(u map[string]interface{}, usage *TokenUsage) {
@@ -26,103 +22,33 @@ func extractTokenFields(u map[string]interface{}, usage *TokenUsage) {
 		usage.PromptTokens = int64(it)
 	}
 
-	if ptd, ok := u["prompt_tokens_details"].(map[string]interface{}); ok {
-		if ct, ok := ptd["cached_tokens"].(float64); ok {
-			usage.CachedTokens = int64(ct)
-		}
-	}
-
-	if ct, ok := u["cache_read_input_tokens"].(float64); ok {
-		usage.CachedTokens = int64(ct)
-	}
-
 	if ct, ok := u["completion_tokens"].(float64); ok {
 		usage.CompletionTokens = int64(ct)
 	} else if ot, ok := u["output_tokens"].(float64); ok {
 		usage.CompletionTokens = int64(ot)
 	}
-}
 
-func EstimatePromptTokensFromRequest(body []byte) *TokenUsage {
-	if len(body) == 0 {
-		return nil
-	}
-
-	var req map[string]interface{}
-	if err := json.Unmarshal(body, &req); err != nil {
-		return nil
-	}
-
-	totalChars := 0
-
-	if messages, ok := req["messages"].([]interface{}); ok {
-		for _, m := range messages {
-			if msg, ok := m.(map[string]interface{}); ok {
-				if content, ok := msg["content"]; ok {
-					totalChars += estimateContentLength(content)
-				}
+	if usage.CachedTokens == 0 {
+		if ptd, ok := u["prompt_tokens_details"].(map[string]interface{}); ok {
+			if ct, ok := ptd["cached_tokens"].(float64); ok {
+				usage.CachedTokens = int64(ct)
 			}
 		}
 	}
 
-	if system, ok := req["system"].(string); ok {
-		totalChars += len(system)
-	}
-	if prompt, ok := req["prompt"].(string); ok {
-		totalChars += len(prompt)
-	}
-
-	if input, ok := req["input"]; ok {
-		totalChars += estimateContentLength(input)
-	}
-	if instructions, ok := req["instructions"].(string); ok {
-		totalChars += len(instructions)
-	}
-
-	if totalChars == 0 {
-		return nil
-	}
-
-	estimated := int64(float64(totalChars) / 2.5)
-	if estimated < 1 {
-		estimated = 1
-	}
-
-	return &TokenUsage{
-		PromptTokens: estimated,
-		TotalTokens:  estimated,
-	}
-}
-
-func estimateContentLength(content interface{}) int {
-	if s, ok := content.(string); ok {
-		return len(s)
-	}
-
-	if arr, ok := content.([]interface{}); ok {
-		total := 0
-		for _, item := range arr {
-			if obj, ok := item.(map[string]interface{}); ok {
-				if t, ok := obj["type"].(string); ok {
-					switch t {
-					case "text":
-						if text, ok := obj["text"].(string); ok {
-							total += len(text)
-						}
-					case "image", "image_url", "image-url":
-						total += 400
-					default:
-						if text, ok := obj["text"].(string); ok {
-							total += len(text)
-						}
-					}
-				}
+	if usage.CachedTokens == 0 {
+		if itd, ok := u["input_tokens_details"].(map[string]interface{}); ok {
+			if ct, ok := itd["cached_tokens"].(float64); ok {
+				usage.CachedTokens = int64(ct)
 			}
 		}
-		return total
 	}
 
-	return 0
+	if usage.CachedTokens == 0 {
+		if ct, ok := u["cache_read_input_tokens"].(float64); ok {
+			usage.CachedTokens = int64(ct)
+		}
+	}
 }
 
 func ParseUsage(body []byte) *TokenUsage {
@@ -137,24 +63,24 @@ func ParseUsage(body []byte) *TokenUsage {
 
 	usage := &TokenUsage{}
 
-	if it, ok := resp["input_tokens"].(float64); ok {
-		usage.PromptTokens = int64(it)
-		usage.Validate()
-		return usage
+	if u, ok := resp["usage"].(map[string]interface{}); ok {
+		extractTokenFields(u, usage)
+	} else {
+		if it, ok := resp["input_tokens"].(float64); ok {
+			usage.PromptTokens = int64(it)
+		}
+		if ot, ok := resp["output_tokens"].(float64); ok {
+			usage.CompletionTokens = int64(ot)
+		}
+		if ct, ok := resp["cache_read_input_tokens"].(float64); ok {
+			usage.CachedTokens = int64(ct)
+		}
 	}
-
-	u, ok := resp["usage"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-
-	extractTokenFields(u, usage)
 
 	if usage.PromptTokens == 0 && usage.CompletionTokens == 0 {
 		return nil
 	}
 
-	usage.Validate()
 	return usage
 }
 
@@ -185,16 +111,22 @@ func ParseUsageFromStream(tailData []byte) *TokenUsage {
 			continue
 		}
 
-		u, ok := data["usage"].(map[string]interface{})
-		if !ok {
-			continue
+		usage := &TokenUsage{}
+		found := false
+
+		if u, ok := data["usage"].(map[string]interface{}); ok {
+			extractTokenFields(u, usage)
+			found = true
 		}
 
-		usage := &TokenUsage{}
-		extractTokenFields(u, usage)
+		if msg, ok := data["message"].(map[string]interface{}); ok {
+			if u, ok := msg["usage"].(map[string]interface{}); ok {
+				extractTokenFields(u, usage)
+				found = true
+			}
+		}
 
-		if usage.PromptTokens > 0 || usage.CompletionTokens > 0 {
-			usage.Validate()
+		if found && (usage.PromptTokens > 0 || usage.CompletionTokens > 0) {
 			lastUsage = usage
 			break
 		}

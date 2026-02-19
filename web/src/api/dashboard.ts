@@ -3,11 +3,11 @@ import http from "@/utils/http";
 
 /**
  * Get dashboard basic statistics
- * @param days Time range (1/7/30 days)
+ * @param hours Time range in hours (1/5/24/168/720)
  */
-export const getDashboardStats = (days: number = 1) => {
+export const getDashboardStats = (hours: number = 1) => {
   return http.get<DashboardStatsResponse>("/dashboard/stats", {
-    params: { days },
+    params: { hours },
   });
 };
 
