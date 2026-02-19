@@ -106,6 +106,7 @@ export default {
     diskUsage: "ディスク使用率",
     uptime: "稼働時間",
     promptTokens: "入力 (prompt_tokens)",
+    uncachedPromptTokens: "入力 (Non-cached)",
     completionTokens: "出力 (completion_tokens)",
     cachedTokens: "キャッシュ (cached_tokens)",
     totalTokens: "合計 (total_tokens)",
@@ -118,6 +119,7 @@ export default {
     last1Month: "1ヶ月",
     realtime: "リアルタイム",
     // グラフラベル用（アンダースコア命名）
+    uncached_prompt_tokens: "入力",
     prompt_tokens: "入力",
     completion_tokens: "出力",
     cached_tokens: "キャッシュ",

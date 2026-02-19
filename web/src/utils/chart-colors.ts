@@ -2,6 +2,7 @@ const cssVarMap: Record<string, string> = {
   "dashboard.success_requests": "--color-request-count",
   "dashboard.failed_requests": "--color-error-rate",
   "dashboard.prompt_tokens": "--color-prompt-tokens",
+  "dashboard.uncached_prompt_tokens": "--color-prompt-tokens",
   "dashboard.completion_tokens": "--color-completion-tokens",
   "dashboard.cached_tokens": "--color-cached-tokens",
   "dashboard.total_tokens": "--color-total-tokens",

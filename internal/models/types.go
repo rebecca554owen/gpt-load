@@ -199,7 +199,8 @@ type SecurityWarning struct {
 type DashboardStatsResponse struct {
 	KeyCount         StatCard          `json:"key_count"`         // Key count
 	TokenConsumption StatCard          `json:"token_consumption"` // Total tokens
-	PromptTokens     StatCard          `json:"prompt_tokens"`     // Input tokens
+	PromptTokens     StatCard          `json:"prompt_tokens"`     // Input tokens (total, includes cached)
+	UncachedPromptTokens StatCard      `json:"uncached_prompt_tokens"` // Input tokens (non-cached, excludes cached)
 	CachedTokens     StatCard          `json:"cached_tokens"`     // Cached tokens (input)
 	CompletionTokens StatCard          `json:"completion_tokens"` // Completion tokens (output)
 	TotalTokens      StatCard          `json:"total_tokens"`      // Total tokens
