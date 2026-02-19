@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gpt-load/internal/channel"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 )
 
 // handleStreamingResponse handles streaming SSE responses and returns parsed token usage
-func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Response) *TokenUsage {
+func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy) *TokenUsage {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
@@ -26,7 +27,7 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
 		logrus.Error("Streaming unsupported by the writer, falling back to normal response")
-		return ps.handleNormalResponse(c, resp)
+		return ps.handleNormalResponse(c, resp, channelHandler)
 	}
 
 	// Use a circular buffer to capture the last 16KB of the stream for token parsing
@@ -53,12 +54,13 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 	}
 
 	tailData := tailBuffer.Bytes()
+	channelType := channelHandler.GetChannelType()
 	// Parse token usage from the tail of the stream
-	return ParseUsageFromStream(tailData)
+	return ParseUsageFromStream(tailData, channelType)
 }
 
 // handleNormalResponse handles non-streaming responses and returns parsed token usage
-func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response) *TokenUsage {
+func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy) *TokenUsage {
 	// Read the entire response body
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -83,8 +85,9 @@ func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response)
 		}
 	}
 
+	channelType := channelHandler.GetChannelType()
 	// Parse token usage from the response
-	usage := ParseUsage(bodyToParse)
+	usage := ParseUsage(bodyToParse, channelType)
 
 	// Write the original (possibly compressed) response to the client
 	if _, err := c.Writer.Write(body); err != nil {

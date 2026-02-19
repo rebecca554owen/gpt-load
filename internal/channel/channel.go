@@ -46,4 +46,7 @@ type ChannelProxy interface {
 
 	// TransformModelList transforms the model list response based on redirect rules.
 	TransformModelList(req *http.Request, bodyBytes []byte, group *models.Group) (map[string]any, error)
+
+	// GetChannelType returns the channel type identifier.
+	GetChannelType() string
 }
