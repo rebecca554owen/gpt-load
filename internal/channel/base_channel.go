@@ -58,6 +58,11 @@ type BaseChannel struct {
 	modelRedirectStrict bool
 }
 
+// GetChannelType returns the channel type identifier.
+func (b *BaseChannel) GetChannelType() string {
+	return b.channelType
+}
+
 // getUpstreamURL selects an upstream URL using a smooth weighted round-robin algorithm.
 func (b *BaseChannel) getUpstreamURL() *url.URL {
 	b.upstreamLock.Lock()
