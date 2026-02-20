@@ -98,11 +98,11 @@ const firstRowCards = computed(() => [
 // Row 2 card configuration
 const secondRowCards = computed(() => [
   {
-    key: "prompt-tokens",
-    title: t("dashboard.promptTokens"),
-    value: props.stats?.prompt_tokens?.value ?? 0,
-    trend: props.stats?.prompt_tokens?.trend ?? 0,
-    trendIsGrowth: props.stats?.prompt_tokens?.trend_is_growth ?? true,
+    key: "non-cached-prompt-tokens",
+    title: t("dashboard.nonCachedPromptTokens"),
+    value: props.stats?.non_cached_prompt_tokens?.value ?? 0,
+    trend: props.stats?.non_cached_prompt_tokens?.trend ?? 0,
+    trendIsGrowth: props.stats?.non_cached_prompt_tokens?.trend_is_growth ?? true,
     icon: "edit",
     color: "var(--color-prompt-tokens)",
   },

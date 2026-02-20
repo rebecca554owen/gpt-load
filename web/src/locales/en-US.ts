@@ -106,6 +106,7 @@ export default {
     diskUsage: "Disk Usage",
     uptime: "Uptime",
     promptTokens: "Input (prompt_tokens)",
+    nonCachedPromptTokens: "Input (Non-cached)",
     completionTokens: "Output (completion_tokens)",
     cachedTokens: "Cached (cached_tokens)",
     totalTokens: "Total (total_tokens)",
@@ -118,6 +119,7 @@ export default {
     last1Month: "1 Month",
     realtime: "Realtime",
     // For chart labels (underscore naming)
+    non_cached_prompt_tokens: "Input",
     prompt_tokens: "Input",
     completion_tokens: "Output",
     cached_tokens: "Cached",

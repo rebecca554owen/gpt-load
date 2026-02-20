@@ -106,6 +106,7 @@ export default {
     diskUsage: "磁盘使用率",
     uptime: "运行时间",
     promptTokens: "输入 (prompt_tokens)",
+    nonCachedPromptTokens: "输入 (Non-cached)",
     completionTokens: "输出 (completion_tokens)",
     cachedTokens: "缓存 (cached_tokens)",
     totalTokens: "总量 (total_tokens)",
@@ -118,6 +119,7 @@ export default {
     last1Month: "1个月",
     realtime: "实时",
     // 用于图表标签翻译（下划线命名）
+    non_cached_prompt_tokens: "输入",
     prompt_tokens: "输入",
     completion_tokens: "输出",
     cached_tokens: "缓存",
