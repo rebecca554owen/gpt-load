@@ -200,6 +200,20 @@ func (s *Server) Stats(c *gin.Context) {
 	cachedTrend := cachedTrendResult.value
 	cachedTrendIsGrowth := cachedTrendResult.isGrowth
 
+	// Calculate non-cached prompt tokens (prompt_tokens - cached_tokens)
+	currentNonCachedPrompt := currentTokenStats.PromptTokens - currentTokenStats.CachedTokens
+	if currentNonCachedPrompt < 0 {
+		currentNonCachedPrompt = 0
+	}
+	previousNonCachedPrompt := previousTokenStats.PromptTokens - previousTokenStats.CachedTokens
+	if previousNonCachedPrompt < 0 {
+		previousNonCachedPrompt = 0
+	}
+
+	nonCachedPromptTrendResult := calculateTrend(currentNonCachedPrompt, previousNonCachedPrompt)
+	nonCachedPromptTrend := nonCachedPromptTrendResult.value
+	nonCachedPromptTrendIsGrowth := nonCachedPromptTrendResult.isGrowth
+
 	promptTrendResult := calculateTrend(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens)
 	promptTrend := promptTrendResult.value
 	promptTrendIsGrowth := promptTrendResult.isGrowth
@@ -226,6 +240,11 @@ func (s *Server) Stats(c *gin.Context) {
 			Value:         float64(currentTokenStats.PromptTokens),
 			Trend:         promptTrend,
 			TrendIsGrowth: promptTrendIsGrowth,
+		},
+		NonCachedPromptTokens: models.StatCard{
+			Value:         float64(currentNonCachedPrompt),
+			Trend:         nonCachedPromptTrend,
+			TrendIsGrowth: nonCachedPromptTrendIsGrowth,
 		},
 		CachedTokens: models.StatCard{
 			Value:         float64(currentTokenStats.CachedTokens),
@@ -601,7 +620,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	}
 
 	var labels []string
-	var promptData, cachedData, outputData, totalData []int64
+	var nonCachedPromptData, cachedData, outputData, totalData []int64
 
 	totalMinutes := totalHours * 60
 	intervals := totalMinutes / intervalMinutes
@@ -626,7 +645,13 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 			}
 		}
 
-		promptData = append(promptData, promptSum)
+		// Calculate non-cached prompt tokens (prompt - cached)
+		nonCachedPromptSum := promptSum - cachedSum
+		if nonCachedPromptSum < 0 {
+			nonCachedPromptSum = 0
+		}
+
+		nonCachedPromptData = append(nonCachedPromptData, nonCachedPromptSum)
 		cachedData = append(cachedData, cachedSum)
 		outputData = append(outputData, outputSum)
 		totalData = append(totalData, totalSum)
@@ -636,9 +661,9 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 		Labels: labels,
 		Datasets: []models.ChartDataset{
 			{
-				Label:    i18n.Message(c, "dashboard.prompt_tokens"),
-				LabelKey: "dashboard.prompt_tokens",
-				Data:     promptData,
+				Label:    i18n.Message(c, "dashboard.non_cached_prompt_tokens"),
+				LabelKey: "dashboard.non_cached_prompt_tokens",
+				Data:     nonCachedPromptData,
 			},
 			{
 				Label:    i18n.Message(c, "dashboard.cached_tokens"),

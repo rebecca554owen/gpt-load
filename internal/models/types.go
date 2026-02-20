@@ -197,16 +197,17 @@ type SecurityWarning struct {
 
 // DashboardStatsResponse API response for dashboard basic statistics
 type DashboardStatsResponse struct {
-	KeyCount         StatCard          `json:"key_count"`         // Key count
-	TokenConsumption StatCard          `json:"token_consumption"` // Total tokens
-	PromptTokens     StatCard          `json:"prompt_tokens"`     // Input tokens
-	CachedTokens     StatCard          `json:"cached_tokens"`     // Cached tokens (input)
-	CompletionTokens StatCard          `json:"completion_tokens"` // Completion tokens (output)
-	TotalTokens      StatCard          `json:"total_tokens"`      // Total tokens
-	RPM              StatCard          `json:"rpm"`               // RPM
-	RequestCount     StatCard          `json:"request_count"`     // Request count
-	ErrorRate        StatCard          `json:"error_rate"`        // Error rate
-	SecurityWarnings []SecurityWarning `json:"security_warnings"`
+	KeyCount             StatCard          `json:"key_count"`               // Key count
+	TokenConsumption     StatCard          `json:"token_consumption"`       // Total tokens
+	PromptTokens         StatCard          `json:"prompt_tokens"`           // Input tokens
+	NonCachedPromptTokens StatCard          `json:"non_cached_prompt_tokens"` // Non-cached input tokens
+	CachedTokens         StatCard          `json:"cached_tokens"`           // Cached tokens (input)
+	CompletionTokens     StatCard          `json:"completion_tokens"`       // Completion tokens (output)
+	TotalTokens          StatCard          `json:"total_tokens"`            // Total tokens
+	RPM                  StatCard          `json:"rpm"`                     // RPM
+	RequestCount         StatCard          `json:"request_count"`           // Request count
+	ErrorRate            StatCard          `json:"error_rate"`              // Error rate
+	SecurityWarnings     []SecurityWarning `json:"security_warnings"`
 }
 
 // ChartDataset dataset for charts
