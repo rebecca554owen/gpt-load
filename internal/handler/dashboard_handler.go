@@ -18,6 +18,20 @@ import (
 const (
 	rpmCalculationWindowMinutes = 10
 	rpmComparisonWindowMinutes  = 20
+
+	// Time interval constants for chart granularity
+	interval10Min  = 10  // 1 hour range
+	interval15Min  = 15  // 1-5 hours range
+	interval30Min  = 30  // 5-24 hours range
+	interval2Hour  = 120 // 1 week range
+	interval10Hour = 600 // 1 month range
+)
+
+type timeGranularity int
+
+const (
+	granularityMinute timeGranularity = iota
+	granularityHour
 )
 
 // boolToInt64 converts bool to int64 (1 for true, 0 for false)
@@ -26,6 +40,32 @@ func boolToInt64(b bool) int64 {
 		return 1
 	}
 	return 0
+}
+
+// buildTimeSelectClause builds database-specific SELECT and GROUP clauses for time-based aggregation
+func buildTimeSelectClause(dbType string, granularity timeGranularity, fields string) (selectClause, groupClause string) {
+	switch dbType {
+	case "mysql":
+		if granularity == granularityMinute {
+			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:%%i:00') as time_slot, %s", fields)
+		} else {
+			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:00:00') as time_slot, %s", fields)
+		}
+	case "postgres":
+		if granularity == granularityMinute {
+			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('minute', timestamp), 'YYYY-MM-DD HH24:MI:00') as time_slot, %s", fields)
+		} else {
+			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00:00') as time_slot, %s", fields)
+		}
+	default: // sqlite and others
+		if granularity == granularityMinute {
+			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M:00', timestamp) as time_slot, %s", fields)
+		} else {
+			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:00:00', timestamp) as time_slot, %s", fields)
+		}
+	}
+	groupClause = "time_slot"
+	return selectClause, groupClause
 }
 
 // parseDaysParameter converts days string to days integer (for stats API)
@@ -40,9 +80,9 @@ func parseDaysParameter(daysStr string) int {
 	}
 }
 
-// parseHoursParameter converts hours string to hours integer
+// parseHoursParameter converts hours string to hours integer with specified default
 // Supports: 1, 5, 24(1 day), 168(1 week), 720(1 month)
-func parseHoursParameter(hoursStr string) int {
+func parseHoursParameter(hoursStr string, defaultHours int) int {
 	switch hoursStr {
 	case "1":
 		return 1
@@ -55,26 +95,7 @@ func parseHoursParameter(hoursStr string) int {
 	case "720":
 		return 720
 	default:
-		return 24 // default to 24 hours (1 day)
-	}
-}
-
-// parseStatsHoursParameter converts hours string to hours integer for stats API
-// Supports: 1, 5, 24, 168, 720 hours
-func parseStatsHoursParameter(hoursStr string) int {
-	switch hoursStr {
-	case "1":
-		return 1
-	case "5":
-		return 5
-	case "24":
-		return 24
-	case "168":
-		return 168
-	case "720":
-		return 720
-	default:
-		return 1 // default to 1 hour
+		return defaultHours
 	}
 }
 
@@ -107,6 +128,26 @@ func calculateErrorRateTrend(currentErrorRate, previousErrorRate float64, hasCur
 	return trendResult{value: 0.0, isGrowth: true}
 }
 
+// trendCard creates a StatCard with trend calculation
+func trendCard(current, previous int64) models.StatCard {
+	result := calculateTrend(current, previous)
+	return models.StatCard{
+		Value:         float64(current),
+		Trend:         result.value,
+		TrendIsGrowth: result.isGrowth,
+	}
+}
+
+// errorRateCard creates a StatCard for error rate with proper trend direction
+func errorRateCard(currentRate, previousRate float64, hasCurrent, hasPrevious bool) models.StatCard {
+	result := calculateErrorRateTrend(currentRate, previousRate, hasCurrent, hasPrevious)
+	return models.StatCard{
+		Value:         currentRate,
+		Trend:         result.value,
+		TrendIsGrowth: result.isGrowth,
+	}
+}
+
 // Stats Get dashboard statistics
 func (s *Server) Stats(c *gin.Context) {
 	// Support both 'hours' and 'days' parameters for backward compatibility
@@ -114,7 +155,7 @@ func (s *Server) Stats(c *gin.Context) {
 	hoursStr := c.Query("hours")
 	var hours int
 	if hoursStr != "" {
-		hours = parseStatsHoursParameter(hoursStr)
+		hours = parseHoursParameter(hoursStr, 1)
 	} else {
 		days := parseDaysParameter(c.DefaultQuery("days", "1"))
 		hours = days * 24
@@ -170,37 +211,17 @@ func (s *Server) Stats(c *gin.Context) {
 		return
 	}
 
-	reqTrendResult := calculateTrend(currentPeriod.TotalRequests, previousPeriod.TotalRequests)
-	reqTrend := reqTrendResult.value
-	reqTrendIsGrowth := reqTrendResult.isGrowth
-
+	// Calculate error rates
 	currentErrorRate := 0.0
 	if currentPeriod.TotalRequests > 0 {
 		currentErrorRate = (float64(currentPeriod.TotalFailures) / float64(currentPeriod.TotalRequests)) * 100
 	}
-
 	previousErrorRate := 0.0
 	if previousPeriod.TotalRequests > 0 {
 		previousErrorRate = (float64(previousPeriod.TotalFailures) / float64(previousPeriod.TotalRequests)) * 100
 	}
 
-	errorRateTrendResult := calculateErrorRateTrend(currentErrorRate, previousErrorRate, currentPeriod.TotalRequests > 0, previousPeriod.TotalRequests > 0)
-	errorRateTrend := errorRateTrendResult.value
-	errorRateTrendIsGrowth := errorRateTrendResult.isGrowth
-
-	tokenTrendResult := calculateTrend(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens)
-	tokenTrend := tokenTrendResult.value
-	tokenTrendIsGrowth := tokenTrendResult.isGrowth
-
-	completionTrendResult := calculateTrend(currentTokenStats.CompletionTokens, previousTokenStats.CompletionTokens)
-	completionTrend := completionTrendResult.value
-	completionTrendIsGrowth := completionTrendResult.isGrowth
-
-	cachedTrendResult := calculateTrend(currentTokenStats.CachedTokens, previousTokenStats.CachedTokens)
-	cachedTrend := cachedTrendResult.value
-	cachedTrendIsGrowth := cachedTrendResult.isGrowth
-
-	// Calculate non-cached prompt tokens (prompt_tokens - cached_tokens)
+	// Calculate non-cached prompt tokens
 	currentNonCachedPrompt := currentTokenStats.PromptTokens - currentTokenStats.CachedTokens
 	if currentNonCachedPrompt < 0 {
 		currentNonCachedPrompt = 0
@@ -210,69 +231,21 @@ func (s *Server) Stats(c *gin.Context) {
 		previousNonCachedPrompt = 0
 	}
 
-	nonCachedPromptTrendResult := calculateTrend(currentNonCachedPrompt, previousNonCachedPrompt)
-	nonCachedPromptTrend := nonCachedPromptTrendResult.value
-	nonCachedPromptTrendIsGrowth := nonCachedPromptTrendResult.isGrowth
-
-	promptTrendResult := calculateTrend(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens)
-	promptTrend := promptTrendResult.value
-	promptTrendIsGrowth := promptTrendResult.isGrowth
-
-	keyTrendResult := calculateTrend(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys)
-	keyTrend := keyTrendResult.value
-	keyTrendIsGrowth := keyTrendResult.isGrowth
-
 	// Get security warning information
 	securityWarnings := s.getSecurityWarnings(c)
 
 	stats := models.DashboardStatsResponse{
-		KeyCount: models.StatCard{
-			Value:         float64(currentKeyStats.TotalKeys),
-			Trend:         keyTrend,
-			TrendIsGrowth: keyTrendIsGrowth,
-		},
-		TokenConsumption: models.StatCard{
-			Value:         float64(currentTokenStats.TotalTokens),
-			Trend:         tokenTrend,
-			TrendIsGrowth: tokenTrendIsGrowth,
-		},
-		PromptTokens: models.StatCard{
-			Value:         float64(currentTokenStats.PromptTokens),
-			Trend:         promptTrend,
-			TrendIsGrowth: promptTrendIsGrowth,
-		},
-		NonCachedPromptTokens: models.StatCard{
-			Value:         float64(currentNonCachedPrompt),
-			Trend:         nonCachedPromptTrend,
-			TrendIsGrowth: nonCachedPromptTrendIsGrowth,
-		},
-		CachedTokens: models.StatCard{
-			Value:         float64(currentTokenStats.CachedTokens),
-			Trend:         cachedTrend,
-			TrendIsGrowth: cachedTrendIsGrowth,
-		},
-		CompletionTokens: models.StatCard{
-			Value:         float64(currentTokenStats.CompletionTokens),
-			Trend:         completionTrend,
-			TrendIsGrowth: completionTrendIsGrowth,
-		},
-		TotalTokens: models.StatCard{
-			Value:         float64(currentTokenStats.TotalTokens),
-			Trend:         tokenTrend,
-			TrendIsGrowth: tokenTrendIsGrowth,
-		},
-		RPM: rpmStats,
-		RequestCount: models.StatCard{
-			Value:         float64(currentPeriod.TotalRequests),
-			Trend:         reqTrend,
-			TrendIsGrowth: reqTrendIsGrowth,
-		},
-		ErrorRate: models.StatCard{
-			Value:         currentErrorRate,
-			Trend:         errorRateTrend,
-			TrendIsGrowth: errorRateTrendIsGrowth,
-		},
-		SecurityWarnings: securityWarnings,
+		KeyCount:               trendCard(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys),
+		TokenConsumption:       trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
+		PromptTokens:           trendCard(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens),
+		NonCachedPromptTokens:  trendCard(currentNonCachedPrompt, previousNonCachedPrompt),
+		CachedTokens:           trendCard(currentTokenStats.CachedTokens, previousTokenStats.CachedTokens),
+		CompletionTokens:       trendCard(currentTokenStats.CompletionTokens, previousTokenStats.CompletionTokens),
+		TotalTokens:            trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
+		RPM:                     rpmStats,
+		RequestCount:           trendCard(currentPeriod.TotalRequests, previousPeriod.TotalRequests),
+		ErrorRate:              errorRateCard(currentErrorRate, previousErrorRate, currentPeriod.TotalRequests > 0, previousPeriod.TotalRequests > 0),
+		SecurityWarnings:       securityWarnings,
 	}
 
 	response.Success(c, stats)
@@ -281,7 +254,7 @@ func (s *Server) Stats(c *gin.Context) {
 // Chart Get dashboard chart data
 func (s *Server) Chart(c *gin.Context) {
 	viewType := c.DefaultQuery("view", "request")
-	hours := parseHoursParameter(c.DefaultQuery("hours", "24"))
+	hours := parseHoursParameter(c.DefaultQuery("hours", "5"), 5)
 
 	now := time.Now()
 	endTime := now
@@ -303,263 +276,148 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 		totalHours = 1
 	}
 
-	// Determine granularity based on time range
-	// Match the same granularity as getTokenChart for consistency
 	var intervalMinutes int
 	switch {
-	case totalHours <= 1: // 1 hour
-		intervalMinutes = 10 // 6 points (matches 6 labels exactly)
-	case totalHours <= 5: // 1-5 hours
-		intervalMinutes = 15 // 20 points
-	case totalHours <= 24: // 5-24 hours
-		intervalMinutes = 30 // 48 points for 24h (every 30 min)
-	case totalHours <= 168: // 24 hours to 1 week
-		intervalMinutes = 120 // 84 points (every 2 hours)
-	default: // > 1 week (1 month = 720 hours)
-		intervalMinutes = 600 // 72 points (every 10 hours)
+	case totalHours <= 1:
+		intervalMinutes = interval10Min
+	case totalHours <= 5:
+		intervalMinutes = interval15Min
+	case totalHours <= 24:
+		intervalMinutes = interval30Min
+	case totalHours <= 168:
+		intervalMinutes = interval2Hour
+	default:
+		intervalMinutes = interval10Hour
 	}
 
-	// For hour-level or larger intervals, use group_hourly_stats (more efficient)
-	// For minute-level intervals (less than 60 minutes), use request_logs directly
 	var labels []string
 	var successData, failureData []int64
 
-	if intervalMinutes < 60 {
-		// Use request_logs for minute-level granularity
-		type requestResult struct {
-			TimeSlot string
-			Success  int64
-			Failure  int64
-		}
-		var results []requestResult
+	granularity := granularityMinute
+	if intervalMinutes >= 60 {
+		granularity = granularityHour
+	}
 
-		// Build database-specific query for minute-level aggregation
-		dbType := s.DB.Dialector.Name()
-		var selectClause, groupClause string
+	type requestResult struct {
+		TimeSlot string
+		Success  int64
+		Failure  int64
+	}
+	var results []requestResult
 
-		switch dbType {
-		case "mysql":
-			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:%%i:00') as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		case "postgres":
-			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('minute', timestamp), 'YYYY-MM-DD HH24:MI:00') as time_slot, SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		default: // sqlite and others
-			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M:00', timestamp) as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		}
+	dbType := s.DB.Dialector.Name()
+	fields := "SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure"
+	selectClause, groupClause := buildTimeSelectClause(dbType, granularity, fields)
 
-		err := s.DB.Model(&models.RequestLog{}).
-			Select(selectClause).
-			Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
-			Where("group_id NOT IN (?)",
-				s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
-			Group(groupClause).
-			Order("time_slot asc").
-			Scan(&results).Error
+	err := s.DB.Model(&models.RequestLog{}).
+		Select(selectClause).
+		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
+		Where("group_id NOT IN (?)",
+			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
+		Group(groupClause).
+		Order("time_slot asc").
+		Scan(&results).Error
 
-		if err != nil {
-			response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
-			return
-		}
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
+		return
+	}
 
-		// Create a map for easy lookup
-		statsBySlot := make(map[time.Time]requestResult)
-		for _, result := range results {
-			slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+	statsByTime := make(map[time.Time]requestResult)
+	for _, result := range results {
+		slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+		if granularity == granularityMinute {
 			slotTime = slotTime.Truncate(time.Minute)
-			statsBySlot[slotTime] = result
-		}
-
-		// Get pending logs from Redis cache for real-time statistics
-		if s.RequestLogService != nil {
-			pendingLogs, err := s.RequestLogService.GetPendingLogs()
-			if err != nil {
-				logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
-			} else {
-				// Build a set of aggregate group IDs for fast lookup
-				aggregateGroupIDs, err := s.getAggregateGroupIDs()
-				if err != nil {
-					logrus.Warnf("Failed to get aggregate group IDs: %v", err)
-				}
-
-				for _, log := range pendingLogs {
-					// Check if within time range
-					if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
-						continue
-					}
-
-					// Check if this is an aggregate group
-					if aggregateGroupIDs != nil {
-						if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
-							continue
-						}
-					}
-
-					slotTime := log.Timestamp.Truncate(time.Minute)
-					if existing, ok := statsBySlot[slotTime]; ok {
-						if log.IsSuccess {
-							existing.Success++
-						} else {
-							existing.Failure++
-						}
-						statsBySlot[slotTime] = existing
-					} else {
-						statsBySlot[slotTime] = requestResult{
-							TimeSlot: slotTime.Format("2006-01-02 15:04:05"),
-							Success:  boolToInt64(log.IsSuccess),
-							Failure:  boolToInt64(!log.IsSuccess),
-						}
-					}
-				}
-			}
-		}
-
-		totalMinutes := totalHours * 60
-		intervals := totalMinutes / intervalMinutes
-		if intervals < 1 {
-			intervals = 1
-		}
-		// Ensure the last interval covers the current time
-		lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
-		if lastSlotEnd.Before(endTime) {
-			intervals++
-		}
-
-		startSlot := startTime.Truncate(time.Minute)
-		for i := 0; i < intervals; i++ {
-			slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
-			slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
-			labels = append(labels, slotStart.Format(time.RFC3339))
-
-			var successSum, failureSum int64
-			for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Minute) {
-				if data, ok := statsBySlot[t]; ok {
-					successSum += data.Success
-					failureSum += data.Failure
-				}
-			}
-			successData = append(successData, successSum)
-			failureData = append(failureData, failureSum)
-		}
-	} else {
-		// Use request_logs for hour-level or larger granularity (same as token stats)
-		type requestResult struct {
-			TimeSlot string
-			Success  int64
-			Failure  int64
-		}
-		var results []requestResult
-
-		// Build database-specific query for hour-level aggregation
-		dbType := s.DB.Dialector.Name()
-		var selectClause, groupClause string
-
-		switch dbType {
-		case "mysql":
-			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:00:00') as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		case "postgres":
-			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00:00') as time_slot, SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		default: // sqlite and others
-			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:00:00', timestamp) as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
-			groupClause = "time_slot"
-		}
-
-		err := s.DB.Model(&models.RequestLog{}).
-			Select(selectClause).
-			Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
-			Where("group_id NOT IN (?)",
-				s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
-			Group(groupClause).
-			Order("time_slot asc").
-			Scan(&results).Error
-
-		if err != nil {
-			response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
-			return
-		}
-
-		// Create a map for easy lookup by hour
-		statsByHour := make(map[time.Time]*requestResult)
-		for _, result := range results {
-			slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+		} else {
 			slotTime = slotTime.Truncate(time.Hour)
-			statsByHour[slotTime] = &result
 		}
+		statsByTime[slotTime] = result
+	}
 
-		// Get pending logs from Redis cache for real-time statistics
-		if s.RequestLogService != nil {
-			pendingLogs, err := s.RequestLogService.GetPendingLogs()
+	if s.RequestLogService != nil {
+		pendingLogs, err := s.RequestLogService.GetPendingLogs()
+		if err != nil {
+			logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
+		} else {
+			aggregateGroupIDs, err := s.getAggregateGroupIDs()
 			if err != nil {
-				logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
-			} else {
-				// Build a set of aggregate group IDs for fast lookup
-				aggregateGroupIDs, err := s.getAggregateGroupIDs()
-				if err != nil {
-					logrus.Warnf("Failed to get aggregate group IDs: %v", err)
+				logrus.Warnf("Failed to get aggregate group IDs: %v", err)
+			}
+
+			for _, log := range pendingLogs {
+				if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
+					continue
 				}
 
-				for _, log := range pendingLogs {
-					// Check if within time range
-					if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
+				if aggregateGroupIDs != nil {
+					if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
 						continue
 					}
+				}
 
-					// Check if this is an aggregate group
-					if aggregateGroupIDs != nil {
-						if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
-							continue
-						}
-					}
+				var slotTime time.Time
+				if granularity == granularityMinute {
+					slotTime = log.Timestamp.Truncate(time.Minute)
+				} else {
+					slotTime = log.Timestamp.Truncate(time.Hour)
+				}
 
-					hour := log.Timestamp.Truncate(time.Hour)
-					if existing, ok := statsByHour[hour]; ok {
-						if log.IsSuccess {
-							existing.Success++
-						} else {
-							existing.Failure++
-						}
+				if existing, ok := statsByTime[slotTime]; ok {
+					if log.IsSuccess {
+						existing.Success++
 					} else {
-						statsByHour[hour] = &requestResult{
-							TimeSlot: hour.Format("2006-01-02 15:04:05"),
-							Success:  boolToInt64(log.IsSuccess),
-							Failure:  boolToInt64(!log.IsSuccess),
-						}
+						existing.Failure++
+					}
+					statsByTime[slotTime] = existing
+				} else {
+					statsByTime[slotTime] = requestResult{
+						TimeSlot: slotTime.Format("2006-01-02 15:04:05"),
+						Success:  boolToInt64(log.IsSuccess),
+						Failure:  boolToInt64(!log.IsSuccess),
 					}
 				}
 			}
 		}
+	}
 
-		totalMinutes := totalHours * 60
-		intervals := totalMinutes / intervalMinutes
-		if intervals < 1 {
-			intervals = 1
+	totalMinutes := totalHours * 60
+	intervals := totalMinutes / intervalMinutes
+	if intervals < 1 {
+		intervals = 1
+	}
+	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
+	if lastSlotEnd.Before(endTime) {
+		intervals++
+	}
+
+	startSlot := startTime.Truncate(time.Minute)
+	for i := 0; i < intervals; i++ {
+		slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+		slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
+		labels = append(labels, slotStart.Format(time.RFC3339))
+
+		var successSum, failureSum int64
+		var step time.Duration
+		if granularity == granularityMinute {
+			step = time.Minute
+		} else {
+			step = time.Hour
 		}
-		// Ensure the last interval covers the current time
-		lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
-		if lastSlotEnd.Before(endTime) {
-			intervals++
-		}
 
-		startSlot := startTime.Truncate(time.Minute)
-		for i := 0; i < intervals; i++ {
-			slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
-			slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
-			labels = append(labels, slotStart.Format(time.RFC3339))
-
-			var successSum, failureSum int64
-			for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Hour) {
-				hour := t.Truncate(time.Hour)
-				if data, ok := statsByHour[hour]; ok {
-					successSum += data.Success
-					failureSum += data.Failure
-				}
+		for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(step) {
+			var lookupTime time.Time
+			if granularity == granularityMinute {
+				lookupTime = t
+			} else {
+				lookupTime = t.Truncate(time.Hour)
 			}
-			successData = append(successData, successSum)
-			failureData = append(failureData, failureSum)
+			if data, ok := statsByTime[lookupTime]; ok {
+				successSum += data.Success
+				failureSum += data.Failure
+			}
 		}
+		successData = append(successData, successSum)
+		failureData = append(failureData, failureSum)
 	}
 
 	chartData := models.ChartData{
@@ -588,23 +446,20 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 		totalHours = 1
 	}
 
-	// Determine granularity based on time range
-	// Fewer data points for cleaner X-axis labels
 	var intervalMinutes int
 	switch {
-	case totalHours <= 1: // 1 hour
-		intervalMinutes = 10 // 6 points (matches 6 labels exactly)
-	case totalHours <= 5: // 1-5 hours
-		intervalMinutes = 15 // 20 points
-	case totalHours <= 24: // 5-24 hours
-		intervalMinutes = 30 // 48 points for 24h (every 30 min)
-	case totalHours <= 168: // 24 hours to 1 week
-		intervalMinutes = 120 // 84 points (every 2 hours)
-	default: // > 1 week (1 month = 720 hours)
-		intervalMinutes = 600 // 72 points (every 10 hours)
+	case totalHours <= 1:
+		intervalMinutes = interval10Min
+	case totalHours <= 5:
+		intervalMinutes = interval15Min
+	case totalHours <= 24:
+		intervalMinutes = interval30Min
+	case totalHours <= 168:
+		intervalMinutes = interval2Hour
+	default:
+		intervalMinutes = interval10Hour
 	}
 
-	// Get token statistics from request_logs with dynamic aggregation
 	type tokenResult struct {
 		TimeSlot         string
 		PromptTokens     int64
@@ -615,21 +470,9 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 
 	var results []tokenResult
 
-	// Build database-specific query for dynamic granularity
 	dbType := s.DB.Dialector.Name()
-	var selectClause, groupClause string
-
-	switch dbType {
-	case "mysql":
-		selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:%%i:00') as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
-		groupClause = "time_slot"
-	case "postgres":
-		selectClause = fmt.Sprintf("to_char(DATE_TRUNC('minute', timestamp), 'YYYY-MM-DD HH24:MI:00') as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
-		groupClause = "time_slot"
-	default: // sqlite and others
-		selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:%%M:00', timestamp) as time_slot, COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens")
-		groupClause = "time_slot"
-	}
+	fields := "COALESCE(SUM(prompt_tokens), 0) as prompt_tokens, COALESCE(SUM(completion_tokens), 0) as completion_tokens, COALESCE(SUM(total_tokens), 0) as total_tokens, COALESCE(SUM(cached_tokens), 0) as cached_tokens"
+	selectClause, groupClause := buildTimeSelectClause(dbType, granularityMinute, fields)
 
 	err := s.DB.Model(&models.RequestLog{}).
 		Select(selectClause).
@@ -643,7 +486,6 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 		return
 	}
 
-	// Create a map for easy lookup
 	statsBySlot := make(map[time.Time]tokenResult)
 	for _, result := range results {
 		slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
@@ -651,33 +493,28 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 		statsBySlot[slotTime] = result
 	}
 
-	// Get pending logs from Redis cache for real-time statistics
 	if s.RequestLogService != nil {
 		pendingLogs, err := s.RequestLogService.GetPendingLogs()
 		if err != nil {
 			logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
 		} else {
-			// Build a set of aggregate group IDs for fast lookup
 			aggregateGroupIDs, err := s.getAggregateGroupIDs()
 			if err != nil {
 				logrus.Warnf("Failed to get aggregate group IDs: %v", err)
 			}
 
-			// Aggregate pending logs by time slot
 			pendingBySlot := make(map[time.Time]*tokenResult)
 			for _, log := range pendingLogs {
 				if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) || log.RequestType != models.RequestTypeFinal {
 					continue
 				}
 
-				// Check if this is an aggregate group
 				if aggregateGroupIDs != nil {
 					if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
 						continue
 					}
 				}
 
-				// Truncate to minute level for aggregation
 				slotTime := log.Timestamp.Truncate(time.Minute)
 				if _, exists := pendingBySlot[slotTime]; !exists {
 					pendingBySlot[slotTime] = &tokenResult{
@@ -694,17 +531,14 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 				pendingBySlot[slotTime].CachedTokens += log.CachedTokens
 			}
 
-			// Merge pending data into statsBySlot
 			for slotTime, pendingData := range pendingBySlot {
 				if existing, ok := statsBySlot[slotTime]; ok {
-					// Add to existing data
 					existing.PromptTokens += pendingData.PromptTokens
 					existing.CompletionTokens += pendingData.CompletionTokens
 					existing.TotalTokens += pendingData.TotalTokens
 					existing.CachedTokens += pendingData.CachedTokens
 					statsBySlot[slotTime] = existing
 				} else {
-					// New time slot
 					statsBySlot[slotTime] = *pendingData
 				}
 			}
@@ -719,7 +553,6 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	if intervals < 1 {
 		intervals = 1
 	}
-	// Ensure the last interval covers the current time
 	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
 	if lastSlotEnd.Before(endTime) {
 		intervals++
@@ -742,7 +575,6 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 			}
 		}
 
-		// Calculate non-cached prompt tokens (prompt - cached)
 		nonCachedPromptSum := promptSum - cachedSum
 		if nonCachedPromptSum < 0 {
 			nonCachedPromptSum = 0
