@@ -1,3 +1,4 @@
+// Chart colors mapping
 const cssVarMap: Record<string, string> = {
   "dashboard.success_requests": "--color-request-count",
   "dashboard.failed_requests": "--color-error-rate",
@@ -10,9 +11,31 @@ const cssVarMap: Record<string, string> = {
   "dashboard.input_non_cached_tokens": "--color-prompt-tokens",
 };
 
+// Token speed color palette - top 7 colors
+const tokenSpeedColors = [
+  "#087EA4", // Rank 1: Deepest teal - fastest
+  "#0A9EC1", // Rank 2
+  "#0CBEDD", // Rank 3
+  "#14B8A6", // Rank 4: Teal
+  "#1AB5A0", // Rank 5
+  "#26AF94", // Rank 6
+  "#32A988", // Rank 7: Lightest teal - slowest
+];
+
 export function useChartColors() {
-  const getDatasetColor = (labelKey: string | undefined, label: string): string => {
+  const getDatasetColor = (
+    labelKey: string | undefined,
+    label: string,
+    speedIndex?: number
+  ): string => {
     const key = labelKey || label;
+
+    // Token speed charts use position-based heat gradient
+    // Backend already sorts datasets by average speed (descending)
+    if (key.startsWith("token_speed.") && speedIndex !== undefined) {
+      return tokenSpeedColors[speedIndex] || tokenSpeedColors[tokenSpeedColors.length - 1];
+    }
+
     if (cssVarMap[key]) {
       return `var(${cssVarMap[key]})`;
     }
@@ -31,8 +54,17 @@ export function useChartColors() {
       return true;
     }
 
-    // Only try to translate when label looks like an i18n key (contains dot)
-    if (label.includes(".")) {
+    // Only try to translate when label looks like an i18n key:
+    // - Contains dot
+    // - NOT from token_speed (format: "token_speed.xxx")
+    // - NOT a dynamic combination (format: "group - model")
+    // - Starts with known prefix like "dashboard."
+    if (
+      label.includes(".") &&
+      !label.startsWith("token_speed.") &&
+      !label.includes(" - ") &&
+      (label.startsWith("dashboard.") || label.startsWith("common."))
+    ) {
       try {
         const translatedLabel = t(label);
         // Check if translated text contains error keywords

@@ -112,6 +112,7 @@ export default {
     totalTokens: "总量 (total_tokens)",
     tokenView: "Token趋势",
     requestView: "请求趋势",
+    tokenSpeedView: "Token 速度",
     last1Hour: "1小时",
     last5Hours: "5小时",
     last24Hours: "24小时",

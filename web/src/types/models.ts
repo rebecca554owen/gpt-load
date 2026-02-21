@@ -277,3 +277,6 @@ export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];
 }
+
+// Chart view type for dashboard
+export type ChartViewType = "request" | "token" | "token_speed";

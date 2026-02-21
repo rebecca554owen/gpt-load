@@ -1,4 +1,4 @@
-import type { ChartData, DashboardStatsResponse, Group } from "@/types/models";
+import type { ChartData, ChartViewType, DashboardStatsResponse, Group } from "@/types/models";
 import http from "@/utils/http";
 
 /**
@@ -13,10 +13,10 @@ export const getDashboardStats = (hours: number = 5) => {
 
 /**
  * Get dashboard chart data
- * @param view View type (request/token)
- * @param hours Time range in hours (1/3/6/24/72/168)
+ * @param view View type (request/token/token_speed)
+ * @param hours Time range in hours (1/5/24/168/720)
  */
-export const getDashboardChart = (view: "request" | "token" = "token", hours: number = 5) => {
+export const getDashboardChart = (view: ChartViewType = "token", hours: number = 5) => {
   return http.get<ChartData>("/dashboard/chart", {
     params: { view, hours },
   });

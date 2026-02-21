@@ -4,16 +4,15 @@ import BaseInfoCard from "@/components/BaseInfoCard.vue";
 import EncryptionMismatchAlert from "@/components/EncryptionMismatchAlert.vue";
 import LineChart from "@/components/LineChart.vue";
 import SecurityAlert from "@/components/SecurityAlert.vue";
-import type { DashboardStatsResponse } from "@/types/models";
+import type { ChartViewType, DashboardStatsResponse } from "@/types/models";
 import type { TimeRangeHours } from "@/composables/useChartData";
 import { NSpace } from "naive-ui";
 import { onMounted, ref, watch } from "vue";
 
-// View type: request | token
-const viewType = ref<"request" | "token">("token");
+const viewType = ref<ChartViewType>("token_speed");
 
 // Time range in hours: 1/5/168/720
-const timeRange = ref<TimeRangeHours>(1);
+const timeRange = ref<TimeRangeHours>(5);
 
 const dashboardStats = ref<DashboardStatsResponse | null>(null);
 

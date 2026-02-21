@@ -1,14 +1,13 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import type { ChartData } from "@/types/models";
+import type { ChartData, ChartViewType } from "@/types/models";
 import { getDashboardChart } from "@/api/dashboard";
 import { ANIMATION_DELAY } from "@/constants/chart";
 
-// Time range options in hours
 export type TimeRangeHours = 1 | 5 | 24 | 168 | 720;
 
 export function useChartData(
-  viewType: () => "request" | "token",
+  viewType: () => ChartViewType,
   timeRange: () => TimeRangeHours,
   onAnimationReady: () => void
 ) {

@@ -77,7 +77,8 @@ export function useChartInteraction(
         color: getDatasetColor(dataset),
         index,
       }))
-      .filter(item => !hiddenDatasetIndices().has(item.index));
+      .filter(item => !hiddenDatasetIndices().has(item.index))
+      .sort((a, b) => b.value - a.value); // Sort by value descending
 
     if (closestTimeIndex >= 0) {
       hoveredPoint.value = {

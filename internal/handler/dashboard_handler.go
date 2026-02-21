@@ -8,6 +8,8 @@ import (
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
 	"gpt-load/internal/utils"
+	"math"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,6 +27,9 @@ const (
 	interval30Min  = 30  // 5-24 hours range
 	interval2Hour  = 120 // 1 week range
 	interval10Hour = 600 // 1 month range
+
+	// Token speed chart configuration
+	topCombosLimit = 7 // Number of top group-model combinations to track
 )
 
 type timeGranularity int
@@ -235,17 +240,17 @@ func (s *Server) Stats(c *gin.Context) {
 	securityWarnings := s.getSecurityWarnings(c)
 
 	stats := models.DashboardStatsResponse{
-		KeyCount:               trendCard(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys),
-		TokenConsumption:       trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
-		PromptTokens:           trendCard(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens),
-		NonCachedPromptTokens:  trendCard(currentNonCachedPrompt, previousNonCachedPrompt),
-		CachedTokens:           trendCard(currentTokenStats.CachedTokens, previousTokenStats.CachedTokens),
-		CompletionTokens:       trendCard(currentTokenStats.CompletionTokens, previousTokenStats.CompletionTokens),
-		TotalTokens:            trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
-		RPM:                     rpmStats,
-		RequestCount:           trendCard(currentPeriod.TotalRequests, previousPeriod.TotalRequests),
-		ErrorRate:              errorRateCard(currentErrorRate, previousErrorRate, currentPeriod.TotalRequests > 0, previousPeriod.TotalRequests > 0),
-		SecurityWarnings:       securityWarnings,
+		KeyCount:              trendCard(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys),
+		TokenConsumption:      trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
+		PromptTokens:          trendCard(currentTokenStats.PromptTokens, previousTokenStats.PromptTokens),
+		NonCachedPromptTokens: trendCard(currentNonCachedPrompt, previousNonCachedPrompt),
+		CachedTokens:          trendCard(currentTokenStats.CachedTokens, previousTokenStats.CachedTokens),
+		CompletionTokens:      trendCard(currentTokenStats.CompletionTokens, previousTokenStats.CompletionTokens),
+		TotalTokens:           trendCard(currentTokenStats.TotalTokens, previousTokenStats.TotalTokens),
+		RPM:                   rpmStats,
+		RequestCount:          trendCard(currentPeriod.TotalRequests, previousPeriod.TotalRequests),
+		ErrorRate:             errorRateCard(currentErrorRate, previousErrorRate, currentPeriod.TotalRequests > 0, previousPeriod.TotalRequests > 0),
+		SecurityWarnings:      securityWarnings,
 	}
 
 	response.Success(c, stats)
@@ -263,6 +268,9 @@ func (s *Server) Chart(c *gin.Context) {
 	if viewType == "token" {
 		// Token view - get token statistics from request_logs
 		s.getTokenChart(c, startTime, endTime)
+	} else if viewType == "token_speed" {
+		// Token speed view - get token speed statistics from request_logs
+		s.getTokenSpeedChart(c, startTime, endTime)
 	} else {
 		// Request view - get request statistics from group_hourly_stats
 		s.getRequestChart(c, startTime, endTime)
@@ -610,6 +618,217 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 				Data:     totalData,
 			},
 		},
+	}
+
+	response.Success(c, chartData)
+}
+
+// getTokenSpeedChart returns token speed statistics chart data
+func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time) {
+	totalHours := int(endTime.Sub(startTime).Hours())
+	if totalHours < 1 {
+		totalHours = 1
+	}
+
+	var intervalMinutes int
+	switch {
+	case totalHours <= 1:
+		intervalMinutes = interval10Min
+	case totalHours <= 5:
+		intervalMinutes = interval15Min
+	case totalHours <= 24:
+		intervalMinutes = interval30Min
+	case totalHours <= 168:
+		intervalMinutes = interval2Hour
+	default:
+		intervalMinutes = interval10Hour
+	}
+
+	type speedRawData struct {
+		GroupName        string
+		Model            string
+		Timestamp        time.Time
+		Duration         int64
+		CompletionTokens int64
+	}
+
+	var rawData []speedRawData
+	err := s.DB.Model(&models.RequestLog{}).
+		Select("group_name, model, timestamp, duration, completion_tokens").
+		Where("timestamp >= ? AND timestamp < ?", startTime, endTime).
+		Where("is_success = ? AND request_type = ?", true, models.RequestTypeFinal).
+		Where("group_id NOT IN (?)",
+			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
+		Where("duration > 0 AND completion_tokens > 0").
+		Scan(&rawData).Error
+	if err != nil {
+		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
+		return
+	}
+
+	comboRequestCount := make(map[string]int64)
+	for _, data := range rawData {
+		comboKey := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
+		comboRequestCount[comboKey]++
+	}
+
+	type comboCount struct {
+		key   string
+		count int64
+	}
+	var sortedCombos []comboCount
+	for key, count := range comboRequestCount {
+		sortedCombos = append(sortedCombos, comboCount{key, count})
+	}
+	sort.Slice(sortedCombos, func(i, j int) bool {
+		return sortedCombos[i].count > sortedCombos[j].count
+	})
+
+	topCombos := make(map[string]bool)
+	for i := 0; i < len(sortedCombos) && i < topCombosLimit; i++ {
+		topCombos[sortedCombos[i].key] = true
+	}
+
+	type timeComboKey struct {
+		timeSlot time.Time
+		combo    string
+	}
+	type timeComboData struct {
+		durations        []float64
+		completionTokens []float64
+	}
+	dataByTimeCombo := make(map[timeComboKey]*timeComboData)
+
+	for _, data := range rawData {
+		comboKey := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
+		if !topCombos[comboKey] {
+			continue
+		}
+
+		slotTime := data.Timestamp.Truncate(time.Duration(intervalMinutes) * time.Minute)
+		key := timeComboKey{slotTime, comboKey}
+
+		if _, exists := dataByTimeCombo[key]; !exists {
+			dataByTimeCombo[key] = &timeComboData{}
+		}
+
+		dataByTimeCombo[key].durations = append(dataByTimeCombo[key].durations, float64(data.Duration)/1000)
+		dataByTimeCombo[key].completionTokens = append(dataByTimeCombo[key].completionTokens, float64(data.CompletionTokens))
+	}
+
+	var labels []string
+	totalMinutes := totalHours * 60
+	intervals := totalMinutes / intervalMinutes
+	if intervals < 1 {
+		intervals = 1
+	}
+	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
+	if lastSlotEnd.Before(endTime) {
+		intervals++
+	}
+
+	startSlot := startTime.Truncate(time.Minute)
+	for i := 0; i < intervals; i++ {
+		slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+		labels = append(labels, slotStart.Format(time.RFC3339))
+	}
+
+	datasets := make(map[string][]float64)
+	comboList := make([]string, 0, len(topCombos))
+	for combo := range topCombos {
+		comboList = append(comboList, combo)
+		datasets[combo] = make([]float64, intervals)
+	}
+	sort.Strings(comboList)
+
+	for i := 0; i < intervals; i++ {
+		slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+		slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
+		for _, combo := range comboList {
+			var allSpeeds []float64
+
+			for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Duration(intervalMinutes) * time.Minute) {
+				lookupTime := t.Truncate(time.Duration(intervalMinutes) * time.Minute)
+				if data, ok := dataByTimeCombo[timeComboKey{lookupTime, combo}]; ok {
+					for j := range data.durations {
+						seconds := data.durations[j]
+						tokens := data.completionTokens[j]
+						if seconds > 0 {
+							speed := tokens / seconds
+							allSpeeds = append(allSpeeds, speed)
+						}
+					}
+				}
+			}
+
+			avgSpeed := 0.0
+			if len(allSpeeds) > 0 {
+				var sum, sumSquares float64
+				for _, speed := range allSpeeds {
+					sum += speed
+				}
+				mean := sum / float64(len(allSpeeds))
+				for _, speed := range allSpeeds {
+					sumSquares += (speed - mean) * (speed - mean)
+				}
+				stdDev := math.Sqrt(sumSquares / float64(len(allSpeeds)))
+
+				var filteredSpeeds []float64
+				for _, speed := range allSpeeds {
+					if stdDev == 0 || math.Abs(speed-mean) <= 3*stdDev {
+						filteredSpeeds = append(filteredSpeeds, speed)
+					}
+				}
+
+				if len(filteredSpeeds) > 0 {
+					var filteredSum float64
+					for _, speed := range filteredSpeeds {
+						filteredSum += speed
+					}
+					avgSpeed = filteredSum / float64(len(filteredSpeeds))
+				}
+			}
+			datasets[combo][i] = avgSpeed
+		}
+	}
+
+	// Calculate average speed for each combo across all time intervals
+	comboAverageSpeed := make(map[string]float64)
+	for _, combo := range comboList {
+		var totalSpeed float64
+		var nonZeroCount int
+		for _, val := range datasets[combo] {
+			if val > 0 {
+				totalSpeed += val
+				nonZeroCount++
+			}
+		}
+		if nonZeroCount > 0 {
+			comboAverageSpeed[combo] = totalSpeed / float64(nonZeroCount)
+		}
+	}
+
+	// Sort combos by average speed (descending)
+	sort.Slice(comboList, func(i, j int) bool {
+		return comboAverageSpeed[comboList[i]] > comboAverageSpeed[comboList[j]]
+	})
+
+	var chartDatasets []models.ChartDataset
+	for _, combo := range comboList {
+		data := make([]int64, intervals)
+		for i, val := range datasets[combo] {
+			data[i] = int64(val)
+		}
+		chartDatasets = append(chartDatasets, models.ChartDataset{
+			Label:    combo,
+			LabelKey: "token_speed." + combo,
+			Data:     data,
+		})
+	}
+
+	chartData := models.ChartData{
+		Labels:   labels,
+		Datasets: chartDatasets,
 	}
 
 	response.Success(c, chartData)

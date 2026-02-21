@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import type { ChartDataset } from "@/types/models";
+import type { ChartDataset, ChartViewType } from "@/types/models";
 import { NRadioGroup, NRadio, NSelect } from "naive-ui";
 import { useChartColors } from "@/utils/chart-colors";
 import { useChartData, type TimeRangeHours } from "@/composables/useChartData";
@@ -10,14 +10,14 @@ import { useChartInteraction } from "@/composables/useChartInteraction";
 import { useChartRendering } from "@/composables/useChartRendering";
 
 interface Props {
-  viewType: "request" | "token";
+  viewType: ChartViewType;
   timeRange: TimeRangeHours;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  "update:viewType": [value: "request" | "token"];
+  "update:viewType": [value: ChartViewType];
   "update:timeRange": [value: TimeRangeHours];
 }>();
 
@@ -26,8 +26,8 @@ const { getDatasetColor: getColor, isErrorDataset: checkIsErrorDataset } = useCh
 
 const chartSvg = ref<SVGElement>();
 
-const getDatasetColor = (dataset: ChartDataset): string => {
-  return getColor(dataset.label_key, dataset.label);
+const getDatasetColor = (dataset: ChartDataset, speedIndex?: number): string => {
+  return getColor(dataset.label_key || "", dataset.label, speedIndex);
 };
 
 const isErrorDataset = (label: string): boolean => {
@@ -85,16 +85,25 @@ const translateLabel = (label: string): string => {
   if (/[一-龥]/.test(label)) {
     return label;
   }
+  // For token speed labels in format "group_name - model_name", try to translate
+  if (label.includes(" - ")) {
+    return label; // Return as-is since it's a dynamic combination
+  }
   return t(label);
 };
+
+// Track token speed dataset index for color assignment
+const isTokenSpeedView = computed(() => props.viewType === "token_speed");
 
 const datasetsWithColor = computed(() => {
   if (!chartData.value) {
     return [];
   }
-  return chartData.value.datasets.map(dataset => ({
+  return chartData.value.datasets.map((dataset, index) => ({
     ...dataset,
-    color: getDatasetColor(dataset),
+    color: isTokenSpeedView.value
+      ? getDatasetColor(dataset, index)
+      : getDatasetColor(dataset),
   }));
 });
 </script>
@@ -106,10 +115,11 @@ const datasetsWithColor = computed(() => {
         <!-- Top-left: View type toggle -->
         <n-radio-group
           :value="viewType"
-          @update:value="(value: 'request' | 'token') => emit('update:viewType', value)"
+          @update:value="(value: 'request' | 'token' | 'token_speed') => emit('update:viewType', value)"
           size="small"
           class="view-toggle"
         >
+          <n-radio value="token_speed">{{ t("dashboard.tokenSpeedView") }}</n-radio>
           <n-radio value="token">{{ t("dashboard.tokenView") }}</n-radio>
           <n-radio value="request">{{ t("dashboard.requestView") }}</n-radio>
         </n-radio-group>
@@ -126,7 +136,7 @@ const datasetsWithColor = computed(() => {
 
     <div v-if="chartData" class="chart-content">
       <div class="chart-wrapper">
-        <div class="chart-legend">
+        <div class="chart-legend" :class="{ 'legend-speed': viewType === 'token_speed' }">
           <div
             v-for="(dataset, index) in datasetsWithColor"
             :key="dataset.label"
@@ -134,7 +144,18 @@ const datasetsWithColor = computed(() => {
             :class="{ 'legend-item-hidden': hiddenDatasetIndices.has(index) }"
             @click="toggleDataset(index)"
           >
-            <div class="legend-indicator" :style="{ backgroundColor: dataset.color }" />
+            <div
+              v-if="viewType === 'token_speed'"
+              class="legend-text-prefix"
+              :style="{ color: dataset.color }"
+            >
+              {{ index + 1 }}.
+            </div>
+            <div
+              v-else
+              class="legend-indicator"
+              :style="{ backgroundColor: dataset.color }"
+            />
             <span class="legend-label">{{ translateLabel(dataset.label) }}</span>
           </div>
         </div>
@@ -238,6 +259,7 @@ const datasetsWithColor = computed(() => {
               :d="generateAreaPath(dataset.data)"
               :fill="`url(#gradient-${datasetIndex})`"
               class="area-path"
+              :class="{ 'area-path-speed': viewType === 'token_speed' }"
               :style="{ opacity: isErrorDataset(dataset.label) ? 0.3 : 0.6 }"
             />
 
@@ -301,6 +323,7 @@ const datasetsWithColor = computed(() => {
         <div
           v-if="tooltipData"
           class="chart-tooltip"
+          :class="{ 'tooltip-speed': viewType === 'token_speed' }"
           :style="{
             left: tooltipPosition.x + 'px',
             top: tooltipPosition.y + 'px',
@@ -311,9 +334,16 @@ const datasetsWithColor = computed(() => {
               formatTimeLabel(tooltipData.time, tooltipData.index, chartData?.labels.length || 0)
             }}
           </div>
-          <div v-for="dataset in tooltipData.datasets" :key="dataset.label" class="tooltip-value">
-            <span class="tooltip-color" :style="{ backgroundColor: dataset.color }" />
-            {{ translateLabel(dataset.label) }}: {{ formatNumber(dataset.value) }}
+          <div
+            v-for="(dataset, idx) in tooltipData.datasets"
+            :key="dataset.label"
+            class="tooltip-value"
+          >
+            <span v-if="viewType === 'token_speed'" class="tooltip-rank-text">{{ idx + 1 }}.</span>
+            <span v-else class="tooltip-color" :style="{ backgroundColor: dataset.color }" />
+            <span class="tooltip-label-text">{{ translateLabel(dataset.label) }}</span>
+            <span class="tooltip-value-number">{{ formatNumber(dataset.value) }}</span>
+            <span v-if="viewType === 'token_speed'" class="tooltip-unit">tok/s</span>
           </div>
         </div>
       </div>
@@ -390,9 +420,9 @@ const datasetsWithColor = computed(() => {
 
 .chart-legend {
   position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0px;
+  left: 115px;
+  right: 0px;
   z-index: 10;
   display: flex;
   justify-content: center;
@@ -400,6 +430,7 @@ const datasetsWithColor = computed(() => {
   padding: 2px;
   backdrop-filter: blur(8px);
   border-radius: 24px;
+  flex-wrap: nowrap;
 }
 
 /* Light theme */
@@ -412,6 +443,13 @@ const datasetsWithColor = computed(() => {
 :root.dark .chart-legend {
   background: var(--overlay-bg);
   border: 1px solid var(--border-color);
+}
+
+/* Token speed legend style */
+.legend-speed {
+  gap: 16px;
+  padding: 8px 16px;
+  justify-content: flex-start;
 }
 
 .legend-item {
@@ -485,6 +523,12 @@ const datasetsWithColor = computed(() => {
 .legend-label {
   font-size: 13px;
   color: inherit;
+}
+
+.legend-text-prefix {
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .chart-wrapper {
@@ -562,7 +606,28 @@ const datasetsWithColor = computed(() => {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   min-width: 140px;
-  max-width: 220px;
+  max-width: 240px;
+}
+
+/* Light theme tooltip */
+:root:not(.dark) .chart-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a2e;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.tooltip-speed {
+  min-width: 200px;
+  max-width: 320px;
+}
+
+:root:not(.dark) .tooltip-speed {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+:root.dark .tooltip-speed {
+  background: rgba(20, 20, 30, 0.95);
 }
 
 .tooltip-time {
@@ -575,6 +640,11 @@ const datasetsWithColor = computed(() => {
   padding-bottom: 6px;
 }
 
+:root:not(.dark) .tooltip-time {
+  color: #666;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
+}
+
 .tooltip-value {
   display: flex;
   align-items: center;
@@ -582,6 +652,39 @@ const datasetsWithColor = computed(() => {
   font-weight: 600;
   margin-bottom: 4px;
   font-size: 12px;
+}
+
+.tooltip-rank-text {
+  font-weight: 700;
+  color: #888;
+  min-width: 20px;
+}
+
+:root:not(.dark) .tooltip-rank-text {
+  color: #999;
+}
+
+.tooltip-label-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tooltip-value-number {
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  color: #a8e6cf;
+}
+
+:root:not(.dark) .tooltip-value-number {
+  color: #059669;
+}
+
+.tooltip-unit {
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 500;
 }
 
 .tooltip-value:last-child {
@@ -592,6 +695,7 @@ const datasetsWithColor = computed(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .chart-loading {
@@ -653,6 +757,16 @@ const datasetsWithColor = computed(() => {
     background: var(--card-bg-solid);
     border: 1px solid var(--border-color);
     gap: 6px;
+  }
+
+  .legend-rank-badge {
+    padding-left: 24px;
+  }
+
+  .legend-rank {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
   }
 
   .chart-svg {

@@ -112,6 +112,7 @@ export default {
     totalTokens: "Total (total_tokens)",
     tokenView: "Token Trends",
     requestView: "Request Trends",
+    tokenSpeedView: "Token Speed",
     last1Hour: "1 Hour",
     last5Hours: "5 Hours",
     last24Hours: "24 Hours",
