@@ -79,8 +79,8 @@ func parseStatsHoursParameter(hoursStr string) int {
 }
 
 type trendResult struct {
-	value       float64
-	isGrowth     bool
+	value    float64
+	isGrowth bool
 }
 
 func calculateTrend(current, previous int64) trendResult {
@@ -353,7 +353,7 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 
 		err := s.DB.Model(&models.RequestLog{}).
 			Select(selectClause).
-			Where("timestamp >= ? AND timestamp < ?", startTime, endTime).
+			Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
 			Where("group_id NOT IN (?)",
 				s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
 			Group(groupClause).
@@ -379,9 +379,23 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 			if err != nil {
 				logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
 			} else {
+				// Build a set of aggregate group IDs for fast lookup
+				aggregateGroupIDs, err := s.getAggregateGroupIDs()
+				if err != nil {
+					logrus.Warnf("Failed to get aggregate group IDs: %v", err)
+				}
+
 				for _, log := range pendingLogs {
+					// Check if within time range
 					if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
 						continue
+					}
+
+					// Check if this is an aggregate group
+					if aggregateGroupIDs != nil {
+						if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
+							continue
+						}
 					}
 
 					slotTime := log.Timestamp.Truncate(time.Minute)
@@ -411,50 +425,106 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 
 		startSlot := startTime.Truncate(time.Minute)
 		for i := 0; i < intervals; i++ {
-			slot := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
-			labels = append(labels, slot.Format(time.RFC3339))
+			slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+			slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
+			labels = append(labels, slotStart.Format(time.RFC3339))
 
-			if data, ok := statsBySlot[slot]; ok {
-				successData = append(successData, data.Success)
-				failureData = append(failureData, data.Failure)
-			} else {
-				successData = append(successData, 0)
-				failureData = append(failureData, 0)
+			var successSum, failureSum int64
+			for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Minute) {
+				if data, ok := statsBySlot[t]; ok {
+					successSum += data.Success
+					failureSum += data.Failure
+				}
 			}
+			successData = append(successData, successSum)
+			failureData = append(failureData, failureSum)
 		}
 	} else {
-		// Use group_hourly_stats for hour-level or larger granularity (more efficient)
-		var hourlyStats []models.GroupHourlyStat
-		query := s.DB.Table("group_hourly_stats").
-			Where("time >= ? AND time < ?", startTime.Truncate(time.Hour), endTime.Truncate(time.Hour).Add(time.Hour))
-		query = query.Where("group_id NOT IN (?)",
-			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate"))
-		if err := query.Order("time asc").Find(&hourlyStats).Error; err != nil {
+		// Use request_logs for hour-level or larger granularity (same as token stats)
+		type requestResult struct {
+			TimeSlot string
+			Success  int64
+			Failure  int64
+		}
+		var results []requestResult
+
+		// Build database-specific query for hour-level aggregation
+		dbType := s.DB.Dialector.Name()
+		var selectClause, groupClause string
+
+		switch dbType {
+		case "mysql":
+			selectClause = fmt.Sprintf("DATE_FORMAT(timestamp, '%%Y-%%m-%%d %%H:00:00') as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		case "postgres":
+			selectClause = fmt.Sprintf("to_char(DATE_TRUNC('hour', timestamp), 'YYYY-MM-DD HH24:00:00') as time_slot, SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		default: // sqlite and others
+			selectClause = fmt.Sprintf("strftime('%%Y-%%m-%%d %%H:00:00', timestamp) as time_slot, SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure")
+			groupClause = "time_slot"
+		}
+
+		err := s.DB.Model(&models.RequestLog{}).
+			Select(selectClause).
+			Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
+			Where("group_id NOT IN (?)",
+				s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
+			Group(groupClause).
+			Order("time_slot asc").
+			Scan(&results).Error
+
+		if err != nil {
 			response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
 			return
 		}
 
-		statsByHour := make(map[time.Time]map[string]int64)
-		for _, stat := range hourlyStats {
-			hour := stat.Time.Local().Truncate(time.Hour)
-			if _, ok := statsByHour[hour]; !ok {
-				statsByHour[hour] = make(map[string]int64)
-			}
-			statsByHour[hour]["success"] += stat.SuccessCount
-			statsByHour[hour]["failure"] += stat.FailureCount
+		// Create a map for easy lookup by hour
+		statsByHour := make(map[time.Time]*requestResult)
+		for _, result := range results {
+			slotTime, _ := time.ParseInLocation("2006-01-02 15:04:05", result.TimeSlot, time.Local)
+			slotTime = slotTime.Truncate(time.Hour)
+			statsByHour[slotTime] = &result
 		}
 
-		// Get pending stats from buffer for real-time data
+		// Get pending logs from Redis cache for real-time statistics
 		if s.RequestLogService != nil {
-			pendingStats := s.RequestLogService.GetPendingStats()
-			for _, stat := range pendingStats {
-				hour := stat.Time.Truncate(time.Hour)
-				if stat.Time.After(startTime.Truncate(time.Hour)) && stat.Time.Before(endTime) {
-					if _, ok := statsByHour[hour]; !ok {
-						statsByHour[hour] = make(map[string]int64)
+			pendingLogs, err := s.RequestLogService.GetPendingLogs()
+			if err != nil {
+				logrus.Warnf("Failed to get pending logs for real-time stats: %v", err)
+			} else {
+				// Build a set of aggregate group IDs for fast lookup
+				aggregateGroupIDs, err := s.getAggregateGroupIDs()
+				if err != nil {
+					logrus.Warnf("Failed to get aggregate group IDs: %v", err)
+				}
+
+				for _, log := range pendingLogs {
+					// Check if within time range
+					if log.Timestamp.Before(startTime) || log.Timestamp.After(endTime) {
+						continue
 					}
-					statsByHour[hour]["success"] += stat.SuccessCount
-					statsByHour[hour]["failure"] += stat.FailureCount
+
+					// Check if this is an aggregate group
+					if aggregateGroupIDs != nil {
+						if _, isAggregate := aggregateGroupIDs[log.GroupID]; isAggregate {
+							continue
+						}
+					}
+
+					hour := log.Timestamp.Truncate(time.Hour)
+					if existing, ok := statsByHour[hour]; ok {
+						if log.IsSuccess {
+							existing.Success++
+						} else {
+							existing.Failure++
+						}
+					} else {
+						statsByHour[hour] = &requestResult{
+							TimeSlot: hour.Format("2006-01-02 15:04:05"),
+							Success:  boolToInt64(log.IsSuccess),
+							Failure:  boolToInt64(!log.IsSuccess),
+						}
+					}
 				}
 			}
 		}
@@ -467,18 +537,20 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 
 		startSlot := startTime.Truncate(time.Minute)
 		for i := 0; i < intervals; i++ {
-			slot := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
-			labels = append(labels, slot.Format(time.RFC3339))
+			slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
+			slotEnd := slotStart.Add(time.Duration(intervalMinutes) * time.Minute)
+			labels = append(labels, slotStart.Format(time.RFC3339))
 
-			// Round to nearest hour for lookup
-			hour := slot.Truncate(time.Hour)
-			if data, ok := statsByHour[hour]; ok {
-				successData = append(successData, data["success"])
-				failureData = append(failureData, data["failure"])
-			} else {
-				successData = append(successData, 0)
-				failureData = append(failureData, 0)
+			var successSum, failureSum int64
+			for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Hour) {
+				hour := t.Truncate(time.Hour)
+				if data, ok := statsByHour[hour]; ok {
+					successSum += data.Success
+					failureSum += data.Failure
+				}
 			}
+			successData = append(successData, successSum)
+			failureData = append(failureData, failureSum)
 		}
 	}
 
@@ -636,7 +708,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 
 		var promptSum, cachedSum, outputSum, totalSum int64
 
-		for t := slotStart; t.Before(slotEnd); t = t.Add(time.Minute) {
+		for t := slotStart; t.Before(slotEnd) && t.Before(endTime); t = t.Add(time.Minute) {
 			if data, ok := statsBySlot[t]; ok {
 				promptSum += data.PromptTokens
 				cachedSum += data.CachedTokens
@@ -693,13 +765,36 @@ type hourlyStatResult struct {
 
 func (s *Server) getHourlyStats(startTime, endTime time.Time) (hourlyStatResult, error) {
 	var result hourlyStatResult
-	err := s.DB.Table("group_hourly_stats").
-		Where("time >= ? AND time < ?", startTime, endTime).
+
+	// Query directly from request_logs table for real-time data (same as token stats)
+	// Only count final requests, not retry requests
+	err := s.DB.Model(&models.RequestLog{}).
+		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
 		Where("group_id NOT IN (?)",
 			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
-		Select("COALESCE(SUM(success_count), 0) + COALESCE(SUM(failure_count), 0) as total_requests, COALESCE(SUM(failure_count), 0) as total_failures").
+		Select("COUNT(*) as total_requests, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as total_failures").
 		Scan(&result).Error
+
 	return result, err
+}
+
+// getAggregateGroupIDs returns a set of aggregate group IDs for fast lookup
+func (s *Server) getAggregateGroupIDs() (map[uint]struct{}, error) {
+	var groupIDs []uint
+	err := s.DB.Table("groups").
+		Where("group_type = ?", "aggregate").
+		Pluck("id", &groupIDs).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	aggregateSet := make(map[uint]struct{})
+	for _, id := range groupIDs {
+		aggregateSet[id] = struct{}{}
+	}
+
+	return aggregateSet, nil
 }
 
 type rpmStatResult struct {
