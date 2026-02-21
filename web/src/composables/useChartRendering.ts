@@ -111,12 +111,15 @@ export function useChartRendering(
   };
 
   // Get the number of labels to show based on time range
-  const getLabelCount = (rangeHours: TimeRangeHours): number =>
-    LABEL_COUNTS[rangeHours] ?? 6;
+  const getLabelCount = (rangeHours: TimeRangeHours): number => LABEL_COUNTS[rangeHours] ?? 6;
 
   // Generate label text based on position
   // All ranges have 6 labels total, with 5 time intervals + realtime
-  const generateLabelText = (positionIndex: number, totalLabels: number, rangeHours: TimeRangeHours): string => {
+  const generateLabelText = (
+    positionIndex: number,
+    totalLabels: number,
+    rangeHours: TimeRangeHours
+  ): string => {
     const isRealtime = positionIndex === totalLabels - 1;
     if (isRealtime) {
       return "realtime";

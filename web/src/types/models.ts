@@ -252,17 +252,17 @@ export interface SecurityWarning {
 
 // Dashboard basic statistics response
 export interface DashboardStatsResponse {
-  key_count: StatCard
-  token_consumption: StatCard
-  prompt_tokens: StatCard
-  non_cached_prompt_tokens: StatCard
-  cached_tokens: StatCard
-  completion_tokens: StatCard
-  total_tokens: StatCard
-  rpm: StatCard
-  request_count: StatCard
-  error_rate: StatCard
-  security_warnings: SecurityWarning[]
+  key_count: StatCard;
+  token_consumption: StatCard;
+  prompt_tokens: StatCard;
+  non_cached_prompt_tokens: StatCard;
+  cached_tokens: StatCard;
+  completion_tokens: StatCard;
+  total_tokens: StatCard;
+  rpm: StatCard;
+  request_count: StatCard;
+  error_rate: StatCard;
+  security_warnings: SecurityWarning[];
 }
 
 // Chart dataset

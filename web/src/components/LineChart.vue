@@ -2,10 +2,9 @@
 import { computed, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ChartDataset } from "@/types/models";
-import type { TimeRangeHours } from "@/composables/useChartData";
 import { NRadioGroup, NRadio, NSelect } from "naive-ui";
 import { useChartColors } from "@/utils/chart-colors";
-import { useChartData } from "@/composables/useChartData";
+import { useChartData, type TimeRangeHours } from "@/composables/useChartData";
 import { useChartAnimation } from "@/composables/useChartAnimation";
 import { useChartInteraction } from "@/composables/useChartInteraction";
 import { useChartRendering } from "@/composables/useChartRendering";

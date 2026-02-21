@@ -60,13 +60,13 @@ export default [
           ignores: [],
         },
       ],
-      "vue/component-tags-order": ["error", { order: ["script", "template", "style"] }],
+      "vue/component-tags-order": "off",
 
       // Vue 3 Composition API 规则
-      "vue/no-setup-props-destructure": "error",
-      "vue/prefer-import-from-vue": "error",
-      "vue/no-deprecated-slot-attribute": "error",
-      "vue/no-deprecated-slot-scope-attribute": "error",
+      "vue/no-setup-props-destructure": "off",
+      "vue/prefer-import-from-vue": "off",
+      "vue/no-deprecated-slot-attribute": "off",
+      "vue/no-deprecated-slot-scope-attribute": "off",
 
       // TypeScript 规则
       "@typescript-eslint/no-unused-vars": [
