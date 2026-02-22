@@ -826,6 +826,16 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		})
 	}
 
+	// If no datasets, create an empty dataset to ensure chart renders with axes
+	if len(chartDatasets) == 0 {
+		emptyData := make([]int64, intervals)
+		chartDatasets = append(chartDatasets, models.ChartDataset{
+			Label:    "",
+			LabelKey: "",
+			Data:     emptyData,
+		})
+	}
+
 	chartData := models.ChartData{
 		Labels:   labels,
 		Datasets: chartDatasets,
