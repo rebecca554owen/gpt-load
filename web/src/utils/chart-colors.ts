@@ -11,15 +11,19 @@ const cssVarMap: Record<string, string> = {
   "dashboard.input_non_cached_tokens": "--color-prompt-tokens",
 };
 
-// Token speed color palette - top 7 colors
+// Token speed color palette - Cyber Speed Heat Gradient (Top 10)
+// From hottest (fastest) to coolest (slowest): Orange → Gold → Lime → Cyan → Blue
 const tokenSpeedColors = [
-  "#087EA4", // Rank 1: Deepest teal - fastest
-  "#0A9EC1", // Rank 2
-  "#0CBEDD", // Rank 3
-  "#14B8A6", // Rank 4: Teal
-  "#1AB5A0", // Rank 5
-  "#26AF94", // Rank 6
-  "#32A988", // Rank 7: Lightest teal - slowest
+  "#FF6B35", // Rank 1: Incinerator Orange - blazing fast
+  "#FF8C42", // Rank 2: Solar Flare
+  "#FFB347", // Rank 3: Golden Burst
+  "#FFD23F", // Rank 4: Electric Gold
+  "#7ED957", // Rank 5: Neon Lime
+  "#00E676", // Rank 6: Matrix Green
+  "#00D9FF", // Rank 7: Arctic Cyan
+  "#00B4D8", // Rank 8: Glacial Blue
+  "#4A90E2", // Rank 9: Ocean Depth
+  "#5C6BC0", // Rank 10: Deep Twilight - cool cruise
 ];
 
 export function useChartColors() {

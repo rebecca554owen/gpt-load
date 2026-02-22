@@ -8,6 +8,7 @@ import { useChartData, type TimeRangeHours } from "@/composables/useChartData";
 import { useChartAnimation } from "@/composables/useChartAnimation";
 import { useChartInteraction } from "@/composables/useChartInteraction";
 import { useChartRendering } from "@/composables/useChartRendering";
+import { CHART_CONFIG } from "@/constants/chart";
 
 interface Props {
   viewType: ChartViewType;
@@ -33,6 +34,9 @@ const getDatasetColor = (dataset: ChartDataset, speedIndex?: number): string => 
 const isErrorDataset = (label: string): boolean => {
   return checkIsErrorDataset(label, t);
 };
+
+// Track token speed dataset index for color assignment
+const isTokenSpeedView = computed(() => props.viewType === "token_speed");
 
 const {
   chartData,
@@ -66,7 +70,10 @@ const {
 } = useChartRendering(
   () => chartData.value,
   () => props.timeRange,
-  () => hiddenDatasetIndices.value
+  () => hiddenDatasetIndices.value,
+  CHART_CONFIG.width,
+  CHART_CONFIG.height,
+  isTokenSpeedView.value ? CHART_CONFIG.paddingWithLegend : CHART_CONFIG.padding
 );
 
 const { startAnimation } = useChartAnimation(plotWidth, plotHeight);
@@ -91,9 +98,6 @@ const translateLabel = (label: string): string => {
   }
   return t(label);
 };
-
-// Track token speed dataset index for color assignment
-const isTokenSpeedView = computed(() => props.viewType === "token_speed");
 
 const datasetsWithColor = computed(() => {
   if (!chartData.value) {
@@ -430,7 +434,7 @@ const datasetsWithColor = computed(() => {
   padding: 2px;
   backdrop-filter: blur(8px);
   border-radius: 24px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 /* Light theme */
@@ -447,9 +451,11 @@ const datasetsWithColor = computed(() => {
 
 /* Token speed legend style */
 .legend-speed {
-  gap: 16px;
+  gap: 12px;
   padding: 8px 16px;
   justify-content: flex-start;
+  flex-wrap: wrap;
+  max-width: calc(100% - 130px);
 }
 
 .legend-item {

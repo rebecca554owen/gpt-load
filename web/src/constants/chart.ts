@@ -2,6 +2,7 @@ export const CHART_CONFIG = {
   width: 800,
   height: 260,
   padding: { top: 40, right: 40, bottom: 60, left: 80 } as const,
+  paddingWithLegend: { top: 80, right: 40, bottom: 60, left: 80 } as const,
 } as const;
 
 export const PAGINATION = {

@@ -29,7 +29,7 @@ const (
 	interval10Hour = 600 // 1 month range
 
 	// Token speed chart configuration
-	topCombosLimit = 7 // Number of top group-model combinations to track
+	topCombosLimit = 10 // Number of top group-model combinations to track
 )
 
 type timeGranularity int
@@ -823,6 +823,16 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 			Label:    combo,
 			LabelKey: "token_speed." + combo,
 			Data:     data,
+		})
+	}
+
+	// If no datasets, create an empty dataset to ensure chart renders with axes
+	if len(chartDatasets) == 0 {
+		emptyData := make([]int64, intervals)
+		chartDatasets = append(chartDatasets, models.ChartDataset{
+			Label:    "",
+			LabelKey: "",
+			Data:     emptyData,
 		})
 	}
 
