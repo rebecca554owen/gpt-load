@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { versionService, type VersionInfo } from "@/services/version";
+import { useVersion } from "@/composables/useVersion";
 import {
   BugOutline,
   ChatbubbleOutline,
@@ -11,22 +11,12 @@ import {
   WarningOutline,
 } from "@vicons/ionicons5";
 import { NIcon, NTooltip } from "naive-ui";
-import { onMounted, ref } from "vue";
+import { onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-const versionInfo = ref<VersionInfo>({
-  currentVersion: "0.1.0",
-  latestVersion: null,
-  isLatest: false,
-  hasUpdate: false,
-  releaseUrl: null,
-  lastCheckTime: 0,
-  status: "checking",
-});
-
-const isChecking = ref(false);
+const { versionInfo, isChecking, checkVersion } = useVersion();
 
 const statusConfig: Record<string, { color: string; icon: typeof TimeOutline; text: string }> = {
   checking: {
@@ -53,22 +43,6 @@ const statusConfig: Record<string, { color: string; icon: typeof TimeOutline; te
 
 const formatVersion = (version: string): string => {
   return version.startsWith("v") ? version : `v${version}`;
-};
-
-const checkVersion = async () => {
-  if (isChecking.value) {
-    return;
-  }
-
-  isChecking.value = true;
-  try {
-    const result = await versionService.checkForUpdates();
-    versionInfo.value = result;
-  } catch (error) {
-    console.warn("Version check failed:", error);
-  } finally {
-    isChecking.value = false;
-  }
 };
 
 const handleVersionClick = () => {

@@ -43,7 +43,7 @@ function getDefaultLocale(): Locale {
 // Create i18n instance
 const defaultLocale = getDefaultLocale();
 const i18n = createI18n({
-  legacy: false, // Use Composition API mode
+  legacy: false,
   locale: defaultLocale,
   fallbackLocale: "zh-CN",
   messages: {
@@ -74,7 +74,7 @@ export function setLocale(locale: Locale) {
 
 // Get current locale
 export function getLocale(): Locale {
-  return i18n.global.locale.value as Locale;
+  return i18n.global.locale.value as string as Locale;
 }
 
 // Get current locale label

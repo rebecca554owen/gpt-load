@@ -8,7 +8,7 @@ interface ErrorResponseData {
 interface AxiosError {
   message?: string;
   response?: {
-    data?: ErrorResponseData | ErrorResponseData[] | unknown;
+    data?: ErrorResponseData | Record<string, unknown>;
     status?: number;
   };
 }
@@ -26,25 +26,20 @@ export function useApi() {
    * @returns Parsed error message string or null
    */
   function parseResponseDataError(
-    data: ErrorResponseData | ErrorResponseData[] | unknown
+    data: ErrorResponseData | Record<string, unknown>
   ): string | null {
-    // If array, take first element
-    const errorData = Array.isArray(data) ? data[0] : data;
-
-    if (errorData && typeof errorData === "object" && "message" in errorData) {
-      return (errorData as ErrorResponseData).message || "";
+    if (data && typeof data === "object" && "message" in data) {
+      return (data as ErrorResponseData).message || "";
     }
 
-    // If string, return directly
-    if (typeof errorData === "string") {
-      return errorData;
+    if (typeof data === "string") {
+      return data;
     }
 
-    // Otherwise return JSON string
     try {
-      return JSON.stringify(errorData);
+      return JSON.stringify(data);
     } catch {
-      return String(errorData);
+      return String(data);
     }
   }
 

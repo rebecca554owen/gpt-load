@@ -54,8 +54,21 @@ const formatTrend = (trend: number): string => {
   return `${sign}${trend.toFixed(1)}%`;
 };
 
+// Card type definition
+interface StatCard {
+  key: string;
+  title: string;
+  subTitle?: string;
+  value: number;
+  trend: number;
+  trendIsGrowth: boolean;
+  icon: string;
+  color: string;
+  isRate?: boolean;
+}
+
 // Row 1 card configuration
-const firstRowCards = computed(() => [
+const firstRowCards = computed<StatCard[]>(() => [
   {
     key: "key-count",
     title: t("dashboard.totalKeys"),
@@ -96,10 +109,11 @@ const firstRowCards = computed(() => [
 ]);
 
 // Row 2 card configuration
-const secondRowCards = computed(() => [
+const secondRowCards = computed<StatCard[]>(() => [
   {
     key: "non-cached-prompt-tokens",
     title: t("dashboard.nonCachedPromptTokens"),
+    subTitle: "Non-cached",
     value: props.stats?.non_cached_prompt_tokens?.value ?? 0,
     trend: props.stats?.non_cached_prompt_tokens?.trend ?? 0,
     trendIsGrowth: props.stats?.non_cached_prompt_tokens?.trend_is_growth ?? true,
@@ -109,6 +123,7 @@ const secondRowCards = computed(() => [
   {
     key: "cached-tokens",
     title: t("dashboard.cachedTokens"),
+    subTitle: "cached_tokens",
     value: props.stats?.cached_tokens?.value ?? 0,
     trend: props.stats?.cached_tokens?.trend ?? 0,
     trendIsGrowth: props.stats?.cached_tokens?.trend_is_growth ?? true,
@@ -118,6 +133,7 @@ const secondRowCards = computed(() => [
   {
     key: "completion-tokens",
     title: t("dashboard.completionTokens"),
+    subTitle: "completion_tokens",
     value: props.stats?.completion_tokens?.value ?? 0,
     trend: props.stats?.completion_tokens?.trend ?? 0,
     trendIsGrowth: props.stats?.completion_tokens?.trend_is_growth ?? true,
@@ -127,6 +143,7 @@ const secondRowCards = computed(() => [
   {
     key: "total-tokens",
     title: t("dashboard.totalTokens"),
+    subTitle: "total_tokens",
     value: props.stats?.total_tokens?.value ?? 0,
     trend: props.stats?.total_tokens?.trend ?? 0,
     trendIsGrowth: props.stats?.total_tokens?.trend_is_growth ?? true,
@@ -161,7 +178,10 @@ const secondRowCards = computed(() => [
               <div class="stat-value">
                 {{ props.stats ? formatValue(card.value, card.isRate ? "rate" : "count") : "--" }}
               </div>
-              <div class="stat-title">{{ card.title }}</div>
+              <div class="stat-title">
+                {{ card.title }}
+                <span v-if="card.subTitle" class="stat-title-en"> ({{ card.subTitle }})</span>
+              </div>
             </div>
 
             <div class="stat-bar">
@@ -199,7 +219,10 @@ const secondRowCards = computed(() => [
               <div class="stat-value">
                 {{ props.stats ? formatValue(card.value) : "--" }}
               </div>
-              <div class="stat-title">{{ card.title }}</div>
+              <div class="stat-title">
+                {{ card.title }}
+                <span v-if="card.subTitle" class="stat-title-en"> ({{ card.subTitle }})</span>
+              </div>
             </div>
 
             <div class="stat-bar">
@@ -309,6 +332,12 @@ const secondRowCards = computed(() => [
   font-size: 0.8rem;
   color: var(--text-tertiary);
   font-weight: 500;
+}
+
+.stat-title-en {
+  font-size: 0.7rem;
+  color: var(--text-quaternary);
+  font-weight: 400;
 }
 
 .stat-bar {

@@ -17,6 +17,7 @@ import {
   NTooltip,
   useMessage,
   type FormRules,
+  type SelectOption,
 } from "naive-ui";
 import { reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -43,11 +44,11 @@ const loading = ref(false);
 const formRef = ref();
 
 // 渠道类型选项
-const channelTypeOptions = [
-  { label: "OpenAI (Chat Completions)", value: "openai" as ChannelType },
-  { label: "OpenAI (Responses API)", value: "openai-responses" as ChannelType },
-  { label: "Gemini", value: "gemini" as ChannelType },
-  { label: "Anthropic", value: "anthropic" as ChannelType },
+const channelTypeOptions: SelectOption[] = [
+  { label: "OpenAI (Chat Completions)", value: "openai" },
+  { label: "OpenAI (Responses API)", value: "openai-responses" },
+  { label: "Gemini", value: "gemini" },
+  { label: "Anthropic", value: "anthropic" },
 ];
 
 // 默认表单数据

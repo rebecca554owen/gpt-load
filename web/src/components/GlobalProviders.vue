@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { appState } from "@/utils/app-state";
-import { actualTheme } from "@/utils/theme";
+import { useAppStateStore } from "@/stores/appState";
+import { actualTheme } from "@/composables/useTheme";
 import { getLocale } from "@/locales";
 import {
   darkTheme,
@@ -220,6 +220,7 @@ function useGlobalMessage() {
 const LoadingBar = defineComponent({
   setup() {
     const loadingBar = useLoadingBar();
+    const appState = useAppStateStore();
     watch(
       () => appState.loading,
       loading => {

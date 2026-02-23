@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { DialogReactive } from "naive-ui";
+import type { DialogOptions, DialogReactive } from "naive-ui";
 
 export interface ConfirmActionOptions {
   title: string;
@@ -14,7 +14,7 @@ export function useConfirmDialog() {
   const isLoading = ref(false);
 
   async function confirmAction(
-    dialog: (options: Record<string, unknown>) => DialogReactive,
+    dialog: (options: DialogOptions) => DialogReactive,
     options: ConfirmActionOptions
   ) {
     if (isLoading.value) {
@@ -40,7 +40,7 @@ export function useConfirmDialog() {
           isLoading.value = false;
         }
       },
-    } as Record<string, unknown>);
+    });
   }
 
   function withLoading<T>(fn: () => Promise<T>): () => Promise<T> {

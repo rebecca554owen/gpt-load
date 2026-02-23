@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+
+defineOptions({
+  name: "LineChart",
+});
+
 import { useI18n } from "vue-i18n";
 import type { ChartDataset, ChartViewType } from "@/types/models";
 import { NRadioGroup, NRadio, NSelect } from "naive-ui";
-import { useChartColors } from "@/utils/chart-colors";
+import { useChartColors } from "@/composables/useChartColors";
 import { useChartData, type TimeRangeHours } from "@/composables/useChartData";
 import { useChartAnimation } from "@/composables/useChartAnimation";
 import { useChartInteraction } from "@/composables/useChartInteraction";
@@ -105,9 +110,7 @@ const datasetsWithColor = computed(() => {
   }
   return chartData.value.datasets.map((dataset, index) => ({
     ...dataset,
-    color: isTokenSpeedView.value
-      ? getDatasetColor(dataset, index)
-      : getDatasetColor(dataset),
+    color: isTokenSpeedView.value ? getDatasetColor(dataset, index) : getDatasetColor(dataset),
   }));
 });
 </script>
@@ -119,7 +122,9 @@ const datasetsWithColor = computed(() => {
         <!-- Top-left: View type toggle -->
         <n-radio-group
           :value="viewType"
-          @update:value="(value: 'request' | 'token' | 'token_speed') => emit('update:viewType', value)"
+          @update:value="
+            (value: 'request' | 'token' | 'token_speed') => emit('update:viewType', value)
+          "
           size="small"
           class="view-toggle"
         >
@@ -155,11 +160,7 @@ const datasetsWithColor = computed(() => {
             >
               {{ index + 1 }}.
             </div>
-            <div
-              v-else
-              class="legend-indicator"
-              :style="{ backgroundColor: dataset.color }"
-            />
+            <div v-else class="legend-indicator" :style="{ backgroundColor: dataset.color }" />
             <span class="legend-label">{{ translateLabel(dataset.label) }}</span>
           </div>
         </div>
@@ -167,6 +168,8 @@ const datasetsWithColor = computed(() => {
           ref="chartSvg"
           viewBox="0 0 800 260"
           class="chart-svg"
+          role="img"
+          :aria-label="t('dashboard.chartAriaLabel', { viewType: t(`dashboard.${viewType}View`) })"
           @mousemove="handleMouseMove"
           @mouseleave="hideTooltip"
         >
@@ -329,8 +332,8 @@ const datasetsWithColor = computed(() => {
           class="chart-tooltip"
           :class="{ 'tooltip-speed': viewType === 'token_speed' }"
           :style="{
-            left: tooltipPosition.x + 'px',
-            top: tooltipPosition.y + 'px',
+            left: (tooltipPosition.x / 800) * 100 + '%',
+            top: (tooltipPosition.y / 260) * 100 + '%',
           }"
         >
           <div class="tooltip-time">
@@ -606,7 +609,7 @@ const datasetsWithColor = computed(() => {
   border-radius: 8px;
   font-size: 13px;
   pointer-events: none;
-  transform: translateX(-50%) translateY(-100%);
+  transform: translate(-50%, -100%);
   z-index: 1000;
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);

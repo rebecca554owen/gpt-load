@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import { LogOutOutline } from "@vicons/ionicons5";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";

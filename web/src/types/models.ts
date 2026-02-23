@@ -5,8 +5,27 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+interface GroupConfigBase {
+  timeout?: number;
+  retry?: number;
+}
+
+interface GroupConfigChannelSpecific {
+  openai?: {
+    model?: string;
+  };
+  gemini?: {
+    model?: string;
+  };
+  anthropic?: {
+    model?: string;
+  };
+}
+
+export type GroupConfig = GroupConfigBase & GroupConfigChannelSpecific;
+
 // Key status
-export type KeyStatus = "active" | "invalid" | undefined;
+export type KeyStatus = "active" | "invalid";
 
 // Group type
 export type GroupType = "standard" | "aggregate";
@@ -26,6 +45,10 @@ export interface APIKey {
   last_used_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface KeyRow extends APIKey {
+  is_visible: boolean;
 }
 
 export interface UpstreamInfo {
@@ -87,20 +110,20 @@ export interface Group {
   channel_type: ChannelType;
   upstreams: UpstreamInfo[];
   validation_endpoint: string;
-  config: Record<string, unknown>;
+  config?: GroupConfig;
   api_keys?: APIKey[];
   endpoint?: string;
-  param_overrides: Record<string, unknown>;
-  model_redirect_rules: Record<string, string>;
+  param_overrides?: Record<string, unknown>;
+  model_redirect_rules?: Record<string, string>;
   model_redirect_strict: boolean;
   model_mapping_strict?: boolean;
   header_rules?: HeaderRule[];
   proxy_keys: string;
   group_type?: GroupType;
-  sub_groups?: SubGroupInfo[]; // Subgroup list (aggregate groups only)
-  sub_group_ids?: number[]; // Subgroup ID list
-  model_mappings?: string | ModelMapping[]; // JSON string or array (pass array for update)
-  model_mappings_list?: ModelMapping[]; // Parsed array
+  sub_groups?: SubGroupInfo[];
+  sub_group_ids?: number[];
+  model_mappings?: string | ModelMapping[];
+  model_mappings_list?: ModelMapping[];
   created_at?: string;
   updated_at?: string;
 }
@@ -110,6 +133,37 @@ export interface GroupConfigOption {
   name: string;
   description: string;
   default_value: string | number;
+}
+
+export interface ConfigItem {
+  key: string;
+  value: number | string | boolean;
+}
+
+export interface HeaderRuleItem {
+  key: string;
+  value: string;
+  action: "set" | "remove";
+}
+
+export interface GroupFormData {
+  name: string;
+  display_name: string;
+  description: string;
+  upstreams: UpstreamInfo[];
+  channel_type: ChannelType;
+  sort: number;
+  test_model: string;
+  validation_endpoint: string;
+  param_overrides: string;
+  model_redirect_rules: string;
+  model_redirect_strict: boolean;
+  model_mapping_strict: boolean;
+  config: Record<string, number | string | boolean>;
+  configItems: ConfigItem[];
+  header_rules: HeaderRuleItem[];
+  proxy_keys: string;
+  group_type?: string;
 }
 
 // GroupStatsResponse defines the complete statistics for a group.
@@ -134,7 +188,7 @@ export interface RequestStats {
   failure_rate: number;
 }
 
-export type TaskType = "KEY_VALIDATION" | "KEY_IMPORT" | "KEY_DELETE";
+export type TaskType = "KEY_VALIDATION" | "KEY_IMPORT" | "KEY_DELETE" | "GROUP_SYNC";
 
 export interface KeyValidationResult {
   invalid_keys: number;
@@ -152,15 +206,24 @@ export interface KeyDeleteResult {
   ignored_count: number;
 }
 
+export interface GroupSyncResult {
+  synced_count: number;
+  failed_count: number;
+}
+
 export interface TaskInfo {
+  id?: number;
   task_type: TaskType;
   is_running: boolean;
+  status?: "pending" | "running" | "completed" | "failed";
   group_name?: string;
   processed?: number;
   total?: number;
   started_at?: string;
   finished_at?: string;
-  result?: KeyValidationResult | KeyImportResult | KeyDeleteResult;
+  created_at?: string;
+  updated_at?: string;
+  result?: KeyValidationResult | KeyImportResult | KeyDeleteResult | GroupSyncResult;
   error?: string;
 }
 

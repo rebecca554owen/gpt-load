@@ -111,8 +111,8 @@ export function useKeyActions(options: KeyActionsOptions) {
       title: t("keys.clearKeys"),
       content: t("keys.confirmClearInvalidKeys"),
       onConfirm: async () => {
-        const { data } = await keysApi.clearAllInvalidKeys(groupId);
-        window.$message.success(data?.message || t("keys.clearSuccess"));
+        await keysApi.clearAllInvalidKeys(groupId);
+        window.$message.success(t("keys.clearSuccess"));
         await options.onLoad();
       },
     });
