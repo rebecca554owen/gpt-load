@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
-import { appState } from "@/utils/app-state";
+import { useAppStateStore } from "@/stores/appState";
 import { Close, CloudUploadOutline } from "@vicons/ionicons5";
 import { NButton, NCard, NInput, NModal, NUpload, type UploadFileInfo } from "naive-ui";
 import { ref, watch } from "vue";
@@ -93,6 +93,7 @@ async function handleSubmit() {
 
   try {
     loading.value = true;
+    const appState = useAppStateStore();
 
     if (inputMode.value === "text") {
       await keysApi.addKeysAsync(props.groupId, keysText.value);
@@ -104,7 +105,7 @@ async function handleSubmit() {
     resetForm();
     handleClose();
     window.$message.success(t("keys.importTaskStarted"));
-    appState.taskPollingTrigger++;
+    appState.triggerTaskPolling();
   } finally {
     loading.value = false;
   }

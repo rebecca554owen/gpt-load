@@ -7,7 +7,7 @@ import type {
   ParentAggregateGroup,
   SubGroupInfo,
 } from "@/types/models";
-import { appState } from "@/utils/app-state";
+import { useAppStateStore } from "@/stores/appState";
 import { useCopy } from "@/composables/useCopy";
 import { getGroupDisplayName, maskProxyKeys } from "@/utils/display";
 import {
@@ -43,6 +43,7 @@ import GroupFormModal from "./GroupFormModal.vue";
 
 const { t } = useI18n();
 const { copyWithFeedback } = useCopy();
+const appState = useAppStateStore();
 
 interface Props {
   group: Group | null;

@@ -47,6 +47,10 @@ export interface APIKey {
   updated_at: string;
 }
 
+export interface KeyRow extends APIKey {
+  is_visible: boolean;
+}
+
 export interface UpstreamInfo {
   url: string;
   weight: number;
@@ -129,6 +133,37 @@ export interface GroupConfigOption {
   name: string;
   description: string;
   default_value: string | number;
+}
+
+export interface ConfigItem {
+  key: string;
+  value: number | string | boolean;
+}
+
+export interface HeaderRuleItem {
+  key: string;
+  value: string;
+  action: "set" | "remove";
+}
+
+export interface GroupFormData {
+  name: string;
+  display_name: string;
+  description: string;
+  upstreams: UpstreamInfo[];
+  channel_type: ChannelType;
+  sort: number;
+  test_model: string;
+  validation_endpoint: string;
+  param_overrides: string;
+  model_redirect_rules: string;
+  model_redirect_strict: boolean;
+  model_mapping_strict: boolean;
+  config: Record<string, number | string | boolean>;
+  configItems: ConfigItem[];
+  header_rules: HeaderRuleItem[];
+  proxy_keys: string;
+  group_type?: string;
 }
 
 // GroupStatsResponse defines the complete statistics for a group.
