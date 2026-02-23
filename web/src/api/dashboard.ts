@@ -1,6 +1,14 @@
 import type { ChartData, ChartViewType, DashboardStatsResponse, Group } from "@/types/models";
 import http from "@/utils/http";
 
+interface ApiError {
+  code: number;
+  message: string;
+  error?: string;
+}
+
+export type ApiResult<T> = { data: T } | ApiError;
+
 /**
  * Get dashboard basic statistics
  * @param hours Time range in hours (1/5/24/168/720)

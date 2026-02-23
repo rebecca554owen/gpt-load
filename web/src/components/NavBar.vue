@@ -7,11 +7,11 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-const props = defineProps({
-  mode: {
-    type: String,
-    default: "horizontal",
-  },
+interface Props {
+  mode?: "horizontal" | "vertical";
+}
+const props = withDefaults(defineProps<Props>(), {
+  mode: "horizontal",
 });
 
 const emit = defineEmits(["close"]);
@@ -49,7 +49,7 @@ function renderMenuItem(key: string, label: string, iconName: string): MenuOptio
         },
         {
           default: () => [
-            h(AppIcon, { name: iconName, size: 18 }),
+            h(AppIcon, { name: iconName, size: 18, "aria-hidden": "true" }),
             h("span", { class: "nav-item-text" }, label),
           ],
         }

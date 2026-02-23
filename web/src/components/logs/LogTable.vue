@@ -3,6 +3,7 @@ import { logApi } from "@/api/logs";
 import type { LogFilter, RequestLog } from "@/types/models";
 import { useCopy } from "@/composables/useCopy";
 import { maskKey } from "@/utils/display";
+import { formatDateTime } from "@/utils/format";
 import { PAGINATION } from "@/constants/chart";
 import {
   CheckmarkDoneOutline,
@@ -135,14 +136,6 @@ const loadLogs = async () => {
   } finally {
     loading.value = false;
   }
-};
-
-const formatDateTime = (timestamp: string) => {
-  if (!timestamp) {
-    return "-";
-  }
-  const date = new Date(timestamp);
-  return date.toLocaleString("zh-CN", { hour12: false }).replace(/\//g, "-");
 };
 
 const toggleKeyVisibility = (row: LogRow) => {

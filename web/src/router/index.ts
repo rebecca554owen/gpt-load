@@ -1,4 +1,4 @@
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import Layout from "@/components/Layout.vue";
 

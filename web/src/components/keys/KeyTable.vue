@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
+
+defineOptions({
+  name: "KeyTable",
+});
 import type { APIKey, Group, KeyStatus } from "@/types/models";
 import { appState, triggerSyncOperationRefresh } from "@/utils/app-state";
 import { copy } from "@/utils/clipboard";
 import { getGroupDisplayName, maskKey } from "@/utils/display";
-import { formatDuration } from "@/utils/format";
+import { formatDuration, formatRelativeTime } from "@/utils/format";
 import { PAGINATION } from "@/constants/chart";
 import {
   AddCircleOutline,
@@ -88,7 +92,7 @@ const moreOptions = [
   { label: t("keys.validateInvalidKeys"), key: "validateInvalid" },
 ];
 
-let testingMsg: MessageReactive | null = null;
+const testingMsg = ref<MessageReactive | null>(null);
 const isDeling = ref(false);
 const isRestoring = ref(false);
 
@@ -239,11 +243,11 @@ async function copyKey(key: KeyRow) {
 }
 
 async function testKey(_key: KeyRow) {
-  if (!props.selectedGroup?.id || !_key.key_value || testingMsg) {
+  if (!props.selectedGroup?.id || !_key.key_value || testingMsg.value) {
     return;
   }
 
-  testingMsg = window.$message.info(t("keys.testingKey"), {
+  testingMsg.value = window.$message.info(t("keys.testingKeyWithEllipsis"), {
     duration: 0,
   });
 
@@ -269,8 +273,8 @@ async function testKey(_key: KeyRow) {
   } catch (_error) {
     console.error("Test failed");
   } finally {
-    testingMsg?.destroy();
-    testingMsg = null;
+    testingMsg.value?.destroy();
+    testingMsg.value = null;
   }
 }
 
@@ -376,32 +380,6 @@ async function deleteKey(key: KeyRow) {
   });
 }
 
-function formatRelativeTime(date: string) {
-  if (!date) {
-    return t("keys.never");
-  }
-  const now = new Date();
-  const target = new Date(date);
-  const diffSeconds = Math.floor((now.getTime() - target.getTime()) / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) {
-    return t("keys.daysAgo", { days: diffDays });
-  }
-  if (diffHours > 0) {
-    return t("keys.hoursAgo", { hours: diffHours });
-  }
-  if (diffMinutes > 0) {
-    return t("keys.minutesAgo", { minutes: diffMinutes });
-  }
-  if (diffSeconds > 0) {
-    return t("keys.secondsAgo", { seconds: diffSeconds });
-  }
-  return t("keys.justNow");
-}
-
 function getStatusClass(status: KeyStatus): string {
   switch (status) {
     case "active":
@@ -470,7 +448,7 @@ async function restoreAllInvalid() {
 }
 
 async function validateKeys(status: "all" | "active" | "invalid") {
-  if (!props.selectedGroup?.id || testingMsg) {
+  if (!props.selectedGroup?.id || testingMsg.value) {
     return;
   }
 
@@ -481,7 +459,7 @@ async function validateKeys(status: "all" | "active" | "invalid") {
     statusText = t("keys.invalid");
   }
 
-  testingMsg = window.$message.info(t("keys.validatingKeysMsg", { type: statusText }), {
+  testingMsg.value = window.$message.info(t("keys.validatingKeysMsg", { type: statusText }), {
     duration: 0,
   });
 
@@ -492,8 +470,8 @@ async function validateKeys(status: "all" | "active" | "invalid") {
   } catch (_error) {
     console.error("Test failed");
   } finally {
-    testingMsg?.destroy();
-    testingMsg = null;
+    testingMsg.value?.destroy();
+    testingMsg.value = null;
   }
 }
 
@@ -515,10 +493,9 @@ async function clearAllInvalid() {
       isDeling.value = true;
       d.loading = true;
       try {
-        const { data } = await keysApi.clearAllInvalidKeys(props.selectedGroup.id);
-        window.$message.success(data?.message || t("keys.clearSuccess"));
+        await keysApi.clearAllInvalidKeys(props.selectedGroup.id);
+        window.$message.success(t("keys.clearSuccess"));
         await loadKeys();
-        // Trigger sync operation refresh
         triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL_INVALID");
       } catch (_error) {
         console.error("Delete failed");
@@ -703,6 +680,7 @@ function resetPage() {
                     text
                     @click="editKeyNotes(key)"
                     :title="t('keys.editNotes')"
+                    :aria-label="t('keys.editNotes')"
                   >
                     <template #icon>
                       <n-icon :component="Pencil" />
@@ -713,12 +691,19 @@ function resetPage() {
                     text
                     @click="toggleKeyVisibility(key)"
                     :title="t('keys.showHide')"
+                    :aria-label="t('keys.showHide')"
                   >
                     <template #icon>
                       <n-icon :component="key.is_visible ? EyeOffOutline : EyeOutline" />
                     </template>
                   </n-button>
-                  <n-button size="tiny" text @click="copyKey(key)" :title="t('common.copy')">
+                  <n-button
+                    size="tiny"
+                    text
+                    @click="copyKey(key)"
+                    :title="t('common.copy')"
+                    :aria-label="t('common.copy')"
+                  >
                     <template #icon>
                       <n-icon :component="CopyOutline" />
                     </template>
@@ -739,7 +724,9 @@ function resetPage() {
                   <strong>{{ key.failure_count }}</strong>
                 </span>
                 <span class="stat-item">
-                  {{ key.last_used_at ? formatRelativeTime(key.last_used_at) : t("keys.unused") }}
+                  {{
+                    key.last_used_at ? formatRelativeTime(key.last_used_at, t) : t("keys.unused")
+                  }}
                 </span>
               </div>
               <n-button-group class="key-actions">
@@ -748,6 +735,7 @@ function resetPage() {
                   size="tiny"
                   @click="testKey(key)"
                   :title="t('keys.testKey')"
+                  :aria-label="t('keys.testKey')"
                 >
                   {{ t("keys.testShort") }}
                 </n-button>
@@ -757,6 +745,7 @@ function resetPage() {
                   size="tiny"
                   @click="restoreKey(key)"
                   :title="t('keys.restoreKey')"
+                  :aria-label="t('keys.restoreKey')"
                 >
                   {{ t("keys.restoreShort") }}
                 </n-button>
@@ -765,6 +754,7 @@ function resetPage() {
                   size="tiny"
                   @click="deleteKey(key)"
                   :title="t('keys.deleteKey')"
+                  :aria-label="t('keys.deleteKey')"
                 >
                   {{ t("common.deleteShort") }}
                 </n-button>
@@ -950,7 +940,10 @@ function resetPage() {
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    border-color 0.2s;
   white-space: nowrap;
 }
 
@@ -1026,7 +1019,10 @@ function resetPage() {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 14px;
-  transition: all 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1169,7 +1165,10 @@ function resetPage() {
   cursor: pointer;
   font-size: 10px;
   font-weight: 500;
-  transition: all 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s,
+    border-color 0.2s;
   white-space: nowrap;
   color: var(--text-primary);
 }

@@ -1,5 +1,5 @@
 import i18n from "@/locales";
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import axios from "axios";
 import { appState } from "./app-state";
 

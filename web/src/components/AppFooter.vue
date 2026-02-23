@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { versionService, type VersionInfo } from "@/services/version";
+import { versionService, type VersionInfo } from "@/composables/useVersion";
 import {
   BugOutline,
   ChatbubbleOutline,

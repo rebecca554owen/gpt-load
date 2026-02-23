@@ -1,5 +1,5 @@
 import http from "@/utils/http";
-import { useState } from "@/utils/state";
+import { useState } from "@/composables/useGlobalState";
 
 const AUTH_KEY = "authKey";
 
@@ -17,7 +17,6 @@ export function useAuthService() {
       authKey.value = key;
       return true;
     } catch (_error) {
-      // Error already logged
       return false;
     }
   };

@@ -1,4 +1,3 @@
-// Chart colors mapping
 const cssVarMap: Record<string, string> = {
   "dashboard.success_requests": "--color-request-count",
   "dashboard.failed_requests": "--color-error-rate",
@@ -11,19 +10,17 @@ const cssVarMap: Record<string, string> = {
   "dashboard.input_non_cached_tokens": "--color-prompt-tokens",
 };
 
-// Token speed color palette - Cyber Speed Heat Gradient (Top 10)
-// From hottest (fastest) to coolest (slowest): Orange → Gold → Lime → Cyan → Blue
 const tokenSpeedColors = [
-  "#FF6B35", // Rank 1: Incinerator Orange - blazing fast
-  "#FF8C42", // Rank 2: Solar Flare
-  "#FFB347", // Rank 3: Golden Burst
-  "#FFD23F", // Rank 4: Electric Gold
-  "#7ED957", // Rank 5: Neon Lime
-  "#00E676", // Rank 6: Matrix Green
-  "#00D9FF", // Rank 7: Arctic Cyan
-  "#00B4D8", // Rank 8: Glacial Blue
-  "#4A90E2", // Rank 9: Ocean Depth
-  "#5C6BC0", // Rank 10: Deep Twilight - cool cruise
+  "#FF6B35",
+  "#FF8C42",
+  "#FFB347",
+  "#FFD23F",
+  "#7ED957",
+  "#00E676",
+  "#00D9FF",
+  "#00B4D8",
+  "#4A90E2",
+  "#5C6BC0",
 ];
 
 export function useChartColors() {
@@ -34,8 +31,6 @@ export function useChartColors() {
   ): string => {
     const key = labelKey || label;
 
-    // Token speed charts use position-based heat gradient
-    // Backend already sorts datasets by average speed (descending)
     if (key.startsWith("token_speed.") && speedIndex !== undefined) {
       return tokenSpeedColors[speedIndex] || tokenSpeedColors[tokenSpeedColors.length - 1];
     }
@@ -47,7 +42,6 @@ export function useChartColors() {
   };
 
   const isErrorDataset = (label: string, t: (key: string) => string): boolean => {
-    // First check if the original label contains error keywords
     if (
       label.includes("失败") ||
       label.includes("Failed") ||
@@ -58,11 +52,6 @@ export function useChartColors() {
       return true;
     }
 
-    // Only try to translate when label looks like an i18n key:
-    // - Contains dot
-    // - NOT from token_speed (format: "token_speed.xxx")
-    // - NOT a dynamic combination (format: "group - model")
-    // - Starts with known prefix like "dashboard."
     if (
       label.includes(".") &&
       !label.startsWith("token_speed.") &&
@@ -71,7 +60,6 @@ export function useChartColors() {
     ) {
       try {
         const translatedLabel = t(label);
-        // Check if translated text contains error keywords
         if (
           translatedLabel.includes("失败") ||
           translatedLabel.includes("Error") ||
@@ -80,7 +68,7 @@ export function useChartColors() {
           return true;
         }
       } catch {
-        // Translation failed, ignore
+        // Ignore translation errors
       }
     }
 

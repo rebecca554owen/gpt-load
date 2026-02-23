@@ -1,5 +1,10 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
+
+defineOptions({
+  name: "GroupFormModal",
+});
+
 import { settingsApi } from "@/api/settings";
 import ProxyKeysInput from "@/components/common/ProxyKeysInput.vue";
 import type { Group, GroupConfigOption, UpstreamInfo } from "@/types/models";
@@ -617,7 +622,7 @@ async function handleSubmit() {
                   </n-tooltip>
                 </div>
               </template>
-              <n-input v-model:value="formData.name" placeholder="gemini" />
+              <n-input v-model:value="formData.name" autocomplete="off" placeholder="gemini" />
             </n-form-item>
 
             <n-form-item :label="t('keys.displayName')" path="display_name" class="form-item-half">
@@ -632,7 +637,11 @@ async function handleSubmit() {
                   </n-tooltip>
                 </div>
               </template>
-              <n-input v-model:value="formData.display_name" placeholder="Google Gemini" />
+              <n-input
+                v-model:value="formData.display_name"
+                autocomplete="off"
+                placeholder="Google Gemini"
+              />
             </n-form-item>
           </div>
 
@@ -695,6 +704,7 @@ async function handleSubmit() {
               <n-input
                 v-model:value="formData.test_model"
                 :placeholder="testModelPlaceholder"
+                autocomplete="off"
                 @input="() => !props.group && (userModifiedFields.test_model = true)"
               />
             </n-form-item>
@@ -729,6 +739,7 @@ async function handleSubmit() {
                 :placeholder="
                   validationEndpointPlaceholder || t('keys.optionalCustomValidationPath')
                 "
+                autocomplete="off"
               />
             </n-form-item>
 
@@ -810,6 +821,7 @@ async function handleSubmit() {
                 <n-input
                   v-model:value="upstream.url"
                   :placeholder="upstreamPlaceholder"
+                  autocomplete="off"
                   @input="() => !props.group && index === 0 && (userModifiedFields.upstream = true)"
                 />
               </div>

@@ -222,7 +222,7 @@ export const keysApi = {
   },
 
   // Clear all invalid keys
-  clearAllInvalidKeys(group_id: number): Promise<{ data: { message: string } }> {
+  clearAllInvalidKeys(group_id: number): Promise<void> {
     return http.post(
       "/keys/clear-all-invalid",
       { group_id },
@@ -233,7 +233,7 @@ export const keysApi = {
   },
 
   // Clear all keys
-  clearAllKeys(group_id: number): Promise<{ data: { message: string } }> {
+  clearAllKeys(group_id: number): Promise<void> {
     return http.post(
       "/keys/clear-all",
       { group_id },
