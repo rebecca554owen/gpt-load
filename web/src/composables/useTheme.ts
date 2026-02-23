@@ -1,22 +1,18 @@
 import { computed, ref, watch } from "vue";
 
-// Theme mode type
 export type ThemeMode = "auto" | "light" | "dark";
 export type ActualTheme = "light" | "dark";
 
-// Storage key name
 const THEME_KEY = "gpt-load-theme-mode";
 
-// Get initial theme mode
 function getInitialThemeMode(): ThemeMode {
   const stored = localStorage.getItem(THEME_KEY);
   if (stored && ["auto", "light", "dark"].includes(stored)) {
     return stored as ThemeMode;
   }
-  return "auto"; // Default to auto mode
+  return "auto";
 }
 
-// Detect system theme preference
 function getSystemTheme(): ActualTheme {
   if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
     return "dark";
@@ -24,13 +20,9 @@ function getSystemTheme(): ActualTheme {
   return "light";
 }
 
-// Theme mode (user selection)
-export const themeMode = ref<ThemeMode>(getInitialThemeMode());
-
-// System theme (auto-detected)
+const themeMode = ref<ThemeMode>(getInitialThemeMode());
 const systemTheme = ref<ActualTheme>(getSystemTheme());
 
-// Actual theme in use
 export const actualTheme = computed<ActualTheme>(() => {
   if (themeMode.value === "auto") {
     return systemTheme.value;
@@ -38,16 +30,13 @@ export const actualTheme = computed<ActualTheme>(() => {
   return themeMode.value as ActualTheme;
 });
 
-// Is dark mode
 export const isDark = computed(() => actualTheme.value === "dark");
 
-// Switch theme mode
 export function setThemeMode(mode: ThemeMode) {
   themeMode.value = mode;
   localStorage.setItem(THEME_KEY, mode);
 }
 
-// Toggle theme (for button)
 export function toggleTheme() {
   const modes: ThemeMode[] = ["auto", "light", "dark"];
   const currentIndex = modes.indexOf(themeMode.value);
@@ -55,20 +44,26 @@ export function toggleTheme() {
   setThemeMode(modes[nextIndex]);
 }
 
-// Listen for system theme changes
+export function useTheme() {
+  return {
+    mode: themeMode,
+    actualTheme,
+    isDark,
+    setThemeMode,
+    toggleTheme,
+  };
+}
+
 if (window.matchMedia) {
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
-  // Update system theme
   const updateSystemTheme = (e: MediaQueryListEvent | MediaQueryList) => {
     systemTheme.value = e.matches ? "dark" : "light";
   };
 
-  // Add listener
   mediaQuery.addEventListener("change", updateSystemTheme);
 }
 
-// Update HTML root element class (for CSS variable switching)
 watch(
   actualTheme,
   theme => {

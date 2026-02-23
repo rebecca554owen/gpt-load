@@ -28,8 +28,12 @@ const loadStats = async () => {
 };
 
 // Watch time range changes
-watch(timeRange, () => {
-  loadStats();
+watch(timeRange, async () => {
+  try {
+    await loadStats();
+  } catch (error) {
+    console.error("Failed to load stats:", error);
+  }
 });
 
 onMounted(() => {

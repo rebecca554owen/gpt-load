@@ -2,12 +2,14 @@
 import { Close } from "@vicons/ionicons5";
 import { keysApi } from "@/api/keys";
 import type { TaskInfo } from "@/types/models";
-import { appState } from "@/utils/app-state";
+import { useAppStateStore } from "@/stores/appState";
 import { NButton, NCard, NIcon, NProgress, NText, useMessage } from "naive-ui";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
+
+const appState = useAppStateStore();
 
 const taskInfo = ref<TaskInfo>({ is_running: false, task_type: "KEY_VALIDATION" });
 const visible = ref(false);
@@ -82,12 +84,12 @@ async function pollOnce() {
 
           // 触发分组数据刷新
           if (task.group_name && task.finished_at) {
-            appState.lastCompletedTask = {
+            appState.setLastCompletedTask({
               groupName: task.group_name,
               taskType: task.task_type,
               finishedAt: task.finished_at,
-            };
-            appState.groupDataRefreshTrigger++;
+            });
+            appState.triggerGroupDataRefresh();
           }
         }
       }
