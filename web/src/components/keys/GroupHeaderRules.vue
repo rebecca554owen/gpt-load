@@ -3,6 +3,7 @@ import type { GroupFormData, HeaderRuleItem } from "@/types/models";
 import { Add, HelpCircleOutline, Remove } from "@vicons/ionicons5";
 import { NButton, NFormItem, NIcon, NInput, NSwitch, NTooltip } from "naive-ui";
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 
 defineOptions({
   name: "GroupHeaderRules",
@@ -57,6 +58,12 @@ function validateHeaderKeyUniqueness(
     (rule, index) => index !== currentIndex && canonicalHeaderKey(rule.key.trim()) === canonicalKey
   );
 }
+
+const headerRuleValidationStates = computed(() => {
+  return props.formData.header_rules.map((rule, index) =>
+    validateHeaderKeyUniqueness(props.formData.header_rules, index, rule.key)
+  );
+});
 </script>
 
 <template>
@@ -108,17 +115,10 @@ function validateHeaderKeyUniqueness(
             <n-input
               :value="headerRule.key"
               :placeholder="t('keys.headerName')"
-              :status="
-                !validateHeaderKeyUniqueness(formData.header_rules, index, headerRule.key)
-                  ? 'error'
-                  : undefined
-              "
+              :status="!headerRuleValidationStates[index] ? 'error' : undefined"
               @update:value="(value: string) => updateHeaderRule(index, 'key', value)"
             />
-            <div
-              v-if="!validateHeaderKeyUniqueness(formData.header_rules, index, headerRule.key)"
-              class="error-message"
-            >
+            <div v-if="!headerRuleValidationStates[index]" class="error-message">
               {{ t("keys.duplicateHeader") }}
             </div>
           </div>

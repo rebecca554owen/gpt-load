@@ -28,6 +28,7 @@ import {
   NTooltip,
   useMessage,
   type FormRules,
+  type SelectOption,
 } from "naive-ui";
 import { computed, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
@@ -87,7 +88,7 @@ const formData = reactive<GroupFormData>({
   group_type: "standard",
 });
 
-const channelTypeOptions = ref<{ label: string; value: string }[]>([]);
+const channelTypeOptions = ref<SelectOption[]>([]);
 const configOptions = ref<GroupConfigOption[]>([]);
 const channelTypesFetched = ref(false);
 const configOptionsFetched = ref(false);
@@ -611,12 +612,6 @@ async function handleSubmit() {
 </template>
 
 <style scoped>
-.group-form-modal {
-}
-
-.group-form-card {
-}
-
 .form-section {
   margin-bottom: 24px;
 }

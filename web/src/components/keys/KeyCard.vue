@@ -183,90 +183,21 @@ function handleDelete() {
 </template>
 
 <style scoped>
+/* Component-specific styles only - all card styles are in components.css */
 .key-card {
-  background: var(--card-bg-solid);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 14px;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s,
-    border-color 0.2s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.key-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  /* Use .item-card base styles from components.css */
 }
 
 .key-card.status-valid {
-  border-color: var(--success-border);
-  background: var(--success-bg);
-  border-width: 1.5px;
+  /* Use .item-card.status-valid from components.css */
 }
 
 .key-card.status-invalid {
-  border-color: var(--invalid-border);
-  background: var(--card-bg-solid);
-  opacity: 0.85;
+  /* Use .item-card.status-invalid from components.css */
 }
 
 .key-card.status-error {
-  border-color: var(--error-border);
-  background: var(--error-bg);
-}
-
-.key-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.key-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-stats {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  flex: 1;
-  min-width: 0;
-}
-
-.stat-item {
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-.stat-item strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.key-actions {
-  flex-shrink: 0;
-  &:deep(.n-button) {
-    padding: 0 4px;
-  }
+  /* Use .item-card.status-error from components.css */
 }
 
 .key-text {
@@ -288,14 +219,8 @@ function handleDelete() {
   background: var(--bg-tertiary);
 }
 
-:deep(.n-input__input-el) {
+.key-text :deep(.n-input__input-el) {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
   font-size: 13px;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
 }
 </style>

@@ -37,6 +37,8 @@ export default {
     endTime: "End Time",
     selectAll: "Select All",
     deselectAll: "Deselect All",
+    moreActions: "More Actions",
+    viewDetails: "View Details",
   },
   login: {
     title: "GPT Load",

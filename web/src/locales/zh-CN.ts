@@ -37,6 +37,8 @@ export default {
     endTime: "结束时间",
     selectAll: "全选",
     deselectAll: "取消选中",
+    moreActions: "更多操作",
+    viewDetails: "查看详情",
   },
   login: {
     title: "GPT Load",

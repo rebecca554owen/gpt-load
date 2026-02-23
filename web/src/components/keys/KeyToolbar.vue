@@ -114,7 +114,7 @@ function handleMoreActionSelect(key: string) {
           </n-button>
         </n-input-group>
         <n-dropdown :options="moreOptions" trigger="click" @select="handleMoreActionSelect">
-          <n-button size="small" tertiary>
+          <n-button size="small" tertiary :aria-label="t('common.moreActions')">
             <template #icon>
               <span style="font-size: 16px; font-weight: bold">⋯</span>
             </template>
@@ -124,55 +124,3 @@ function handleMoreActionSelect(key: string) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--card-bg-solid);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-  gap: 16px;
-  min-height: 64px;
-}
-
-.toolbar :deep(.n-button) {
-  font-weight: 500;
-}
-
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-@media (max-width: 768px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .toolbar-right :deep(.n-space) {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-</style>

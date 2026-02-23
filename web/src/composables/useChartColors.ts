@@ -78,6 +78,5 @@ export function useChartColors() {
   return {
     getDatasetColor,
     isErrorDataset,
-    cssVarMap,
   };
 }

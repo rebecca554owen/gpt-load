@@ -765,6 +765,9 @@ async function duplicateModelMapping(mapping: ModelMapping) {
 </template>
 
 <style scoped>
+/* Component-specific styles only - shared styles in components.css */
+
+/* Container styles */
 .model-mapping-table-container {
   background: var(--card-bg-solid);
   border-radius: 8px;
@@ -778,47 +781,13 @@ async function duplicateModelMapping(mapping: ModelMapping) {
   contain: layout;
 }
 
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--card-bg-solid);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-  gap: 16px;
-  min-height: 64px;
-}
-
-.toolbar :deep(.n-button) {
-  font-weight: 500;
-}
-
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
 .model-mappings-grid-container {
   flex: 1;
-  /* Let container expand naturally based on card height */
-  overflow-y: visible; /* Changed to visible, don't limit content */
-  overflow-x: hidden; /* Prevent horizontal overflow */
+  overflow-y: visible;
+  overflow-x: hidden;
   padding: 16px;
   min-height: 0;
-  /* Ensure container can grow with content */
   height: auto;
-  /* Allow container to grow within parent */
   max-height: none;
 }
 
@@ -826,16 +795,13 @@ async function duplicateModelMapping(mapping: ModelMapping) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
-  /* Ensure grid handles cards with different heights correctly */
   grid-auto-rows: min-content;
-  /* Let grid grow naturally */
   align-items: start;
-  /* Ensure content is not truncated */
   overflow: visible;
 }
 
+/* Model mapping specific - card style overrides for liquid glass effect */
 .key-card {
-  /* Liquid glass style */
   background: rgba(250, 252, 255, 0.75);
   backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
@@ -881,31 +847,19 @@ html.dark .key-card:hover {
     inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-.key-card.status-valid {
-  border-color: rgba(124, 185, 135, 0.5);
-  background: rgba(124, 185, 135, 0.08);
-  border-width: 1.5px;
-}
-
-html.dark .key-card.status-valid {
-  border-color: rgba(124, 185, 135, 0.4);
-  background: rgba(124, 185, 135, 0.12);
-}
-
-/* Model mapping specific styles - purple theme (distinct from sub-groups) */
+/* Model mapping status - purple theme */
 .key-card.status-model-mapping {
   border-color: rgba(114, 46, 209, 0.5);
   background: rgba(114, 46, 209, 0.06);
   border-width: 1.5px;
 }
 
-/* Model mapping style in dark mode */
 html.dark .key-card.status-model-mapping {
   border-color: rgba(179, 127, 235, 0.4);
   background: rgba(179, 127, 235, 0.1);
 }
 
-/* Model mapping name styles */
+/* Model mapping names container - component specific */
 .model-mapping-names {
   display: flex;
   align-items: baseline;
@@ -913,7 +867,7 @@ html.dark .key-card.status-model-mapping {
   min-width: 0;
 }
 
-/* Reuse group-url style from GroupInfoCard */
+/* Group URL style */
 .group-url {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -926,21 +880,17 @@ html.dark .key-card.status-model-mapping {
   transition: all 0.2s ease;
 }
 
-/* Weight display styles */
+/* Weight display with scroll */
 .weight-display {
   margin: 4px 0;
-  /* Allow content to grow within card, but with reasonable height limit */
-  overflow-y: auto; /* Show scrollbar when content is excessive */
-  max-height: 300px; /* Set reasonable max height to ensure edit buttons are visible */
-  /* Ensure correct display within card */
+  overflow-y: auto;
+  max-height: 300px;
   flex: 1;
-  min-height: 0; /* Allow shrinking */
-  /* Beautify scrollbar */
+  min-height: 0;
   scrollbar-width: thin;
   scrollbar-color: var(--border-color) transparent;
 }
 
-/* Webkit scrollbar styles */
 .weight-display::-webkit-scrollbar {
   width: 6px;
 }
@@ -959,15 +909,13 @@ html.dark .key-card.status-model-mapping {
   background-color: var(--text-tertiary);
 }
 
-/* Sub-group progress bar container styles */
+/* Sub-group progress bars - component specific */
 .subgroup-progress-bars {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  /* Ensure content expands correctly */
   height: auto;
-  min-height: 0; /* Allow shrinking */
-  /* Ensure content doesn't overflow */
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1022,7 +970,7 @@ html.dark .key-card.status-model-mapping {
   min-width: 0;
 }
 
-/* Test button styles - using softer color scheme */
+/* Test button - component specific */
 .target-test-button {
   margin-left: 8px;
   padding: 0 6px;
@@ -1032,12 +980,10 @@ html.dark .key-card.status-model-mapping {
   font-weight: 500;
 }
 
-/* Test success state - soft green (low saturation) */
 .target-test-button.n-button--success-type {
   border-color: rgba(16, 185, 129, 0.25);
   background: rgba(16, 185, 129, 0.05);
   color: #0d9488;
-  font-weight: 500;
 }
 
 .target-test-button.n-button--success-type:hover {
@@ -1045,12 +991,10 @@ html.dark .key-card.status-model-mapping {
   border-color: rgba(16, 185, 129, 0.35);
 }
 
-/* Test info state - soft blue (low saturation) */
 .target-test-button.n-button--info-type {
   border-color: rgba(14, 165, 233, 0.25);
   background: rgba(14, 165, 233, 0.05);
   color: #0891b2;
-  font-weight: 500;
 }
 
 .target-test-button.n-button--info-type:hover {
@@ -1058,12 +1002,10 @@ html.dark .key-card.status-model-mapping {
   border-color: rgba(14, 165, 233, 0.35);
 }
 
-/* Test warning state - soft orange (low saturation) */
 .target-test-button.n-button--warning-type {
   border-color: rgba(251, 146, 60, 0.25);
   background: rgba(251, 146, 60, 0.05);
   color: #c2410c;
-  font-weight: 500;
 }
 
 .target-test-button.n-button--warning-type:hover {
@@ -1071,12 +1013,10 @@ html.dark .key-card.status-model-mapping {
   border-color: rgba(251, 146, 60, 0.35);
 }
 
-/* Test error state - soft red (low saturation) */
 .target-test-button.n-button--error-type {
   border-color: rgba(239, 68, 68, 0.25);
   background: rgba(239, 68, 68, 0.05);
   color: #b91c1c;
-  font-weight: 500;
 }
 
 .target-test-button.n-button--error-type:hover {
@@ -1092,61 +1032,23 @@ html.dark .key-card.status-model-mapping {
   overflow: hidden;
 }
 
-.weight-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-.key-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
+/* Key bottom - component specific */
 .key-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
   margin-top: auto;
   padding-top: 8px;
-  /* Ensure action buttons are always visible */
   flex-shrink: 0;
   background: inherit;
   position: relative;
   z-index: 1;
 }
 
-.key-actions {
-  flex-shrink: 0;
-}
-
-.key-actions :deep(.n-button) {
-  padding: 0 4px;
-}
-
+/* Input element font */
 :deep(.n-input__input-el) {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
   font-size: 13px;
 }
 
-.quick-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-/* Active state - 绿色渐变（与子分组保持一致） */
+/* Green gradient for active state - component specific override */
 .key-card .weight-fill-active {
   background: linear-gradient(90deg, #0e7a43, #18a058, #36ad6a, #5fd299) !important;
 }
@@ -1155,87 +1057,26 @@ html.dark .key-card .weight-fill-active {
   background: linear-gradient(90deg, #4aba7d, #63e2b7, #7fe7c4, #a3f5d0) !important;
 }
 
-/* Unavailable state - striped pattern (red/orange warning) */
-.key-card .weight-fill-unavailable {
-  background: repeating-linear-gradient(
-    45deg,
-    #f5a9a9,
-    #f5a9a9 8px,
-    #e88592 8px,
-    #e88592 16px
-  ) !important;
-  opacity: 0.85;
+/* Tooltip override */
+.model-mapping-info-tooltip {
+  min-width: 300px;
+  max-width: 90vw;
 }
 
-html.dark .key-card .weight-fill-unavailable {
-  background: repeating-linear-gradient(
-    45deg,
-    #8b3a3a,
-    #8b3a3a 8px,
-    #a04848 8px,
-    #a04848 16px
-  ) !important;
+.target-detail {
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.target-model-detail {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 13px;
   opacity: 0.8;
+  font-weight: 400;
 }
 
-.weight-text {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 14px;
-  min-width: 40px;
-  text-align: right;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--card-bg-solid);
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.pagination-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-info {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.empty-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-}
-
+/* Responsive design */
 @media (max-width: 768px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
   .model-mappings-grid {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -1288,26 +1129,12 @@ html.dark .key-card .weight-fill-unavailable {
 
   .weight-display {
     max-height: 200px;
-    overflow-y: auto;
   }
 
   .target-progress-item {
     min-height: 20px;
   }
-}
 
-/* Tooltip styles */
-.model-mapping-info-tooltip {
-  min-width: 300px;
-  max-width: 90vw;
-  width: auto;
-  padding: 8px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-/* Mobile adaptation */
-@media (max-width: 768px) {
   .model-mapping-info-tooltip {
     min-width: 280px;
     max-width: 85vw;
@@ -1343,68 +1170,5 @@ html.dark .key-card .weight-fill-unavailable {
   .target-model-detail {
     font-size: 12px;
   }
-}
-
-.info-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-:root:not(.dark) .info-header {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.info-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: inherit;
-}
-
-.info-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  line-height: 1.5;
-  gap: 12px;
-}
-
-.info-label {
-  color: inherit;
-  opacity: 0.7;
-  flex-shrink: 0;
-  min-width: 100px;
-  font-weight: 500;
-}
-
-.info-value {
-  color: inherit;
-  font-weight: 500;
-  text-align: right;
-  word-break: break-word;
-  flex: 1;
-}
-
-.target-detail {
-  margin-bottom: 4px;
-  font-size: 12px;
-}
-
-.target-model-detail {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13px;
-  opacity: 0.8;
-  font-weight: 400;
 }
 </style>

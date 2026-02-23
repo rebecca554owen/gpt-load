@@ -185,9 +185,3 @@ export function useVersion() {
     clearCache,
   };
 }
-
-export const versionService = {
-  checkForUpdates,
-  getCurrentVersion,
-  clearCache,
-};

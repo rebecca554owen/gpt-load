@@ -1,0 +1,900 @@
+/* ============================================
+   统一组件样式系统
+   GPT-Load Frontend Design System
+   ============================================ */
+
+/* ============================================
+   1. 通用工具栏样式 (Toolbar)
+   合并 KeyToolbar、SubGroupTable、ModelMappingTable、LogTable
+   ============================================ */
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: var(--card-bg-solid);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.toolbar :deep(.n-button) {
+  font-weight: 500;
+}
+
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.toolbar-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+/* 响应式设计 - 工具栏 */
+@media (max-width: 768px) {
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .toolbar-right :deep(.n-space) {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ============================================
+   2. 通用卡片容器样式 (Card Containers)
+   ============================================ */
+
+/* 主容器 - 包含工具栏、网格和分页的完整容器 */
+.card-container {
+  background: var(--card-bg-solid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 卡片网格容器 - 可滚动的内容区域 */
+.card-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* 响应式网格布局 */
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  grid-auto-rows: min-content;
+  align-items: start;
+  overflow: visible;
+}
+
+/* 空状态容器 */
+.empty-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+/* 分页容器 */
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--card-bg-solid);
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+  border-radius: 0 0 8px 8px;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-info {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* 响应式设计 - 分页容器 */
+@media (max-width: 768px) {
+  .pagination-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .item-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+/* ============================================
+   3. 通用卡片基础样式 (Item Card)
+   合并 KeyCard、SubGroupTable、ModelMappingTable 的卡片样式
+   ============================================ */
+
+.item-card {
+  background: var(--card-bg-solid);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  gap: 10px;
+}
+
+.item-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Honor prefers-reduced-motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .item-card {
+    transition: none;
+  }
+
+  .item-card:hover {
+    transform: none;
+  }
+}
+
+/* 卡片头部区域 */
+.item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.item-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 卡片底部操作区域 */
+.item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 快速操作按钮组 */
+.quick-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* 统计信息区域 */
+.item-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+
+.stat-item {
+  white-space: nowrap;
+  color: var(--text-secondary);
+}
+
+.stat-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* 操作按钮组 */
+.item-actions {
+  flex-shrink: 0;
+}
+
+.item-actions :deep(.n-button) {
+  padding: 0 4px;
+}
+
+/* ============================================
+   4. 卡片状态变体 (Card Status Variants)
+   ============================================ */
+
+/* 有效状态 - 绿色 */
+.item-card.status-valid {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  border-width: 1.5px;
+}
+
+/* 无效状态 - 灰色 */
+.item-card.status-invalid {
+  border-color: var(--invalid-border);
+  background: var(--card-bg-solid);
+  opacity: 0.85;
+}
+
+/* 错误状态 - 红色 */
+.item-card.status-error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+/* 子组状态 - 蓝色 */
+.item-card.status-sub-group {
+  border-color: var(--sub-group-border);
+  background: var(--sub-group-bg);
+  border-width: 1.5px;
+}
+
+/* 模型映射状态 - 橙色/琥珀色 */
+.item-card.status-model-mapping {
+  border-color: var(--model-mapping-border);
+  background: var(--model-mapping-bg);
+  border-width: 1.5px;
+}
+
+/* 禁用状态 */
+.item-card.disabled {
+  opacity: 0.6;
+  background: var(--bg-secondary);
+}
+
+/* ============================================
+   5. 进度条/权重条样式 (Progress Bars)
+   ============================================ */
+
+/* 进度条容器 */
+.weight-display {
+  margin: 4px 0;
+}
+
+.weight-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.weight-bar {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.weight-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* 激活状态 - 蓝色渐变 */
+.weight-fill-active {
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4, #38bdf8);
+}
+
+:root.dark .weight-fill-active {
+  background: linear-gradient(90deg, #0ea5e9, #06b6d4, #38bdf8);
+}
+
+/* 不可用状态 - 条纹警告 */
+.weight-fill-unavailable {
+  background: repeating-linear-gradient(45deg, #f5a9a9, #f5a9a9 8px, #e88592 8px, #e88592 16px);
+  opacity: 0.85;
+}
+
+:root.dark .weight-fill-unavailable {
+  background: repeating-linear-gradient(45deg, #8b3a3a, #8b3a3a 8px, #a04848 8px, #a04848 16px);
+  opacity: 0.8;
+}
+
+/* 进度标签 */
+.weight-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.weight-label strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.weight-text {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 14px;
+  min-width: 40px;
+  text-align: right;
+}
+
+/* ============================================
+   6. 文本显示样式 (Text Display)
+   ============================================ */
+
+/* 等宽文本输入框 */
+.mono-text {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+:root:not(.dark) .mono-text {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+}
+
+:root.dark .mono-text {
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
+}
+
+.mono-text :deep(.n-input__input-el) {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 13px;
+}
+
+/* 分组名称标签 */
+.group-name-tag {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sub-group-primary);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  background: var(--sub-group-bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 显示名称 */
+.display-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+/* 子组名称容器 */
+.sub-group-names {
+  display: flex;
+  align-items: baseline;
+  flex: 1;
+  min-width: 0;
+}
+
+/* 模型映射名称容器 */
+.model-mapping-names {
+  display: flex;
+  align-items: baseline;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ============================================
+   7. 信息提示框样式 (Tooltip Info)
+   用于子组和模型映射详情提示
+   ============================================ */
+
+.info-tooltip {
+  min-width: 300px;
+  max-width: 600px;
+  padding: 8px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+:root:not(.dark) .info-header {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.info-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+}
+
+.info-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.5;
+  gap: 12px;
+}
+
+.info-label {
+  color: inherit;
+  opacity: 0.7;
+  flex-shrink: 0;
+  min-width: 100px;
+}
+
+.info-value {
+  color: inherit;
+  font-weight: 500;
+  text-align: right;
+  word-break: break-word;
+  flex: 1;
+}
+
+/* 上游地址列表 */
+.upstream-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.upstream-input {
+  width: 100%;
+  font-size: 12px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  outline: none;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* ============================================
+   8. 统计行样式 (Stats Row)
+   ============================================ */
+
+.stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.stats-left {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  flex: 1;
+}
+
+.stat-success {
+  color: #18a058;
+  font-weight: 600;
+}
+
+:root.dark .stat-success {
+  color: #63e2b7;
+}
+
+.stat-error {
+  color: #d03050;
+  font-weight: 600;
+}
+
+:root.dark .stat-error {
+  color: #e88080;
+}
+
+/* ============================================
+   9. URL/代码片段样式 (Code/URL Display)
+   ============================================ */
+
+.code-url {
+  font-size: 0.8rem;
+  color: var(--primary-color);
+  font-family: monospace;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.code-url:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--primary-color);
+}
+
+/* ============================================
+   10. 测试按钮状态颜色 (Test Button States)
+   按响应时间分级的颜色方案
+   ============================================ */
+
+/* test-super-fast: < 200ms - 极速响应 - 亮绿色 */
+.test-super-fast,
+.test-very-fast {
+  border-color: var(--test-super-fast);
+  background: var(--test-super-fast-bg);
+  color: var(--test-super-fast);
+}
+
+/* test-excellent: 200-500ms - 优秀响应 - 深绿色 */
+.test-excellent {
+  border-color: var(--test-excellent);
+  background: var(--test-excellent-bg);
+  color: var(--test-excellent);
+}
+
+/* test-fast: 500-1000ms - 快速响应 - 黄绿色 */
+.test-fast {
+  border-color: var(--test-good);
+  background: var(--test-good-bg);
+  color: var(--test-good);
+}
+
+/* test-normal: 1000-2000ms - 正常响应 - 金黄色 */
+.test-normal {
+  border-color: var(--test-normal);
+  background: var(--test-normal-bg);
+  color: var(--test-normal);
+}
+
+/* test-slow: 2000-3000ms - 慢速响应 - 橙黄色 */
+.test-slow {
+  border-color: var(--test-low);
+  background: var(--test-low-bg);
+  color: var(--test-low);
+}
+
+/* test-very-slow: 3000-4000ms - 很慢响应 - 橙色 */
+.test-very-slow {
+  border-color: var(--test-very-low);
+  background: var(--test-very-low-bg);
+  color: var(--test-very-low);
+}
+
+/* test-extremely-slow: 4000-5000ms - 极慢响应 - 红色 */
+.test-extremely-slow {
+  border-color: var(--test-extremely-low);
+  background: var(--test-extremely-low-bg);
+  color: var(--test-extremely-low);
+}
+
+/* test-timeout: > 5000ms - 超时 - 灰色 */
+.test-timeout {
+  border-color: var(--test-timeout);
+  background: var(--test-timeout-bg);
+  color: var(--test-timeout);
+}
+
+/* test-failed: 测试失败 - 失败灰 */
+.test-failed {
+  border-color: var(--test-failed);
+  background: var(--test-failed-bg);
+  color: var(--test-failed);
+}
+
+/* ============================================
+   11. 滚动条美化 (Scrollbar Styling)
+   ============================================ */
+
+/* 通用滚动条样式 */
+.scrollable-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollable-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollable-container::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.scrollable-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+:root.dark .scrollable-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+:root.dark .scrollable-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   12. 过滤器区域样式 (Filter Section)
+   用于 LogTable 的复杂过滤器布局
+   ============================================ */
+
+.filter-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.filter-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 1 1 auto;
+}
+
+.filter-item {
+  flex: 1 1 180px;
+  min-width: 180px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 响应式 - 过滤器 */
+@media (max-width: 768px) {
+  .filter-grid {
+    width: 100%;
+  }
+
+  .filter-item {
+    flex: 1 1 100%;
+    min-width: 100%;
+  }
+
+  .filter-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 480px) {
+  .filter-actions :deep(.n-button-group) {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .filter-actions :deep(.n-button) {
+    flex: 1;
+    min-width: 40px;
+  }
+}
+
+/* ============================================
+   13. 列选择器样式 (Column Selector)
+   用于 LogTable 的列显示设置
+   ============================================ */
+
+.column-selector {
+  min-width: 100px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* ============================================
+   14. 类名别名 (Class Aliases)
+   为保持向后兼容，将旧类名映射到统一样式
+   ============================================ */
+
+/* 应用别名样式 - 保持与 KeyTable/SubGroupTable/ModelMappingTable 的兼容性 */
+
+.key-card,
+.item-card {
+  background: var(--card-bg-solid);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+  transition:
+    transform 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  gap: 10px;
+}
+
+.key-card:hover,
+.item-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+/* Honor prefers-reduced-motion for accessibility - alias section */
+@media (prefers-reduced-motion: reduce) {
+  .key-card,
+  .item-card {
+    transition: none;
+  }
+
+  .key-card:hover,
+  .item-card:hover {
+    transform: none;
+  }
+}
+
+.key-main,
+.item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.key-section,
+.item-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.key-bottom,
+.item-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.key-stats,
+.item-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  flex: 1;
+  min-width: 0;
+}
+
+.key-actions,
+.item-actions {
+  flex-shrink: 0;
+}
+
+.key-actions :deep(.n-button),
+.item-actions :deep(.n-button) {
+  padding: 0 4px;
+}
+
+/* 状态别名 */
+.key-card.status-valid,
+.item-card.status-valid {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  border-width: 1.5px;
+}
+
+.key-card.status-invalid,
+.item-card.status-invalid {
+  border-color: var(--invalid-border);
+  background: var(--card-bg-solid);
+  opacity: 0.85;
+}
+
+.key-card.status-error,
+.item-card.status-error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+.key-card.status-sub-group,
+.item-card.status-sub-group {
+  border-color: var(--sub-group-border);
+  background: var(--sub-group-bg);
+  border-width: 1.5px;
+}
+
+.key-card.status-model-mapping,
+.item-card.status-model-mapping {
+  border-color: var(--model-mapping-border);
+  background: var(--model-mapping-bg);
+  border-width: 1.5px;
+}
+
+.key-card.disabled,
+.item-card.disabled {
+  opacity: 0.6;
+  background: var(--bg-secondary);
+}
+
+/* 网格容器别名 */
+.keys-grid,
+.item-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  grid-auto-rows: min-content;
+  align-items: start;
+  overflow: visible;
+}
+
+.keys-grid-container,
+.card-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.key-table-container,
+.card-container {
+  background: var(--card-bg-solid);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}

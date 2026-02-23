@@ -134,27 +134,42 @@ watch(
 );
 
 // 监听任务完成事件，自动刷新当前分组数据
+// Watch for task completion events (e.g., bulk validation, import, delete)
 watch(
-  () => [appState.groupDataRefreshTrigger, appState.syncOperationTrigger],
+  () => appState.groupDataRefreshTrigger,
   () => {
     if (!props.group) {
       return;
     }
 
-    // 检查是否需要刷新当前分组的数据
     const isCurrentGroupTask =
       appState.lastCompletedTask && appState.lastCompletedTask.groupName === props.group.name;
+
+    const isRelevantTaskType =
+      isCurrentGroupTask &&
+      ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
+        appState.lastCompletedTask?.taskType || ""
+      );
+
+    if (isRelevantTaskType) {
+      loadStats();
+    }
+  }
+);
+
+// 监听同步操作事件，自动刷新当前分组数据
+// Watch for sync operation events (e.g., single key test, restore, delete)
+watch(
+  () => appState.syncOperationTrigger,
+  () => {
+    if (!props.group) {
+      return;
+    }
+
     const isCurrentGroupSync =
       appState.lastSyncOperation && appState.lastSyncOperation.groupName === props.group.name;
 
-    const shouldRefresh =
-      (isCurrentGroupTask &&
-        ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
-          appState.lastCompletedTask?.taskType || ""
-        )) ||
-      isCurrentGroupSync;
-
-    if (shouldRefresh) {
+    if (isCurrentGroupSync) {
       loadStats();
     }
   }

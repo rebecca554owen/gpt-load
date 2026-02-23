@@ -1,21 +1,16 @@
 <script setup lang="ts">
 import type { GroupFormData } from "@/types/models";
 import { HelpCircleOutline } from "@vicons/ionicons5";
-import { NFormItem, NIcon, NInput, NSelect, NTooltip } from "naive-ui";
+import { NFormItem, NIcon, NInput, NSelect, NTooltip, type SelectOption } from "naive-ui";
 import { useI18n } from "vue-i18n";
 
 defineOptions({
   name: "GroupChannelConfig",
 });
 
-interface ChannelTypeOption {
-  label: string;
-  value: string;
-}
-
 interface Props {
   formData: GroupFormData;
-  channelTypeOptions: ChannelTypeOption[];
+  channelTypeOptions: SelectOption[];
   testModelPlaceholder: string;
   validationEndpointPlaceholder: string;
   isEditMode: boolean;
@@ -69,7 +64,7 @@ function handleValidationEndpointChange(value: string) {
       </template>
       <n-select
         :value="formData.channel_type"
-        :options="channelTypeOptions as any"
+        :options="channelTypeOptions"
         :placeholder="t('keys.selectChannelType')"
         @update:value="handleChannelTypeChange"
       />

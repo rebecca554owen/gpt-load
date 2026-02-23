@@ -332,8 +332,8 @@ const datasetsWithColor = computed(() => {
           class="chart-tooltip"
           :class="{ 'tooltip-speed': viewType === 'token_speed' }"
           :style="{
-            left: tooltipPosition.x + 'px',
-            top: tooltipPosition.y + 'px',
+            left: (tooltipPosition.x / 800) * 100 + '%',
+            top: (tooltipPosition.y / 260) * 100 + '%',
           }"
         >
           <div class="tooltip-time">
@@ -609,7 +609,7 @@ const datasetsWithColor = computed(() => {
   border-radius: 8px;
   font-size: 13px;
   pointer-events: none;
-  transform: translateX(-50%) translateY(-100%);
+  transform: translate(-50%, -100%);
   z-index: 1000;
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);

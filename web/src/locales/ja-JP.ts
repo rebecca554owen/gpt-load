@@ -37,6 +37,8 @@ export default {
     endTime: "終了時間",
     selectAll: "すべて選択",
     deselectAll: "選択を解除",
+    moreActions: "その他の操作",
+    viewDetails: "詳細を表示",
   },
   login: {
     title: "GPT Load",

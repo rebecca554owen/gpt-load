@@ -77,26 +77,40 @@ watch(statusFilter, async () => {
   }
 });
 
+// Watch for task completion events (e.g., bulk validation, import, delete)
+// When a task completes for the current group, refresh the key list
 watch(
-  () => [appState.groupDataRefreshTrigger, appState.syncOperationTrigger],
+  () => appState.groupDataRefreshTrigger,
   async () => {
     if (props.selectedGroup) {
       const isCurrentGroupTask =
         appState.lastCompletedTask &&
         appState.lastCompletedTask.groupName === props.selectedGroup.name;
 
+      const isRelevantTaskType =
+        isCurrentGroupTask &&
+        ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
+          appState.lastCompletedTask?.taskType || ""
+        );
+
+      if (isRelevantTaskType) {
+        await loadKeys();
+      }
+    }
+  }
+);
+
+// Watch for sync operation events (e.g., single key test, restore, delete)
+// When a sync operation completes for the current group, refresh the key list
+watch(
+  () => appState.syncOperationTrigger,
+  async () => {
+    if (props.selectedGroup) {
       const isCurrentGroupSync =
         appState.lastSyncOperation &&
         appState.lastSyncOperation.groupName === props.selectedGroup.name;
 
-      const shouldRefresh =
-        (isCurrentGroupTask &&
-          ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
-            appState.lastCompletedTask?.taskType || ""
-          )) ||
-        isCurrentGroupSync;
-
-      if (shouldRefresh) {
+      if (isCurrentGroupSync) {
         await loadKeys();
       }
     }
@@ -216,7 +230,10 @@ async function testKey(_key: KeyRow) {
 }
 
 function toggleKeyVisibility(key: KeyRow) {
-  key.is_visible = !key.is_visible;
+  const index = keys.value.findIndex(k => k.id === key.id);
+  if (index !== -1) {
+    keys.value[index] = { ...keys.value[index], is_visible: !keys.value[index].is_visible };
+  }
 }
 
 function editKeyNotes(key: KeyRow) {

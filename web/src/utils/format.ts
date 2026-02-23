@@ -1,3 +1,5 @@
+import { i18n } from "@/main";
+
 export function formatDuration(ms: number): string {
   if (ms < 0) {
     return "0ms";
@@ -55,5 +57,8 @@ export function formatDateTime(timestamp: string): string {
     return "-";
   }
   const date = new Date(timestamp);
-  return date.toLocaleString("zh-CN", { hour12: false }).replace(/\//g, "-");
+  const locale = i18n.global.locale.value;
+  // Map locale to toLocaleString compatible format
+  const localeStr = locale === "zh-CN" ? "zh-CN" : locale === "ja-JP" ? "ja-JP" : "en-US";
+  return date.toLocaleString(localeStr, { hour12: false }).replace(/\//g, "-");
 }
