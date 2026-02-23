@@ -93,8 +93,23 @@ export function useChartInteraction(
         datasetsAtTime.reduce((sum, item) => sum + getYPosition(item.value), 0) /
         datasetsAtTime.length;
 
+      // Calculate tooltip position with boundary detection
+      // Tooltip width is approximately 240px for token_speed view, 180px for others
+      const tooltipWidth = currentData.datasets.length > 5 ? 240 : 180;
+      const tooltipHalfWidth = tooltipWidth / 2;
+
+      let adjustedX = x;
+      // If tooltip would overflow on the right side, shift it left
+      if (x + tooltipHalfWidth > CHART_CONFIG.width) {
+        adjustedX = CHART_CONFIG.width - tooltipHalfWidth - 10;
+      }
+      // If tooltip would overflow on the left side, shift it right
+      else if (x - tooltipHalfWidth < 0) {
+        adjustedX = tooltipHalfWidth + 10;
+      }
+
       tooltipPosition.value = {
-        x,
+        x: adjustedX,
         y: avgY - 20,
       };
 

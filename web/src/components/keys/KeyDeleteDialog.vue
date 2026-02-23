@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
-import { appState } from "@/utils/app-state";
+import { useAppStateStore } from "@/stores/appState";
 import { Close } from "@vicons/ionicons5";
 import { NButton, NCard, NInput, NModal } from "naive-ui";
 import { ref, watch } from "vue";
@@ -54,13 +54,14 @@ async function handleSubmit() {
 
   try {
     loading.value = true;
+    const appState = useAppStateStore();
 
     await keysApi.deleteKeysAsync(props.groupId, keysText.value);
     resetForm();
 
     handleClose();
     window.$message.success(t("keys.deleteTaskStarted"));
-    appState.taskPollingTrigger++;
+    appState.triggerTaskPolling();
   } finally {
     loading.value = false;
   }

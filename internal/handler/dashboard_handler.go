@@ -432,13 +432,13 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 		Labels: labels,
 		Datasets: []models.ChartDataset{
 			{
-				Label:    i18n.Message(c, "dashboard.success_requests"),
-				LabelKey: "dashboard.success_requests",
+				Label:    i18n.Message(c, "dashboard.successRequests"),
+				LabelKey: "dashboard.successRequests",
 				Data:     successData,
 			},
 			{
-				Label:    i18n.Message(c, "dashboard.failed_requests"),
-				LabelKey: "dashboard.failed_requests",
+				Label:    i18n.Message(c, "dashboard.failedRequests"),
+				LabelKey: "dashboard.failedRequests",
 				Data:     failureData,
 			},
 		},
@@ -598,23 +598,23 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 		Labels: labels,
 		Datasets: []models.ChartDataset{
 			{
-				Label:    i18n.Message(c, "dashboard.non_cached_prompt_tokens"),
-				LabelKey: "dashboard.non_cached_prompt_tokens",
+				Label:    i18n.Message(c, "dashboard.nonCachedPromptTokens"),
+				LabelKey: "dashboard.nonCachedPromptTokens",
 				Data:     nonCachedPromptData,
 			},
 			{
-				Label:    i18n.Message(c, "dashboard.cached_tokens"),
-				LabelKey: "dashboard.cached_tokens",
+				Label:    i18n.Message(c, "dashboard.cachedTokens"),
+				LabelKey: "dashboard.cachedTokens",
 				Data:     cachedData,
 			},
 			{
-				Label:    i18n.Message(c, "dashboard.completion_tokens"),
-				LabelKey: "dashboard.completion_tokens",
+				Label:    i18n.Message(c, "dashboard.completionTokens"),
+				LabelKey: "dashboard.completionTokens",
 				Data:     outputData,
 			},
 			{
-				Label:    i18n.Message(c, "dashboard.total_tokens"),
-				LabelKey: "dashboard.total_tokens",
+				Label:    i18n.Message(c, "dashboard.totalTokens"),
+				LabelKey: "dashboard.totalTokens",
 				Data:     totalData,
 			},
 		},

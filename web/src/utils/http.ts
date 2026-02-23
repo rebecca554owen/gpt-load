@@ -1,7 +1,7 @@
 import i18n from "@/locales";
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import axios from "axios";
-import { appState } from "./app-state";
+import { useAppStateStore } from "@/stores/appState";
 
 // Define list of API URLs that don't need loading indicator
 const noLoadingUrls = ["/tasks/status"];
@@ -20,15 +20,18 @@ const http = axios.create({
 
 // Request interceptor
 http.interceptors.request.use(config => {
-  // Check if current request URL is in the blocklist
-  if (config.url && !noLoadingUrls.includes(config.url)) {
-    appState.loading = true;
+  try {
+    const appState = useAppStateStore();
+    if (config.url && !noLoadingUrls.includes(config.url)) {
+      appState.loading = true;
+    }
+  } catch {
+    // Pinia not initialized yet, skip loading state
   }
   const authKey = localStorage.getItem("authKey");
   if (authKey) {
     config.headers.Authorization = `Bearer ${authKey}`;
   }
-  // Add language header
   const locale = localStorage.getItem("locale") || "zh-CN";
   config.headers["Accept-Language"] = locale;
   return config;
@@ -37,14 +40,24 @@ http.interceptors.request.use(config => {
 // Response interceptor
 http.interceptors.response.use(
   response => {
-    appState.loading = false;
+    try {
+      const appState = useAppStateStore();
+      appState.loading = false;
+    } catch {
+      // Pinia not initialized yet, skip
+    }
     if (response.config.method !== "get" && !response.config.hideMessage) {
       window.$message.success(response.data.message ?? i18n.global.t("common.operationSuccess"));
     }
     return response.data;
   },
   error => {
-    appState.loading = false;
+    try {
+      const appState = useAppStateStore();
+      appState.loading = false;
+    } catch {
+      // Pinia not initialized yet, skip
+    }
     if (error.response) {
       if (error.response.status === 401) {
         if (window.location.pathname !== "/login") {

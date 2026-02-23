@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import AppFooter from "@/components/AppFooter.vue";
 import LanguageSelector from "@/components/LanguageSelector.vue";
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import { LockClosedSharp } from "@vicons/ionicons5";
-import { NButton, NCard, NInput, NSpace, NIcon, useMessage } from "naive-ui";
+import { NButton, NCard, NInput, NSpace, NIcon, NFormItem, useMessage } from "naive-ui";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -32,7 +32,7 @@ const handleLogin = async () => {
 <template>
   <div class="login-container">
     <!-- Language switcher -->
-    <div class="language-selector-wrapper">
+    <div class="language-selector-wrapper" :aria-label="t('common.languageSelector')">
       <language-selector />
     </div>
     <div class="login-background">
@@ -55,18 +55,21 @@ const handleLogin = async () => {
         </template>
 
         <n-space vertical size="large">
-          <n-input
-            v-model:value="authKey"
-            type="password"
-            size="large"
-            :placeholder="t('login.authKeyPlaceholder')"
-            class="modern-input"
-            @keyup.enter="handleLogin"
-          >
-            <template #prefix>
-              <n-icon :component="LockClosedSharp" />
-            </template>
-          </n-input>
+          <n-form-item :label="t('login.authKey')">
+            <n-input
+              v-model:value="authKey"
+              type="password"
+              size="large"
+              :placeholder="t('login.authKeyPlaceholder')"
+              class="modern-input"
+              autocomplete="current-password"
+              @keyup.enter="handleLogin"
+            >
+              <template #prefix>
+                <n-icon :component="LockClosedSharp" />
+              </template>
+            </n-input>
+          </n-form-item>
 
           <n-button
             class="login-btn modern-button"
@@ -146,6 +149,18 @@ const handleLogin = async () => {
   }
   50% {
     transform: translateY(-20px) rotate(5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-decoration,
+  .login-decoration-2 {
+    animation: none;
+    opacity: 0.05;
+  }
+
+  .login-btn:hover {
+    transform: none;
   }
 }
 
