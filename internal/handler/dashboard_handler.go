@@ -29,7 +29,7 @@ const (
 	interval10Hour = 600 // 1 month range
 
 	// Token speed chart configuration
-	topCombosLimit = 10 // Number of top group-model combinations to track
+	topCombosLimit = 7 // Number of top group-model combinations to track
 )
 
 type timeGranularity int
