@@ -109,10 +109,10 @@ func (m *SubGroupManager) SelectSubGroup(group *models.Group, modelAlias string)
 				if selectedItem := sel.selectNextModel(); selectedItem != nil {
 					logrus.WithFields(logrus.Fields{
 						"aggregate_group":   group.Name,
-						"model_alias":         alias,
-						"matched_pattern":     pattern,
-						"selected_model":      selectedItem.model,
-						"sub_group":           selectedItem.subGroupName,
+						"model_alias":       alias,
+						"matched_pattern":   pattern,
+						"selected_model":    selectedItem.model,
+						"sub_group":         selectedItem.subGroupName,
 					}).Debug("Selected model from wildcard pattern mapping")
 
 					return &SelectionResult{

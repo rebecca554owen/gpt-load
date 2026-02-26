@@ -128,6 +128,19 @@ func (a *App) Start() error {
 		a.cronChecker.Start()
 	} else {
 		logrus.Info("Starting as Slave Node.")
+
+		// Slave 节点如果使用内存存储（无 Redis），需要自己初始化密钥
+		if _, isMemoryStore := a.storage.(*store.MemoryStore); isMemoryStore {
+			logrus.Warn("Slave node using in-memory store (Redis not available). Loading keys from database for local cache.")
+
+			if err := a.keyPoolProvider.InitializeFromDatabase(); err != nil {
+				return fmt.Errorf("failed to load keys into key pool: %w", err)
+			}
+			logrus.Debug("API keys loaded into memory store (Slave without Redis).")
+		} else {
+			logrus.Info("Slave node connected to Redis, keys will sync from Master.")
+		}
+
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 	}
 
