@@ -155,18 +155,18 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		finalBodyBytes = utils.ModifyJSONField(bodyBytes, "model", selectedModel)
 	}
 
-	// Merge ParamOverrides: subgroup first, then aggregate overrides
+	// Merge ParamOverrides: aggregate first, then subgroup (subgroup takes precedence)
 	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
-		// Apply subgroup's ParamOverrides first
-		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
-		if err != nil {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply subgroup parameter overrides: %v", err)))
-			return
-		}
-		// Then apply aggregate group's ParamOverrides (takes precedence on conflicts)
+		// Apply aggregate group's ParamOverrides first (base configuration)
 		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, originalGroup)
 		if err != nil {
 			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply aggregate parameter overrides: %v", err)))
+			return
+		}
+		// Then apply subgroup's ParamOverrides (takes precedence on conflicts)
+		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
+		if err != nil {
+			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply subgroup parameter overrides: %v", err)))
 			return
 		}
 	} else {
@@ -261,17 +261,17 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 	channelHandler.ModifyRequest(req, apiKey, group)
 
-	// Merge HeaderRules: subgroup first, then aggregate overrides
+	// Merge HeaderRules: aggregate first, then subgroup (subgroup takes precedence)
 	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
-		// Apply subgroup's HeaderRules first
-		if len(group.HeaderRuleList) > 0 {
-			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
-			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
-		}
-		// Then apply aggregate group's HeaderRules (takes precedence on conflicts)
+		// Apply aggregate group's HeaderRules first (base configuration)
 		if len(originalGroup.HeaderRuleList) > 0 {
 			headerCtx := utils.NewHeaderVariableContextFromGin(c, originalGroup, apiKey)
 			utils.ApplyHeaderRules(req, originalGroup.HeaderRuleList, headerCtx)
+		}
+		// Then apply subgroup's HeaderRules (takes precedence on conflicts)
+		if len(group.HeaderRuleList) > 0 {
+			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
+			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
 		}
 	} else {
 		// Standard group or aggregate group acting as subgroup
