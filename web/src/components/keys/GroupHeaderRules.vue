@@ -70,7 +70,7 @@ const headerRuleValidationStates = computed(() => {
   <div class="config-section">
     <h5 class="config-title-with-tooltip">
       {{ t("keys.customHeaders") }}
-      <n-tooltip trigger="hover" placement="top">
+      <n-tooltip trigger="hover" placement="top" :scrollable="true" content-style="max-width: 320px">
         <template #trigger>
           <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
         </template>
@@ -206,8 +206,9 @@ const headerRuleValidationStates = computed(() => {
 }
 
 .header-name {
-  flex: 0 0 200px;
+  flex: 0 0 160px;
   position: relative;
+  min-width: 0;
 }
 
 .header-value {

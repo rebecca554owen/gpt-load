@@ -155,10 +155,26 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		finalBodyBytes = utils.ModifyJSONField(bodyBytes, "model", selectedModel)
 	}
 
-	finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
-	if err != nil {
-		response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply parameter overrides: %v", err)))
-		return
+	// Merge ParamOverrides: subgroup first, then aggregate overrides
+	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
+		// Apply subgroup's ParamOverrides first
+		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
+		if err != nil {
+			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply subgroup parameter overrides: %v", err)))
+			return
+		}
+		// Then apply aggregate group's ParamOverrides (takes precedence on conflicts)
+		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, originalGroup)
+		if err != nil {
+			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply aggregate parameter overrides: %v", err)))
+			return
+		}
+	} else {
+		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
+		if err != nil {
+			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply parameter overrides: %v", err)))
+			return
+		}
 	}
 
 	isStream := channelHandler.IsStreamRequest(c, bodyBytes)
@@ -245,10 +261,24 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 	channelHandler.ModifyRequest(req, apiKey, group)
 
-	// Apply custom header rules
-	if len(group.HeaderRuleList) > 0 {
-		headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
-		utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
+	// Merge HeaderRules: subgroup first, then aggregate overrides
+	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
+		// Apply subgroup's HeaderRules first
+		if len(group.HeaderRuleList) > 0 {
+			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
+			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
+		}
+		// Then apply aggregate group's HeaderRules (takes precedence on conflicts)
+		if len(originalGroup.HeaderRuleList) > 0 {
+			headerCtx := utils.NewHeaderVariableContextFromGin(c, originalGroup, apiKey)
+			utils.ApplyHeaderRules(req, originalGroup.HeaderRuleList, headerCtx)
+		}
+	} else {
+		// Standard group or aggregate group acting as subgroup
+		if len(group.HeaderRuleList) > 0 {
+			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
+			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
+		}
 	}
 
 	var client *http.Client

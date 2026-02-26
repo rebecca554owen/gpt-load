@@ -53,10 +53,10 @@
   overflow-y: auto;
 }
 
-/* 聚合组尺寸模态框 (700px) - 用于聚合组编辑 */
+/* 聚合组尺寸模态框 (900px) - 用于聚合组编辑 */
 .modal-aggregate {
-  width: 700px;
-  max-width: 90vw;
+  width: 900px;
+  max-width: 95vw;
   max-height: 85vh;
   overflow-y: auto;
 }

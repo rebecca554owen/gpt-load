@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
 import ProxyKeysInput from "@/components/common/ProxyKeysInput.vue";
-import { type ChannelType, type Group } from "@/types/models";
+import GroupHeaderRules from "@/components/keys/GroupHeaderRules.vue";
+import {
+  type ChannelType,
+  type Group,
+  type GroupFormData,
+  type HeaderRuleItem,
+} from "@/types/models";
 import { Close, HelpCircleOutline } from "@vicons/ionicons5";
 import {
   NButton,
   NCard,
+  NCollapse,
+  NCollapseItem,
   NForm,
   NFormItem,
   NIcon,
@@ -51,6 +59,9 @@ const channelTypeOptions: SelectOption[] = [
   { label: "Anthropic", value: "anthropic" },
 ];
 
+// Param Overrides placeholder text
+const placeholderText = '{\n  "key": "value"\n}';
+
 // 默认表单数据
 const defaultFormData = {
   name: "",
@@ -60,6 +71,8 @@ const defaultFormData = {
   sort: 1,
   proxy_keys: "",
   model_mapping_strict: false,
+  header_rules: [] as HeaderRuleItem[],
+  param_overrides: "",
 };
 
 // 表单数据
@@ -108,6 +121,16 @@ function resetForm() {
   Object.assign(formData, defaultFormData);
 }
 
+// 添加 header rule
+function addHeaderRule() {
+  formData.header_rules.push({ key: "", value: "", action: "set" });
+}
+
+// 移除 header rule
+function removeHeaderRule(index: number) {
+  formData.header_rules.splice(index, 1);
+}
+
 // 加载分组数据（编辑模式）
 function loadGroupData() {
   if (!props.group) {
@@ -122,12 +145,28 @@ function loadGroupData() {
     sort: props.group.sort || 1,
     proxy_keys: props.group.proxy_keys || "",
     model_mapping_strict: props.group.model_mapping_strict || false,
+    header_rules: props.group.header_rules || [],
+    param_overrides: props.group.param_overrides
+      ? JSON.stringify(props.group.param_overrides, null, 2)
+      : "",
   });
 }
 
 // 关闭弹窗
 function handleClose() {
   emit("update:show", false);
+}
+
+// 解析 param_overrides JSON 字符串
+function parseParamOverrides(jsonString: string): Record<string, unknown> | undefined {
+  if (!jsonString || !jsonString.trim()) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(jsonString);
+  } catch {
+    return undefined;
+  }
 }
 
 // 提交表单
@@ -141,6 +180,9 @@ async function handleSubmit() {
 
     loading.value = true;
 
+    // 解析 param_overrides
+    const paramOverrides = parseParamOverrides(formData.param_overrides);
+
     // 构建提交数据
     const submitData = {
       name: formData.name,
@@ -151,6 +193,8 @@ async function handleSubmit() {
       proxy_keys: formData.proxy_keys,
       group_type: "aggregate" as const,
       model_mapping_strict: formData.model_mapping_strict,
+      header_rules: formData.header_rules,
+      param_overrides: paramOverrides,
     };
 
     let result: Group;
@@ -291,6 +335,52 @@ async function handleSubmit() {
             </template>
           </n-form-item>
         </div>
+
+        <!-- 高级配置 -->
+        <n-collapse arrow-placement="right" style="margin-bottom: 24px">
+          <n-collapse-item>
+            <template #header>
+              <span style="font-weight: 600">{{ t("keys.advancedConfig") }}</span>
+            </template>
+            <div class="advanced-config-section">
+              <!-- Header Rules -->
+              <group-header-rules
+                :form-data="{ header_rules: formData.header_rules } as GroupFormData"
+                @update:form-data="
+                  (value: GroupFormData) => (formData.header_rules = value.header_rules)
+                "
+                @add-header-rule="addHeaderRule"
+                @remove-header-rule="removeHeaderRule"
+              />
+
+              <!-- Param Overrides -->
+              <div class="config-section">
+                <h5 class="config-title-with-tooltip">
+                  {{ t("keys.paramOverrides") }}
+                  <n-tooltip trigger="hover" placement="top">
+                    <template #trigger>
+                      <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
+                    </template>
+                    {{ t("keys.paramOverridesTooltip") }}
+                  </n-tooltip>
+                </h5>
+                <n-form-item
+                  :label="t('keys.paramOverrides')"
+                  label-placement="top"
+                  :show-label="false"
+                >
+                  <n-input
+                    v-model:value="formData.param_overrides"
+                    type="textarea"
+                    :placeholder="placeholderText"
+                    :rows="6"
+                    :autosize="{ minRows: 4, maxRows: 10 }"
+                  />
+                </n-form-item>
+              </div>
+            </div>
+          </n-collapse-item>
+        </n-collapse>
       </n-form>
 
       <template #footer>
@@ -369,5 +459,38 @@ async function handleSubmit() {
   border-color: var(--btn-view-color);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.advanced-config-section {
+  padding: 16px 0;
+}
+
+.config-section {
+  margin-top: 16px;
+}
+
+.config-title-with-tooltip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 12px 0;
+}
+
+.config-help {
+  font-size: 13px;
+}
+
+.help-icon {
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: help;
+  transition: color 0.2s ease;
+}
+
+.help-icon:hover {
+  color: var(--primary-color);
 }
 </style>
