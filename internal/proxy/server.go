@@ -377,9 +377,9 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	c.Status(resp.StatusCode)
 
 	if isStream {
-		tokenUsage = ps.handleStreamingResponse(c, resp, channelHandler)
+		tokenUsage = ps.handleStreamingResponse(c, resp, channelHandler, modelAlias, bodyBytes)
 	} else {
-		tokenUsage = ps.handleNormalResponse(c, resp, channelHandler)
+		tokenUsage = ps.handleNormalResponse(c, resp, channelHandler, modelAlias, bodyBytes)
 	}
 
 	ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, tokenUsage, models.RequestTypeFinal, modelAlias)

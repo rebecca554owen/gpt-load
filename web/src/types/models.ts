@@ -31,7 +31,7 @@ export type KeyStatus = "active" | "invalid";
 export type GroupType = "standard" | "aggregate";
 
 // Channel type
-export type ChannelType = "openai" | "openai-responses" | "gemini" | "anthropic";
+export type ChannelType = "openai" | "openai-response" | "gemini" | "anthropic";
 
 // Data model definition
 export interface APIKey {

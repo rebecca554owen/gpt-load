@@ -54,7 +54,7 @@ const formRef = ref();
 // 渠道类型选项
 const channelTypeOptions: SelectOption[] = [
   { label: "OpenAI (Chat Completions)", value: "openai" },
-  { label: "OpenAI (Responses API)", value: "openai-responses" },
+  { label: "OpenAI (Responses API)", value: "openai-response" },
   { label: "Gemini", value: "gemini" },
   { label: "Anthropic", value: "anthropic" },
 ];

@@ -101,7 +101,7 @@ const userModifiedFields = ref({
 const testModelPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
-    case "openai-responses":
+    case "openai-response":
       return "gpt-5-mini";
     case "gemini":
       return "gemini-2.5-flash-lite";
@@ -115,7 +115,7 @@ const testModelPlaceholder = computed(() => {
 const upstreamPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
-    case "openai-responses":
+    case "openai-response":
       return "https://api.openai.com";
     case "gemini":
       return "https://generativelanguage.googleapis.com";
@@ -130,7 +130,7 @@ const validationEndpointPlaceholder = computed(() => {
   switch (formData.channel_type) {
     case "openai":
       return "/v1/chat/completions";
-    case "openai-responses":
+    case "openai-response":
       return "/v1/responses";
     case "anthropic":
       return "/v1/messages";
@@ -223,7 +223,7 @@ watch(
 function getOldDefaultTestModel(channelType: string): string {
   switch (channelType) {
     case "openai":
-    case "openai-responses":
+    case "openai-response":
       return "gpt-5-mini";
     case "gemini":
       return "gemini-2.5-flash-lite";
@@ -237,7 +237,7 @@ function getOldDefaultTestModel(channelType: string): string {
 function getOldDefaultUpstream(channelType: string): string {
   switch (channelType) {
     case "openai":
-    case "openai-responses":
+    case "openai-response":
       return "https://api.openai.com";
     case "gemini":
       return "https://generativelanguage.googleapis.com";
@@ -267,7 +267,7 @@ function resetForm() {
     channel_type: defaultChannelType,
     sort: 1,
     test_model: isCreateMode ? testModelPlaceholder.value : "",
-    validation_endpoint: "",
+    validation_endpoint: isCreateMode ? validationEndpointPlaceholder.value : "",
     param_overrides: "",
     model_redirect_rules: "",
     model_redirect_strict: false,

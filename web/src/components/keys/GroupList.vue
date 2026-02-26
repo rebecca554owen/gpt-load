@@ -76,7 +76,7 @@ function handleGroupClick(group: Group) {
 function getChannelTagType(channelType: string) {
   switch (channelType) {
     case "openai":
-    case "openai-responses":
+    case "openai-response":
       return "success";
     case "gemini":
       return "warning"; // Orange
