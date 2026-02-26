@@ -88,6 +88,13 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 	}
 	c.Request.Body.Close()
 
+	if normalizedBody, normalized := utils.NormalizeJSONRequestBody(bodyBytes, c.GetHeader("Content-Type")); normalized {
+		logrus.WithFields(logrus.Fields{
+			"group": originalGroup.Name,
+		}).Debug("request body normalized from lenient JSON")
+		bodyBytes = normalizedBody
+	}
+
 	var channelHandler channel.ChannelProxy
 	if originalGroup.GroupType == "aggregate" {
 		// For aggregate groups, use first subgroup to extract model name
