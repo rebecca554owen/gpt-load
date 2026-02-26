@@ -259,8 +259,6 @@ function handleGroupCreated(group: Group) {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 100%;
-  overflow-y: auto;
   width: 100%;
 }
 
