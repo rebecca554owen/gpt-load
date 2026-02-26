@@ -4,6 +4,8 @@ import type { Group, SubGroupInfo } from "@/types/models";
 import { getGroupDisplayName } from "@/utils/display";
 import {
   Add,
+  ChevronDownOutline,
+  ChevronUpOutline,
   CreateOutline,
   EyeOutline,
   InformationCircleOutline,
@@ -72,6 +74,9 @@ const editingSubGroup = ref<SubGroupInfo | null>(null);
 // Search and filter state
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "disabled" | "unavailable">("all");
+
+// Collapse state - default collapsed
+const isCollapsed = ref(true);
 
 // Status filter options
 const statusOptions = [
@@ -173,6 +178,11 @@ function formatNumber(num: number): string {
   }
   return num.toString();
 }
+
+// Toggle collapse state
+function toggleCollapse() {
+  isCollapsed.value = !isCollapsed.value;
+}
 </script>
 
 <template>
@@ -210,7 +220,7 @@ function formatNumber(num: number): string {
     </div>
 
     <!-- Sub-group card grid -->
-    <div class="keys-grid-container">
+    <div class="keys-grid-container" v-show="!isCollapsed">
       <n-spin :show="props.loading || false">
         <div v-if="!props.subGroups || props.subGroups.length === 0" class="empty-container">
           <n-empty :description="t('subGroups.noSubGroups')" />
@@ -388,11 +398,17 @@ function formatNumber(num: number): string {
     <div class="pagination-container">
       <div class="pagination-info">
         <span>
-          {{ t("subGroups.totalSubGroups", { total: filteredSubGroups.length }) }}
+          {{ t("subGroups.totalSubGroups", { count: filteredSubGroups.length }) }}
           <template v-if="filteredSubGroups.length !== (props.subGroups?.length || 0)">
             / {{ props.subGroups?.length || 0 }}
           </template>
         </span>
+        <n-icon
+          :component="isCollapsed ? ChevronDownOutline : ChevronUpOutline"
+          size="18"
+          style="cursor: pointer; color: var(--text-secondary); margin-left: 8px"
+          @click="toggleCollapse"
+        />
       </div>
       <div class="pagination-controls">
         <span class="page-info">

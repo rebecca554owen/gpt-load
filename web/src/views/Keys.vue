@@ -255,7 +255,7 @@ function updateSelectedGroupFromResponse(updatedGroup: Group) {
 
   .sidebar {
     width: 240px;
-    height: calc(100vh - 159px);
+    height: calc(100vh - 139px);
   }
 }
 </style>
