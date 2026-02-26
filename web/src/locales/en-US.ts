@@ -56,6 +56,7 @@ export default {
     logs: "Logs",
     settings: "Settings",
     logout: "Logout",
+    login: "Login",
   },
   dashboard: {
     title: "Dashboard",

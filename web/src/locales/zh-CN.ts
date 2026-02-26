@@ -56,6 +56,7 @@ export default {
     logs: "日志",
     settings: "系统设置",
     logout: "退出登录",
+    login: "登录",
   },
   dashboard: {
     title: "仪表盘",

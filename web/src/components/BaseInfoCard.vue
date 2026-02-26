@@ -180,7 +180,7 @@ const secondRowCards = computed<StatCard[]>(() => [
               </div>
               <div class="stat-title">
                 {{ card.title }}
-                <span v-if="card.subTitle" class="stat-title-en"> ({{ card.subTitle }})</span>
+                <span v-if="card.subTitle" class="stat-title-en">({{ card.subTitle }})</span>
               </div>
             </div>
 
@@ -221,7 +221,7 @@ const secondRowCards = computed<StatCard[]>(() => [
               </div>
               <div class="stat-title">
                 {{ card.title }}
-                <span v-if="card.subTitle" class="stat-title-en"> ({{ card.subTitle }})</span>
+                <span v-if="card.subTitle" class="stat-title-en">({{ card.subTitle }})</span>
               </div>
             </div>
 

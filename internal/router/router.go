@@ -101,6 +101,14 @@ func registerAPIRoutes(
 func registerPublicAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server) {
 	api.POST("/auth/login", serverHandler.Login)
 	api.GET("/integration/info", serverHandler.GetIntegrationInfo)
+
+	// Dashboard public endpoints
+	dashboard := api.Group("/dashboard")
+	{
+		dashboard.GET("/stats", serverHandler.Stats)
+		dashboard.GET("/chart", serverHandler.Chart)
+		dashboard.GET("/encryption-status", serverHandler.EncryptionStatus)
+	}
 }
 
 // registerProtectedAPIRoutes registers authenticated API routes
@@ -146,14 +154,6 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 
 	// Tasks
 	api.GET("/tasks/status", serverHandler.GetTaskStatus)
-
-	// Dashboard and logs
-	dashboard := api.Group("/dashboard")
-	{
-		dashboard.GET("/stats", serverHandler.Stats)
-		dashboard.GET("/chart", serverHandler.Chart)
-		dashboard.GET("/encryption-status", serverHandler.EncryptionStatus)
-	}
 
 	// Logs
 	logs := api.Group("/logs")

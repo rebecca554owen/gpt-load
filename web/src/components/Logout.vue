@@ -1,26 +1,32 @@
 <script setup lang="ts">
 import { useAuthService } from "@/composables/useAuth";
-import { LogOutOutline } from "@vicons/ionicons5";
+import { LogInOutline, LogOutOutline } from "@vicons/ionicons5";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 
 const { t } = useI18n();
 
 const router = useRouter();
-const { logout } = useAuthService();
+const { checkLogin, logout } = useAuthService();
+const isLoggedIn = computed(() => checkLogin());
 
-const handleLogout = () => {
-  logout();
-  router.replace("/login");
+const handleClick = () => {
+  if (isLoggedIn.value) {
+    logout();
+    router.replace("/");
+  } else {
+    router.push("/login");
+  }
 };
 </script>
 
 <template>
-  <n-button quaternary round class="logout-button" @click="handleLogout">
+  <n-button quaternary round class="logout-button" @click="handleClick">
     <template #icon>
-      <n-icon :component="LogOutOutline" />
+      <n-icon :component="isLoggedIn ? LogOutOutline : LogInOutline" />
     </template>
-    {{ t("nav.logout") }}
+    {{ isLoggedIn ? t("nav.logout") : t("nav.login") }}
   </n-button>
 </template>
 

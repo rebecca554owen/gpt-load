@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import AppIcon from "@/components/icons/AppIcon.vue";
+import { useAuthService } from "@/composables/useAuth";
 import { type MenuOption } from "naive-ui";
 import { computed, h, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
+const { checkLogin } = useAuthService();
+const isLoggedIn = computed(() => checkLogin());
 
 interface Props {
   mode?: "horizontal" | "vertical";
@@ -17,12 +20,16 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits(["close"]);
 
 const menuOptions = computed<MenuOption[]>(() => {
-  const options: MenuOption[] = [
-    renderMenuItem("dashboard", t("nav.dashboard"), "dashboard"),
-    renderMenuItem("keys", t("nav.keys"), "keys"),
-    renderMenuItem("logs", t("nav.logs"), "logs"),
-    renderMenuItem("settings", t("nav.settings"), "settings"),
-  ];
+  const options: MenuOption[] = [renderMenuItem("dashboard", t("nav.dashboard"), "dashboard")];
+
+  // Admin menu items only shown when logged in
+  if (isLoggedIn.value) {
+    options.push(
+      renderMenuItem("keys", t("nav.keys"), "keys"),
+      renderMenuItem("logs", t("nav.logs"), "logs"),
+      renderMenuItem("settings", t("nav.settings"), "settings")
+    );
+  }
 
   return options;
 });

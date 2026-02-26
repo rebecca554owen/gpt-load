@@ -45,6 +45,7 @@ export default {
     subtitle: "インテリジェント負荷分散管理プラットフォーム",
     welcome: "おかえりなさい",
     welcomeDesc: "続行するには認証キーを入力してください",
+    authKey: "認証キー",
     authKeyPlaceholder: "認証キーを入力",
     loginButton: "ログイン",
     authKeyRequired: "認証キーを入力してください",
@@ -55,6 +56,7 @@ export default {
     logs: "ログ",
     settings: "システム設定",
     logout: "ログアウト",
+    login: "ログイン",
   },
   dashboard: {
     title: "ダッシュボード",
@@ -569,6 +571,7 @@ export default {
     dark: "ダークモード",
     current: "現在",
     clickToSwitch: "{mode}に切り替えるにはクリック",
+    toggleTheme: "テーマ切り替え",
   },
   encryptionAlert: {
     title: "⚠️ 暗号化設定エラー",

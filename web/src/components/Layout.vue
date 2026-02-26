@@ -5,11 +5,14 @@ import LanguageSelector from "@/components/LanguageSelector.vue";
 import Logout from "@/components/Logout.vue";
 import NavBar from "@/components/NavBar.vue";
 import ThemeToggle from "@/components/ThemeToggle.vue";
+import { useAuthService } from "@/composables/useAuth";
 import { useMediaQuery } from "@vueuse/core";
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 
 const isMenuOpen = ref(false);
 const isMobile = useMediaQuery("(max-width: 768px)");
+const { checkLogin } = useAuthService();
+const isLoggedIn = computed(() => checkLogin());
 
 watch(isMobile, value => {
   if (!value) {
@@ -76,8 +79,8 @@ const toggleMenu = () => {
     <app-footer />
   </n-layout>
 
-  <!-- Global task progress bar -->
-  <global-task-progress-bar />
+  <!-- Global task progress bar (only show when logged in) -->
+  <global-task-progress-bar v-if="isLoggedIn" />
 </template>
 
 <style scoped>
