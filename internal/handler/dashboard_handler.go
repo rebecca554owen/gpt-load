@@ -646,11 +646,11 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 	// Query with group_id and JOIN groups table to get current group name
 	type speedRawData struct {
 		GroupID           uint
-		GroupName         string
-		Model             string
-		Timestamp         time.Time
-		Duration          int64
-		CompletionTokens  int64
+		GroupName        string
+		Model            string
+		Timestamp        time.Time
+		Duration         int64
+		CompletionTokens int64
 	}
 
 	var rawData []speedRawData
@@ -696,8 +696,11 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 			dataByTimeCombo[key] = &timeComboData{}
 		}
 
-		dataByTimeCombo[key].durations = append(dataByTimeCombo[key].durations, float64(data.Duration)/1000)
-		dataByTimeCombo[key].completionTokens = append(dataByTimeCombo[key].completionTokens, float64(data.CompletionTokens))
+		// Use duration directly (now contains accurate generation time from first/last token)
+		if data.Duration > 0 {
+			dataByTimeCombo[key].durations = append(dataByTimeCombo[key].durations, float64(data.Duration)/1000)
+			dataByTimeCombo[key].completionTokens = append(dataByTimeCombo[key].completionTokens, float64(data.CompletionTokens))
+		}
 	}
 
 	var labels []string

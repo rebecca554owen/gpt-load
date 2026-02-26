@@ -5,8 +5,9 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
-	"strings"
+	"time"
 
+	"github.com/andybalholm/brotli"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"gpt-load/internal/channel"
@@ -17,31 +18,67 @@ const (
 	streamingChunkSize      = 4 * 1024
 )
 
-// handleStreamingResponse handles streaming SSE responses and returns parsed token usage
-func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy) *TokenUsage {
+// handleStreamingResponse handles streaming SSE responses and returns token usage and generation times
+func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy, model string, requestBody []byte) (*TokenUsage, int64, int64) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
 	c.Header("X-Accel-Buffering", "no")
 
+	contentEncoding := resp.Header.Get("Content-Encoding")
+
 	flusher, ok := c.Writer.(http.Flusher)
 	if !ok {
 		logrus.Error("Streaming unsupported by the writer, falling back to normal response")
-		return ps.handleNormalResponse(c, resp, channelHandler)
+		usage, _, _ := ps.handleNormalResponse(c, resp, channelHandler, model, requestBody)
+		return usage, 0, 0
 	}
 
-	// Use a circular buffer to capture the last 16KB of the stream for token parsing
-	// Increased from 4KB to handle providers like Volces that send usage in a separate chunk after finish_reason
 	tailBuffer := newTailBuffer(streamingTailBufferSize)
+
+	// 记录首末 token 时间
+	var firstTokenTime int64
+	var lastTokenTime int64
+	hasFirstToken := false
+
+	// Check if we need to manually decompress the response body
+	// Go's http.Client auto-decompresses gzip/deflate but NOT brotli (br)
+	var bodyReader io.Reader = resp.Body
+	if contentEncoding == "br" {
+		// brotli.Reader doesn't implement io.ReadCloser, use it directly as io.Reader
+		bodyReader = brotli.NewReader(resp.Body)
+		// Remove Content-Encoding header since we're decompressing
+		c.Header("Content-Encoding", "")
+	} else if contentEncoding == "gzip" {
+		gzReader, err := gzip.NewReader(resp.Body)
+		if err != nil {
+			logrus.Warnf("Failed to create gzip reader: %v", err)
+		} else {
+			defer gzReader.Close()
+			bodyReader = gzReader
+			// Remove Content-Encoding header since we're decompressing
+			c.Header("Content-Encoding", "")
+		}
+	}
 
 	buf := make([]byte, streamingChunkSize)
 	for {
-		n, err := resp.Body.Read(buf)
+		n, err := bodyReader.Read(buf)
 		if n > 0 {
-			// Write to tail buffer for later token parsing (do this first)
-			tailBuffer.Write(buf[:n])
-			// Write to client (ignore errors, client may have disconnected)
-			c.Writer.Write(buf[:n])
+			chunk := buf[:n]
+
+			// 检查是否包含 content，记录时间
+			if containsContent(chunk) {
+				now := time.Now().UnixMilli()
+				if !hasFirstToken {
+					firstTokenTime = now
+					hasFirstToken = true
+				}
+				lastTokenTime = now
+			}
+
+			tailBuffer.Write(chunk)
+			c.Writer.Write(chunk)
 			flusher.Flush()
 		}
 		if err == io.EOF {
@@ -53,48 +90,52 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 		}
 	}
 
-	tailData := tailBuffer.Bytes()
+	// Try to parse usage from upstream response first
 	channelType := channelHandler.GetChannelType()
-	// Parse token usage from the tail of the stream
-	return ParseUsageFromStream(tailData, channelType)
+	usage := ParseUsageFromStream(tailBuffer.Bytes(), channelType)
+
+	// If parsing failed, estimate tokens as fallback
+	if usage == nil {
+		usage = estimateTokensFromStream(model, requestBody, tailBuffer.Bytes())
+	}
+
+	return usage, firstTokenTime, lastTokenTime
 }
 
-// handleNormalResponse handles non-streaming responses and returns parsed token usage
-func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy) *TokenUsage {
-	// Read the entire response body
+// handleNormalResponse handles non-streaming responses and returns token usage
+func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy, model string, requestBody []byte) (*TokenUsage, int64, int64) {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logUpstreamError("reading response body", err)
-		return nil
+		return nil, 0, 0
 	}
 
-	// Check if response is gzip compressed
+	// For parsing usage, we may need to decompress brotli
+	// Go's http.Client auto-decompresses gzip/deflate but NOT brotli
 	var bodyToParse []byte = body
-	isGzip := strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") ||
-		(len(body) > 2 && body[0] == 0x1f && body[1] == 0x8b)
+	contentEncoding := resp.Header.Get("Content-Encoding")
 
-	if isGzip && len(body) > 2 {
-		// Try to decompress for token parsing
-		reader, err := gzip.NewReader(bytes.NewReader(body))
+	if contentEncoding == "br" && len(body) > 0 {
+		// Brotli compressed - decompress for parsing
+		reader := brotli.NewReader(bytes.NewReader(body))
+		decompressed, err := io.ReadAll(reader)
 		if err == nil {
-			defer reader.Close()
-			decompressed, err := io.ReadAll(reader)
-			if err == nil {
-				bodyToParse = decompressed
-			}
+			bodyToParse = decompressed
 		}
 	}
 
 	channelType := channelHandler.GetChannelType()
-	// Parse token usage from the response
 	usage := ParseUsage(bodyToParse, channelType)
 
-	// Write the original (possibly compressed) response to the client
+	if usage == nil {
+		usage = estimateTokens(model, requestBody, bodyToParse)
+	}
+
 	if _, err := c.Writer.Write(body); err != nil {
 		logUpstreamError("writing response body", err)
 	}
 
-	return usage
+	return usage, 0, 0
 }
 
 // tailBuffer is a circular buffer that keeps only the last N bytes

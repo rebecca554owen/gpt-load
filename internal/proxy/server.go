@@ -203,7 +203,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	if err != nil {
 		logrus.Errorf("Failed to select a key for group %s on attempt %d: %v", group.Name, retryCount+1, err)
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrNoKeysAvailable, err.Error()))
-		ps.logRequest(c, originalGroup, group, nil, startTime, http.StatusServiceUnavailable, err, isStream, "", channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
+		ps.logRequest(c, originalGroup, group, nil, startTime, http.StatusServiceUnavailable, err, isStream, "", channelHandler, bodyBytes, nil, 0, 0, models.RequestTypeFinal, modelAlias)
 		return
 	}
 
@@ -215,7 +215,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	}
 	if err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to build upstream URL: %v", err)))
-		ps.logRequest(c, originalGroup, group, apiKey, startTime, http.StatusInternalServerError, err, isStream, "", channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
+		ps.logRequest(c, originalGroup, group, apiKey, startTime, http.StatusInternalServerError, err, isStream, "", channelHandler, bodyBytes, nil, 0, 0, models.RequestTypeFinal, modelAlias)
 		return
 	}
 
@@ -249,7 +249,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	finalBodyBytes, err := channelHandler.ApplyModelRedirect(req, bodyBytes, group)
 	if err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, err.Error()))
-		ps.logRequest(c, originalGroup, group, apiKey, startTime, http.StatusBadRequest, err, isStream, upstreamURL, channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
+		ps.logRequest(c, originalGroup, group, apiKey, startTime, http.StatusBadRequest, err, isStream, upstreamURL, channelHandler, bodyBytes, nil, 0, 0, models.RequestTypeFinal, modelAlias)
 		return
 	}
 
@@ -298,7 +298,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	if err != nil || (resp != nil && resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound) {
 		if err != nil && app_errors.IsIgnorableError(err) {
 			logrus.Debugf("Client-side ignorable error for key %s, aborting retries: %v", utils.MaskAPIKey(apiKey.KeyValue), err)
-			ps.logRequest(c, originalGroup, group, apiKey, startTime, 499, err, isStream, upstreamURL, channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
+			ps.logRequest(c, originalGroup, group, apiKey, startTime, 499, err, isStream, upstreamURL, channelHandler, bodyBytes, nil, 0, 0, models.RequestTypeFinal, modelAlias)
 			return
 		}
 
@@ -336,7 +336,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 			requestType = models.RequestTypeFinal
 		}
 
-		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, bodyBytes, nil, requestType, modelAlias)
+		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, bodyBytes, nil, 0, 0, requestType, modelAlias)
 
 		// If this is the last attempt, check if it's an aggregate group and try switching to another sub-group
 		if isLastAttempt && originalGroup.GroupType == "aggregate" {
@@ -364,11 +364,12 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	// Check if this is a model list request (needs special handling)
 	if shouldInterceptModelList(c.Request.URL.Path, c.Request.Method) {
 		ps.handleModelListResponse(c, resp, group, channelHandler)
-		ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
+		ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, nil, 0, 0, models.RequestTypeFinal, modelAlias)
 		return
 	}
 
 	var tokenUsage *TokenUsage
+	var firstTokenTime, lastTokenTime int64
 	for key, values := range resp.Header {
 		for _, value := range values {
 			c.Header(key, value)
@@ -377,12 +378,12 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	c.Status(resp.StatusCode)
 
 	if isStream {
-		tokenUsage = ps.handleStreamingResponse(c, resp, channelHandler)
+		tokenUsage, firstTokenTime, lastTokenTime = ps.handleStreamingResponse(c, resp, channelHandler, modelAlias, bodyBytes)
 	} else {
-		tokenUsage = ps.handleNormalResponse(c, resp, channelHandler)
+		tokenUsage, _, _ = ps.handleNormalResponse(c, resp, channelHandler, modelAlias, bodyBytes)
 	}
 
-	ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, tokenUsage, models.RequestTypeFinal, modelAlias)
+	ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, tokenUsage, firstTokenTime, lastTokenTime, models.RequestTypeFinal, modelAlias)
 }
 
 // returnUpstreamError is a helper function to return upstream error response
@@ -466,6 +467,8 @@ func (ps *ProxyServer) logRequest(
 	channelHandler channel.ChannelProxy,
 	bodyBytes []byte,
 	tokenUsage *TokenUsage,
+	firstTokenTime int64,
+	lastTokenTime int64,
 	requestType string,
 	originalModel string,
 ) {
@@ -481,6 +484,15 @@ func (ps *ProxyServer) logRequest(
 	}
 
 	duration := time.Since(startTime).Milliseconds()
+
+	// If first/last token times are available, use them for accurate generation duration
+	// This excludes TTFT (Time To First Token) and network overhead
+	if firstTokenTime > 0 && lastTokenTime > 0 {
+		generationDuration := lastTokenTime - firstTokenTime
+		if generationDuration > 0 {
+			duration = generationDuration
+		}
+	}
 
 	logEntry := &models.RequestLog{
 		GroupID:       group.ID,
