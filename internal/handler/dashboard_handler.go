@@ -8,7 +8,6 @@ import (
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
 	"gpt-load/internal/utils"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -644,69 +643,54 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		intervalMinutes = interval10Hour
 	}
 
+	// Query with group_id and JOIN groups table to get current group name
 	type speedRawData struct {
-		GroupName        string
-		Model            string
-		Timestamp        time.Time
-		Duration         int64
-		CompletionTokens int64
+		GroupID           uint
+		GroupName         string
+		Model             string
+		Timestamp         time.Time
+		Duration          int64
+		CompletionTokens  int64
 	}
 
 	var rawData []speedRawData
 	err := s.DB.Model(&models.RequestLog{}).
-		Select("group_name, model, timestamp, duration, completion_tokens").
-		Where("timestamp >= ? AND timestamp < ?", startTime, endTime).
-		Where("is_success = ? AND request_type = ?", true, models.RequestTypeFinal).
-		Where("group_id NOT IN (?)",
-			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
-		Where("duration > 0 AND completion_tokens > 0").
+		Select("request_logs.group_id, COALESCE(groups.name, request_logs.group_name) as group_name, request_logs.model, request_logs.timestamp, request_logs.duration, request_logs.completion_tokens").
+		Joins("LEFT JOIN `groups` ON groups.id = request_logs.group_id").
+		Where("request_logs.timestamp >= ? AND request_logs.timestamp < ?", startTime, endTime).
+		Where("request_logs.is_success = ? AND request_logs.request_type = ?", true, models.RequestTypeFinal).
+		Where("request_logs.group_id NOT IN (?)",
+			s.DB.Table("`groups`").Select("id").Where("group_type = ?", "aggregate")).
+		Where("request_logs.duration > 0 AND request_logs.completion_tokens > 0").
 		Scan(&rawData).Error
 	if err != nil {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.chart_data_failed")
 		return
 	}
 
-	comboRequestCount := make(map[string]int64)
-	for _, data := range rawData {
-		comboKey := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
-		comboRequestCount[comboKey]++
-	}
-
-	type comboCount struct {
-		key   string
-		count int64
-	}
-	var sortedCombos []comboCount
-	for key, count := range comboRequestCount {
-		sortedCombos = append(sortedCombos, comboCount{key, count})
-	}
-	sort.Slice(sortedCombos, func(i, j int) bool {
-		return sortedCombos[i].count > sortedCombos[j].count
-	})
-
-	topCombos := make(map[string]bool)
-	for i := 0; i < len(sortedCombos) && i < topCombosLimit; i++ {
-		topCombos[sortedCombos[i].key] = true
-	}
-
 	type timeComboKey struct {
 		timeSlot time.Time
-		combo    string
+		comboID  string // internal identifier: groupID_model
 	}
 	type timeComboData struct {
 		durations        []float64
 		completionTokens []float64
 	}
 	dataByTimeCombo := make(map[timeComboKey]*timeComboData)
+	comboSet := make(map[string]bool) // internal: groupID_model
+	comboDisplayNames := make(map[string]string) // display: groupID_model -> groupName - model
 
 	for _, data := range rawData {
-		comboKey := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
-		if !topCombos[comboKey] {
-			continue
-		}
+		// Use groupID + model as internal identifier
+		comboID := fmt.Sprintf("%d_%s", data.GroupID, data.Model)
+		comboSet[comboID] = true
+
+		// Store display name with current group name from JOIN
+		comboDisplayName := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
+		comboDisplayNames[comboID] = comboDisplayName
 
 		slotTime := data.Timestamp.Truncate(time.Duration(intervalMinutes) * time.Minute)
-		key := timeComboKey{slotTime, comboKey}
+		key := timeComboKey{slotTime, comboID}
 
 		if _, exists := dataByTimeCombo[key]; !exists {
 			dataByTimeCombo[key] = &timeComboData{}
@@ -733,13 +717,15 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		labels = append(labels, slotStart.Format(time.RFC3339))
 	}
 
-	datasets := make(map[string][]float64)
-	comboList := make([]string, 0, len(topCombos))
-	for combo := range topCombos {
+	comboList := make([]string, 0, len(comboSet))
+	for combo := range comboSet {
 		comboList = append(comboList, combo)
+	}
+
+	datasets := make(map[string][]float64)
+	for _, combo := range comboList {
 		datasets[combo] = make([]float64, intervals)
 	}
-	sort.Strings(comboList)
 
 	for i := 0; i < intervals; i++ {
 		slotStart := startSlot.Add(time.Duration(i*intervalMinutes) * time.Minute)
@@ -761,66 +747,62 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 				}
 			}
 
-			avgSpeed := 0.0
+			// Calculate P90 speed (90th percentile)
+			// P90 = 90% of requests can achieve this speed, excluding slowest 10%
+			p90Speed := 0.0
 			if len(allSpeeds) > 0 {
-				var sum, sumSquares float64
-				for _, speed := range allSpeeds {
-					sum += speed
+				sort.Float64s(allSpeeds)
+				idx := int(float64(len(allSpeeds)) * 0.9)
+				if idx >= len(allSpeeds) {
+					idx = len(allSpeeds) - 1
 				}
-				mean := sum / float64(len(allSpeeds))
-				for _, speed := range allSpeeds {
-					sumSquares += (speed - mean) * (speed - mean)
-				}
-				stdDev := math.Sqrt(sumSquares / float64(len(allSpeeds)))
-
-				var filteredSpeeds []float64
-				for _, speed := range allSpeeds {
-					if stdDev == 0 || math.Abs(speed-mean) <= 3*stdDev {
-						filteredSpeeds = append(filteredSpeeds, speed)
-					}
-				}
-
-				if len(filteredSpeeds) > 0 {
-					var filteredSum float64
-					for _, speed := range filteredSpeeds {
-						filteredSum += speed
-					}
-					avgSpeed = filteredSum / float64(len(filteredSpeeds))
-				}
+				p90Speed = allSpeeds[idx]
 			}
-			datasets[combo][i] = avgSpeed
+			datasets[combo][i] = p90Speed
 		}
 	}
 
-	// Calculate average speed for each combo across all time intervals
-	comboAverageSpeed := make(map[string]float64)
+	// Calculate P90 speed for each combo across all time intervals
+	comboP90Speed := make(map[string]float64)
 	for _, combo := range comboList {
-		var totalSpeed float64
-		var nonZeroCount int
+		var intervalSpeeds []float64
 		for _, val := range datasets[combo] {
 			if val > 0 {
-				totalSpeed += val
-				nonZeroCount++
+				intervalSpeeds = append(intervalSpeeds, val)
 			}
 		}
-		if nonZeroCount > 0 {
-			comboAverageSpeed[combo] = totalSpeed / float64(nonZeroCount)
+		if len(intervalSpeeds) > 0 {
+			sort.Float64s(intervalSpeeds)
+			idx := int(float64(len(intervalSpeeds)) * 0.9)
+			if idx >= len(intervalSpeeds) {
+				idx = len(intervalSpeeds) - 1
+			}
+			comboP90Speed[combo] = intervalSpeeds[idx]
 		}
 	}
 
-	// Sort combos by average speed (descending)
+	// Sort combos by P90 speed (descending)
 	sort.Slice(comboList, func(i, j int) bool {
-		return comboAverageSpeed[comboList[i]] > comboAverageSpeed[comboList[j]]
+		return comboP90Speed[comboList[i]] > comboP90Speed[comboList[j]]
 	})
 
+	// Select top 7 combos by P90 speed
+	topCount := topCombosLimit
+	if len(comboList) < topCount {
+		topCount = len(comboList)
+	}
+	topComboList := comboList[:topCount]
+
 	var chartDatasets []models.ChartDataset
-	for _, combo := range comboList {
+	for _, combo := range topComboList {
 		data := make([]int64, intervals)
 		for i, val := range datasets[combo] {
 			data[i] = int64(val)
 		}
+		// Use display name for chart label
+		displayName := comboDisplayNames[combo]
 		chartDatasets = append(chartDatasets, models.ChartDataset{
-			Label:    combo,
+			Label:    displayName,
 			LabelKey: "token_speed." + combo,
 			Data:     data,
 		})
