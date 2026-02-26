@@ -443,11 +443,11 @@ func (ps *ProxyServer) logRequest(
 		return
 	}
 
-	var requestBodyToLog, userAgent string
+	var requestBodyToLog string
+	userAgent := c.Request.UserAgent()
 
 	if group.EffectiveConfig.EnableRequestBodyLogging {
 		requestBodyToLog = utils.TruncateString(string(bodyBytes), 65000)
-		userAgent = c.Request.UserAgent()
 	}
 
 	duration := time.Since(startTime).Milliseconds()
