@@ -305,9 +305,9 @@ async function handleSubmit() {
             <template #label>
               <div style="display: flex; align-items: center; gap: 4px">
                 {{ t("groups.modelMappingStrict") }}
-                <n-tooltip trigger="hover" placement="top">
+                <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
                   <template #trigger>
-                    <n-icon :component="HelpCircleOutline" style="cursor: help" />
+                    <n-icon :component="HelpCircleOutline" class="help-icon" />
                   </template>
                   {{ t("groups.modelMappingStrictTip") }}
                 </n-tooltip>
@@ -357,7 +357,7 @@ async function handleSubmit() {
               <div class="config-section">
                 <h5 class="config-title-with-tooltip">
                   {{ t("keys.paramOverrides") }}
-                  <n-tooltip trigger="hover" placement="top">
+                  <n-tooltip trigger="hover" placement="bottom-start">
                     <template #trigger>
                       <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
                     </template>

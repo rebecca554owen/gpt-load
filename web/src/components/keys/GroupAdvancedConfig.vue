@@ -37,7 +37,7 @@ const showModelMappingStrict = computed(() => props.formData.group_type === "agg
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.modelRedirectPolicy") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
             </template>
@@ -74,7 +74,7 @@ const showModelMappingStrict = computed(() => props.formData.group_type === "agg
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.modelRedirectRules") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
             </template>
@@ -102,7 +102,7 @@ const showModelMappingStrict = computed(() => props.formData.group_type === "agg
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("groups.modelMappingStrict") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
             </template>
@@ -141,7 +141,7 @@ const showModelMappingStrict = computed(() => props.formData.group_type === "agg
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.paramOverrides") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
             </template>

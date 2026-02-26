@@ -548,7 +548,7 @@ async function handleSubmit() {
           <template #label>
             <div class="form-label-with-tooltip">
               {{ t("keys.proxyKeys") }}
-              <n-tooltip trigger="hover" placement="top">
+              <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
                 <template #trigger>
                   <n-icon :component="HelpCircleOutline" class="help-icon" />
                 </template>

@@ -35,7 +35,7 @@ function updateFormData(key: keyof GroupFormData, value: unknown) {
         <template #label>
           <div class="form-label-with-tooltip">
             {{ t("keys.groupName") }}
-            <n-tooltip trigger="hover" placement="top">
+            <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
               <template #trigger>
                 <n-icon :component="HelpCircleOutline" class="help-icon" />
               </template>
@@ -55,7 +55,7 @@ function updateFormData(key: keyof GroupFormData, value: unknown) {
         <template #label>
           <div class="form-label-with-tooltip">
             {{ t("keys.displayName") }}
-            <n-tooltip trigger="hover" placement="top">
+            <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
               <template #trigger>
                 <n-icon :component="HelpCircleOutline" class="help-icon" />
               </template>
@@ -77,7 +77,7 @@ function updateFormData(key: keyof GroupFormData, value: unknown) {
         <template #label>
           <div class="form-label-with-tooltip">
             {{ t("keys.sortOrder") }}
-            <n-tooltip trigger="hover" placement="top">
+            <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
               <template #trigger>
                 <n-icon :component="HelpCircleOutline" class="help-icon" />
               </template>
@@ -99,7 +99,7 @@ function updateFormData(key: keyof GroupFormData, value: unknown) {
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("common.description") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon" />
             </template>

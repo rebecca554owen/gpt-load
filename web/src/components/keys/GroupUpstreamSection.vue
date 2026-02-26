@@ -70,7 +70,7 @@ function handleRemoveUpstream(index: number) {
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.upstream") }} {{ index + 1 }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon" />
             </template>
@@ -89,7 +89,7 @@ function handleRemoveUpstream(index: number) {
         </div>
         <div class="upstream-weight">
           <span class="weight-label">{{ t("keys.weight") }}</span>
-          <n-tooltip trigger="hover" placement="top" style="width: 100%">
+          <n-tooltip trigger="hover" placement="right" style="width: 100%">
             <template #trigger>
               <n-input-number
                 :value="upstream.weight"

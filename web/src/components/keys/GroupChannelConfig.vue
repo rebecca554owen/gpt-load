@@ -54,7 +54,7 @@ function handleValidationEndpointChange(value: string) {
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.channelType") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon" />
             </template>
@@ -76,7 +76,7 @@ function handleValidationEndpointChange(value: string) {
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.testModel") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon" />
             </template>
@@ -101,7 +101,7 @@ function handleValidationEndpointChange(value: string) {
       <template #label>
         <div class="form-label-with-tooltip">
           {{ t("keys.testPath") }}
-          <n-tooltip trigger="hover" placement="top">
+          <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
             <template #trigger>
               <n-icon :component="HelpCircleOutline" class="help-icon" />
             </template>

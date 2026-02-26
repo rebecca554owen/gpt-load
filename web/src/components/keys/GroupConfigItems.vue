@@ -58,7 +58,7 @@ function handleConfigKeyChange(index: number, key: string) {
   <div class="config-section">
     <h5 class="config-title-with-tooltip">
       {{ t("keys.groupConfig") }}
-      <n-tooltip trigger="hover" placement="top">
+      <n-tooltip trigger="hover" placement="bottom-start">
         <template #trigger>
           <n-icon :component="HelpCircleOutline" class="help-icon config-help" />
         </template>
@@ -82,7 +82,7 @@ function handleConfigKeyChange(index: number, key: string) {
         <template #label>
           <div class="form-label-with-tooltip">
             {{ t("keys.config") }} {{ index + 1 }}
-            <n-tooltip trigger="hover" placement="top">
+            <n-tooltip trigger="hover" placement="right-start" :show-arrow="true">
               <template #trigger>
                 <n-icon :component="HelpCircleOutline" class="help-icon" />
               </template>
@@ -109,7 +109,7 @@ function handleConfigKeyChange(index: number, key: string) {
             />
           </div>
           <div class="config-value">
-            <n-tooltip trigger="hover" placement="top">
+            <n-tooltip trigger="hover" placement="right">
               <template #trigger>
                 <n-input-number
                   v-if="typeof configItem.value === 'number'"

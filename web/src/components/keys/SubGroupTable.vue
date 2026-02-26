@@ -281,7 +281,7 @@ function formatNumber(num: number): string {
             <!-- Action buttons row -->
             <div class="key-bottom">
               <div class="key-stats">
-                <n-tooltip trigger="hover" placement="top">
+                <n-tooltip trigger="hover" placement="right">
                   <template #trigger>
                     <n-button
                       round

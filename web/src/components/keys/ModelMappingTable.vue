@@ -629,7 +629,7 @@ async function duplicateModelMapping(mapping: ModelMapping) {
             <!-- Action buttons row -->
             <div class="key-bottom">
               <!-- Left floating view details button -->
-              <n-tooltip trigger="hover" placement="top">
+              <n-tooltip trigger="hover" placement="right">
                 <template #trigger>
                   <n-button round tertiary type="default" size="tiny">
                     <template #icon>

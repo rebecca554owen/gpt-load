@@ -692,7 +692,7 @@ function resetPage() {
                 <n-form label-placement="left">
                   <n-form-item v-for="(value, key) in group?.config || {}" :key="key">
                     <template #label>
-                      <n-tooltip trigger="hover" :delay="300" placement="top">
+                      <n-tooltip trigger="hover" :delay="300" placement="right-start">
                         <template #trigger>
                           <span class="config-label">
                             {{ getConfigDisplayName(key) }}:
