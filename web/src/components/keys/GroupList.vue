@@ -203,8 +203,26 @@ function handleGroupCreated(group: Group) {
 }
 
 .groups-section::-webkit-scrollbar {
-  width: 1px;
-  height: 1px;
+  width: 6px;
+  height: 6px;
+}
+
+.groups-section::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.groups-section::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.groups-section:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
+}
+
+.groups-section::-webkit-scrollbar-thumb:hover {
+  background: rgba(128, 128, 128, 0.5);
 }
 
 .group-list-container {
@@ -367,9 +385,9 @@ function handleGroupCreated(group: Group) {
   gap: 8px;
 }
 
-/* Scrollbar style */
+/* Scrollbar style - hidden by default, visible on hover */
 .groups-list::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .groups-list::-webkit-scrollbar-track {
@@ -377,12 +395,17 @@ function handleGroupCreated(group: Group) {
 }
 
 .groups-list::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-bg);
-  border-radius: 2px;
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.groups-list:hover::-webkit-scrollbar-thumb {
+  background: rgba(128, 128, 128, 0.3);
 }
 
 .groups-list::-webkit-scrollbar-thumb:hover {
-  background: var(--border-color);
+  background: rgba(128, 128, 128, 0.5);
 }
 
 /* Dark mode special styles */

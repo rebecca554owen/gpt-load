@@ -350,7 +350,9 @@ const datasetsWithColor = computed(() => {
             <span v-else class="tooltip-color" :style="{ backgroundColor: dataset.color }" />
             <span class="tooltip-label-text">{{ translateLabel(dataset.label) }}</span>
             <span class="tooltip-value-number">{{ formatNumber(dataset.value) }}</span>
-            <span v-if="viewType === 'token_speed' && dataset.value > 0" class="tooltip-unit">token/s</span>
+            <span v-if="viewType === 'token_speed' && dataset.value > 0" class="tooltip-unit">
+              token/s
+            </span>
           </div>
         </div>
       </div>

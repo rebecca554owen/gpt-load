@@ -732,7 +732,7 @@ async function duplicateModelMapping(mapping: ModelMapping) {
     <div class="pagination-container">
       <div class="pagination-info">
         <span>
-          {{ t("modelMappings.totalMappings", { total: filteredModelMappings.length }) }}
+          {{ t("modelMappings.totalMappings", { count: filteredModelMappings.length }) }}
           <template v-if="filteredModelMappings.length !== (props.modelMappings?.length || 0)">
             / {{ props.modelMappings?.length || 0 }}
           </template>
