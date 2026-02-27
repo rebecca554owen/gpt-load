@@ -554,8 +554,8 @@ function cancelEdit(target: TargetItem) {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  background: var(--model-mapping-bg);
-  border: 1px solid var(--model-mapping-border);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
 }
 
@@ -601,9 +601,9 @@ function cancelEdit(target: TargetItem) {
   gap: 4px;
   height: 32px;
   padding: 0 8px;
-  background: var(--model-mapping-bg);
-  color: var(--model-mapping-primary);
-  border: 1px solid var(--model-mapping-border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   font-size: 0.85rem;
   font-weight: 500;
@@ -618,13 +618,13 @@ function cancelEdit(target: TargetItem) {
   height: auto;
   min-height: 32px;
   padding: 8px 12px;
-  background: var(--model-mapping-bg);
-  border-color: var(--model-mapping-border);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 .model-config-tag:hover {
-  background: var(--model-mapping-bg);
-  border-color: var(--model-mapping-border);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
 }
 
 .model-config-input {

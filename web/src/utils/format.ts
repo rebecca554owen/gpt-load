@@ -62,3 +62,17 @@ export function formatDateTime(timestamp: string): string {
   const localeStr = locale === "zh-CN" ? "zh-CN" : locale === "ja-JP" ? "ja-JP" : "en-US";
   return date.toLocaleString(localeStr, { hour12: false }).replace(/\//g, "-");
 }
+
+export function formatNumber(num: number): string {
+  if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return num.toString();
+}
+
+export function formatPercentage(num: number): string {
+  if (num <= 0) {
+    return "0";
+  }
+  return `${(num * 100).toFixed(1)}%`;
+}

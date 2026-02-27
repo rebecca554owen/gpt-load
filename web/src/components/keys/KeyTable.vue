@@ -11,13 +11,14 @@ import { getGroupDisplayName, maskKey } from "@/utils/display";
 import { formatDuration } from "@/utils/format";
 import { PAGINATION } from "@/constants/chart";
 import { NButton, NEmpty, NInput, NModal, NSpin, useDialog, type MessageReactive } from "naive-ui";
-import { h, ref, watch, nextTick } from "vue";
+import { h, ref, watch, nextTick, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import KeyCreateDialog from "./KeyCreateDialog.vue";
 import KeyDeleteDialog from "./KeyDeleteDialog.vue";
 import KeyCard from "./KeyCard.vue";
 import KeyToolbar from "./KeyToolbar.vue";
 import KeyPagination from "./KeyPagination.vue";
+import { useVirtualGrid } from "@/composables/useVirtualList";
 
 const { t } = useI18n();
 
@@ -50,6 +51,29 @@ const deleteDialogShow = ref(false);
 const notesDialogShow = ref(false);
 const editingKey = ref<KeyRow | null>(null);
 const editingNotes = ref("");
+
+// Virtual scrolling container
+const gridContainerRef = ref<HTMLElement | null>(null);
+const containerHeight = computed(() => {
+  if (!gridContainerRef.value) {
+    return 600;
+  }
+  // Use the actual container height minus toolbar and pagination
+  const containerHeight = gridContainerRef.value.clientHeight;
+  return Math.max(400, containerHeight - 150); // Reserve space for toolbar and pagination
+});
+
+// Use virtual scrolling for large datasets
+const shouldUseVirtualScroll = computed(() => {
+  return keys.value.length > 24; // Only use virtual scroll for more than 24 items
+});
+
+// Set up virtual list
+const {
+  list: virtualList,
+  containerProps,
+  wrapperProps,
+} = useVirtualGrid(keys, containerHeight.value);
 
 watch(
   () => props.selectedGroup,
@@ -174,6 +198,11 @@ async function loadKeys() {
     keys.value = result.items.map(key => ({ ...key, is_visible: false }));
     total.value = result.pagination.total_items;
     totalPages.value = result.pagination.total_pages;
+
+    // Reset virtual scroll position when data changes
+    if (gridContainerRef.value) {
+      gridContainerRef.value.scrollTop = 0;
+    }
   } finally {
     loading.value = false;
   }
@@ -505,7 +534,7 @@ function resetPage() {
 </script>
 
 <template>
-  <div class="key-table-container">
+  <div class="key-table-container" ref="gridContainerRef">
     <key-toolbar
       :loading="loading"
       v-model:status-filter="statusFilter"
@@ -521,6 +550,31 @@ function resetPage() {
         <div v-if="keys.length === 0 && !loading" class="empty-container">
           <n-empty :description="t('keys.noMatchingKeys')" />
         </div>
+
+        <!-- Virtual scrolling for large datasets -->
+        <div
+          v-else-if="shouldUseVirtualScroll"
+          v-bind="containerProps"
+          class="virtual-grid-container"
+        >
+          <div v-bind="wrapperProps" class="virtual-grid-wrapper">
+            <div class="keys-grid keys-grid-virtual">
+              <key-card
+                v-for="item in virtualList"
+                :key="item.data.id"
+                :key-data="item.data"
+                @edit-notes="editKeyNotes"
+                @toggle-visibility="toggleKeyVisibility"
+                @copy="copyKey"
+                @test="testKey"
+                @restore="restoreKey"
+                @delete="deleteKey"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Regular grid for small datasets -->
         <div v-else class="keys-grid">
           <key-card
             v-for="key in keys"
@@ -595,14 +649,35 @@ function resetPage() {
 
 .keys-grid-container {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .keys-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
+}
+
+/* Virtual grid container */
+.virtual-grid-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+
+.virtual-grid-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.keys-grid-virtual {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 8px;
 }
 
 .empty-container {
