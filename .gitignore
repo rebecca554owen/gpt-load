@@ -219,3 +219,6 @@ data/
 # Claude Code local settings
 .claude/
 tmpclaude-*-cwd
+
+# CodeArts
+.arts/
