@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Group, GroupConfigOption, ParentAggregateGroup } from "@/types/models";
 import { maskProxyKeys } from "@/utils/display";
+import { copy } from "@/utils/clipboard";
 import { CopyOutline, EyeOffOutline, EyeOutline, HelpCircleOutline } from "@vicons/ionicons5";
 import {
   NCollapse,
@@ -67,10 +68,10 @@ async function copyProxyKeys() {
     return;
   }
   const keysToCopy = props.group.proxy_keys.replace(/,/g, "\n");
-  try {
-    await navigator.clipboard.writeText(keysToCopy);
+  const success = await copy(keysToCopy);
+  if (success) {
     window.$message.success(t("keys.proxyKeysCopied"));
-  } catch {
+  } else {
     window.$message.error(t("keys.copyFailed"));
   }
 }

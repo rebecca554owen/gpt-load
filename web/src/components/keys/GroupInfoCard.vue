@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { keysApi } from "@/api/keys";
 import type {
   Group,
   GroupConfigOption,
@@ -7,6 +6,8 @@ import type {
   ParentAggregateGroup,
   SubGroupInfo,
 } from "@/types/models";
+import { keysApi } from "@/api/keys";
+import { copy } from "@/utils/clipboard";
 import { useAppStateStore } from "@/stores/appState";
 import { getGroupDisplayName } from "@/utils/display";
 import { CopyOutline, Pencil, Trash } from "@vicons/ionicons5";
@@ -228,10 +229,10 @@ async function copyUrl(url: string) {
   if (!url) {
     return;
   }
-  try {
-    await navigator.clipboard.writeText(url);
+  const success = await copy(url);
+  if (success) {
     window.$message.success(t("keys.urlCopied"));
-  } catch {
+  } else {
     window.$message.error(t("keys.copyFailed"));
   }
 }
