@@ -125,18 +125,18 @@ func (ch *GeminiChannel) applyNativeFormatRedirect(req *http.Request, bodyBytes 
 			modelPart := parts[i+1]
 			originalModel := strings.Split(modelPart, ":")[0]
 
-			if targetModel, found := group.ModelRedirectMap[originalModel]; found {
+			if actualModel, found := group.ModelRedirectMap[originalModel]; found {
 				suffix := ""
 				if colonIndex := strings.Index(modelPart, ":"); colonIndex != -1 {
 					suffix = modelPart[colonIndex:]
 				}
-				parts[i+1] = targetModel + suffix
+				parts[i+1] = actualModel + suffix
 				req.URL.Path = strings.Join(parts, "/")
 
 				logrus.WithFields(logrus.Fields{
 					"group":          group.Name,
 					"original_model": originalModel,
-					"model":          targetModel,
+					"model":          actualModel,
 					"channel":        "gemini_native",
 					"original_path":  path,
 					"new_path":       req.URL.Path,

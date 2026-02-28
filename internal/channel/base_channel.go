@@ -195,14 +195,14 @@ func (b *BaseChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte, gr
 	}
 
 	// Direct match without any prefix processing
-	if targetModel, found := group.ModelRedirectMap[model]; found {
-		requestData["model"] = targetModel
+	if actualModel, found := group.ModelRedirectMap[model]; found {
+		requestData["model"] = actualModel
 
 		// Log the redirection for audit
 		logrus.WithFields(logrus.Fields{
 			"group":          group.Name,
 			"original_model": model,
-			"model":          targetModel,
+			"model":          actualModel,
 			"channel":        "json_body",
 		}).Debug("Model redirected")
 

@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (ps *ProxyServer) applyParamOverrides(bodyBytes []byte, group *models.Group) ([]byte, error) {
+func applyParamOverrides(bodyBytes []byte, group *models.Group) ([]byte, error) {
 	if len(group.ParamOverrides) == 0 || len(bodyBytes) == 0 {
 		return bodyBytes, nil
 	}
