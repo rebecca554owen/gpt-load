@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// MaskAPIKey masks an API key for safe logging.
+// MaskAPIKey 屏蔽 API 密钥以进行安全日志记录。
 func MaskAPIKey(key string) string {
 	length := len(key)
 	if length <= 8 {
@@ -14,7 +14,7 @@ func MaskAPIKey(key string) string {
 	return fmt.Sprintf("%s****%s", key[:4], key[length-4:])
 }
 
-// TruncateString shortens a string to a maximum length.
+// TruncateString 将字符串截断到最大长度。
 func TruncateString(s string, maxLength int) string {
 	if len(s) > maxLength {
 		return s[:maxLength]
@@ -22,7 +22,7 @@ func TruncateString(s string, maxLength int) string {
 	return s
 }
 
-// SplitAndTrim splits a string by a separator
+// SplitAndTrim 按分隔符分割字符串
 func SplitAndTrim(s string, sep string) []string {
 	if s == "" {
 		return []string{}
@@ -41,7 +41,7 @@ func SplitAndTrim(s string, sep string) []string {
 	return result
 }
 
-// StringToSet converts a separator-delimited string into a set
+// StringToSet 将分隔符分隔的字符串转换为集合
 func StringToSet(s string, sep string) map[string]struct{} {
 	parts := SplitAndTrim(s, sep)
 	if len(parts) == 0 {

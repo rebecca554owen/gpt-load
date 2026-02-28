@@ -1,6 +1,6 @@
 package models
 
-// SystemSettingInfo represents detailed system setting information (for API response)
+// SystemSettingInfo 表示详细的系统设置信息（用于 API 响应）
 type SystemSettingInfo struct {
 	Key          string `json:"key"`
 	Name         string `json:"name"`
@@ -13,7 +13,7 @@ type SystemSettingInfo struct {
 	Required     bool   `json:"required"`
 }
 
-// CategorizedSettings a list of settings grouped by category
+// CategorizedSettings 按类别分组的设置列表
 type CategorizedSettings struct {
 	CategoryName string              `json:"category_name"`
 	Settings     []SystemSettingInfo `json:"settings"`

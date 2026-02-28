@@ -5,7 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_4_6_AddModelMappingColumn adds model_mappings column to groups table
+// V1_4_6_AddModelMappingColumn 向 groups 表添加 model_mappings 列
 func V1_4_6_AddModelMappingColumn(db *gorm.DB) error {
 	logrus.Info("Running v1.4.6 migration: Adding model_mappings column to groups table")
 
@@ -25,7 +25,7 @@ func V1_4_6_AddModelMappingColumn(db *gorm.DB) error {
 	return nil
 }
 
-// groupTable is a minimal model for migration purposes
+// groupTable 迁移用的最小模型
 type groupTable struct {
 	ModelMappings string `gorm:"type:json"`
 }

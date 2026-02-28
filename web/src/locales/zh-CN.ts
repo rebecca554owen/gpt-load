@@ -499,7 +499,7 @@ export default {
     completionTokens: "输出",
     cachedTokens: "缓存",
     totalTokens: "总计",
-    requestModel: "请求模型",
+    originalModel: "原始模型",
     actualModel: "实际模型",
     totalRecords: "共 {total} 条",
     recordsPerPage: "每页 {size} 条",

@@ -88,28 +88,54 @@ export function useChartInteraction(
         y: mouseY,
       };
 
-      const x = getXPosition(closestTimeIndex);
       const avgY =
         datasetsAtTime.reduce((sum, item) => sum + getYPosition(item.value), 0) /
         datasetsAtTime.length;
 
-      // Calculate tooltip position with boundary detection
-      // Tooltip width is approximately 240px for token_speed view, 180px for others
-      const tooltipWidth = currentData.datasets.length > 5 ? 240 : 180;
-      const tooltipHalfWidth = tooltipWidth / 2;
+      // Calculate tooltip position with viewport boundary detection
+      // Tooltip width: 280px for token_speed view (group - model labels), 180px for others
+      const isTokenSpeedView = currentData.datasets.some(d => d.label && d.label.includes(" - "));
+      const tooltipWidth = isTokenSpeedView ? 280 : 180;
 
-      let adjustedX = x;
-      // If tooltip would overflow on the right side, shift it left
-      if (x + tooltipHalfWidth > CHART_CONFIG.width) {
-        adjustedX = CHART_CONFIG.width - tooltipHalfWidth - 10;
+      // Calculate position relative to the viewport
+      const svgRect = svg.getBoundingClientRect();
+      const xInSvg = getXPosition(closestTimeIndex);
+
+      // CSS uses transform: translate(-50%, -100%), so we need to account for that offset
+      // The tooltip center (50%) should not exceed viewport boundaries
+      const tooltipHalfWidth = (tooltipWidth / 2 / svgRect.width) * CHART_CONFIG.width;
+
+      // Check SVG boundaries (accounting for transform offset)
+      const maxX = CHART_CONFIG.width - tooltipHalfWidth;
+      const minX = tooltipHalfWidth;
+
+      let adjustedXInSvg = xInSvg;
+      if (xInSvg > maxX) {
+        adjustedXInSvg = maxX;
+      } else if (xInSvg < minX) {
+        adjustedXInSvg = minX;
       }
-      // If tooltip would overflow on the left side, shift it right
-      else if (x - tooltipHalfWidth < 0) {
-        adjustedX = tooltipHalfWidth + 10;
+
+      // Also check viewport boundaries for extra safety
+      const xInViewport = svgRect.left + (xInSvg / CHART_CONFIG.width) * svgRect.width;
+      const viewportWidth = window.innerWidth;
+      const padding = 16;
+
+      // If tooltip would overflow on the right side of viewport, shift it left
+      if (xInViewport + tooltipWidth / 2 > viewportWidth - padding) {
+        const maxViewportX = viewportWidth - padding - tooltipWidth / 2;
+        const adjustedViewportX = Math.min(xInViewport, maxViewportX);
+        adjustedXInSvg = ((adjustedViewportX - svgRect.left) / svgRect.width) * CHART_CONFIG.width;
+      }
+      // If tooltip would overflow on the left side of viewport, shift it right
+      else if (xInViewport - tooltipWidth / 2 < padding) {
+        const minViewportX = padding + tooltipWidth / 2;
+        const adjustedViewportX = Math.max(xInViewport, minViewportX);
+        adjustedXInSvg = ((adjustedViewportX - svgRect.left) / svgRect.width) * CHART_CONFIG.width;
       }
 
       tooltipPosition.value = {
-        x: adjustedX,
+        x: adjustedXInSvg,
         y: avgY - 20,
       };
 

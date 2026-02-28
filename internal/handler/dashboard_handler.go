@@ -1,16 +1,18 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
+
 	"gpt-load/internal/encryption"
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/i18n"
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
 	"gpt-load/internal/utils"
-	"sort"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -20,16 +22,51 @@ const (
 	rpmCalculationWindowMinutes = 10
 	rpmComparisonWindowMinutes  = 20
 
-	// Time interval constants for chart granularity
-	interval10Min  = 10  // 1 hour range
-	interval15Min  = 15  // 1-5 hours range
-	interval30Min  = 30  // 5-24 hours range
-	interval2Hour  = 120 // 1 week range
-	interval10Hour = 600 // 1 month range
+	// 图表粒度的时间间隔常量
+	interval10Min  = 10  // 1 小时范围
+	interval15Min  = 15  // 1-5 小时范围
+	interval30Min  = 30  // 5-24 小时范围
+	interval2Hour  = 120 // 1 周范围
+	interval10Hour = 600 // 1 个月范围
 
-	// Token speed chart configuration
-	topCombosLimit = 7 // Number of top group-model combinations to track
+	// Token 速度图表配置
+	topCombosLimit = 7 // 要跟踪的顶部组-模型组合数量
 )
+
+// extractAuthKey 从各种来源提取认证密钥
+func extractAuthKey(c *gin.Context) string {
+	if key := c.Query("key"); key != "" {
+		query := c.Request.URL.Query()
+		query.Del("key")
+		c.Request.URL.RawQuery = query.Encode()
+		return key
+	}
+
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		const bearerPrefix = "Bearer "
+		if strings.HasPrefix(authHeader, bearerPrefix) {
+			return authHeader[len(bearerPrefix):]
+		}
+	}
+
+	if key := c.GetHeader("X-Api-Key"); key != "" {
+		return key
+	}
+
+	if key := c.GetHeader("X-Goog-Api-Key"); key != "" {
+		return key
+	}
+
+	return ""
+}
+
+// isAuthenticated 检查请求是否已认证
+func (s *Server) isAuthenticated(c *gin.Context) bool {
+	key := extractAuthKey(c)
+	authConfig := s.config.GetAuthConfig()
+	return key != "" && subtle.ConstantTimeCompare([]byte(key), []byte(authConfig.Key)) == 1
+}
 
 type timeGranularity int
 
@@ -38,7 +75,7 @@ const (
 	granularityHour
 )
 
-// boolToInt64 converts bool to int64 (1 for true, 0 for false)
+// boolToInt64 将布尔值转换为 int64（true 为 1，false 为 0）
 func boolToInt64(b bool) int64 {
 	if b {
 		return 1
@@ -46,7 +83,7 @@ func boolToInt64(b bool) int64 {
 	return 0
 }
 
-// buildTimeSelectClause builds database-specific SELECT and GROUP clauses for time-based aggregation
+// buildTimeSelectClause 构建数据库特定的 SELECT 和 GROUP 子句用于基于时间的聚合
 func buildTimeSelectClause(dbType string, granularity timeGranularity, fields string) (selectClause, groupClause string) {
 	switch dbType {
 	case "mysql":
@@ -72,7 +109,7 @@ func buildTimeSelectClause(dbType string, granularity timeGranularity, fields st
 	return selectClause, groupClause
 }
 
-// parseDaysParameter converts days string to days integer (for stats API)
+// parseDaysParameter 将天数字符串转换为天数整数（用于统计 API）
 func parseDaysParameter(daysStr string) int {
 	switch daysStr {
 	case "3":
@@ -84,8 +121,8 @@ func parseDaysParameter(daysStr string) int {
 	}
 }
 
-// parseHoursParameter converts hours string to hours integer with specified default
-// Supports: 1, 5, 24(1 day), 168(1 week), 720(1 month)
+// parseHoursParameter 将小时字符串转换为小时整数，使用指定的默认值
+// 支持：1, 5, 24(1 天), 168(1 周), 720(1 个月)
 func parseHoursParameter(hoursStr string, defaultHours int) int {
 	switch hoursStr {
 	case "1":
@@ -132,7 +169,7 @@ func calculateErrorRateTrend(currentErrorRate, previousErrorRate float64, hasCur
 	return trendResult{value: 0.0, isGrowth: true}
 }
 
-// trendCard creates a StatCard with trend calculation
+// trendCard 创建带有趋势计算的 StatCard
 func trendCard(current, previous int64) models.StatCard {
 	result := calculateTrend(current, previous)
 	return models.StatCard{
@@ -142,7 +179,7 @@ func trendCard(current, previous int64) models.StatCard {
 	}
 }
 
-// errorRateCard creates a StatCard for error rate with proper trend direction
+// errorRateCard 创建错误率的 StatCard，带有正确的趋势方向
 func errorRateCard(currentRate, previousRate float64, hasCurrent, hasPrevious bool) models.StatCard {
 	result := calculateErrorRateTrend(currentRate, previousRate, hasCurrent, hasPrevious)
 	return models.StatCard{
@@ -152,10 +189,10 @@ func errorRateCard(currentRate, previousRate float64, hasCurrent, hasPrevious bo
 	}
 }
 
-// Stats Get dashboard statistics
+// Stats 获取仪表板统计数据
 func (s *Server) Stats(c *gin.Context) {
-	// Support both 'hours' and 'days' parameters for backward compatibility
-	// Priority: hours > days
+	// 支持 'hours' 和 'days' 参数以保持向后兼容
+	// 优先级：hours > days
 	hoursStr := c.Query("hours")
 	var hours int
 	if hoursStr != "" {
@@ -172,7 +209,7 @@ func (s *Server) Stats(c *gin.Context) {
 		return
 	}
 
-	// Calculate time ranges based on hours
+	// 根据小时数计算时间范围
 	currentDuration := time.Duration(hours) * time.Hour
 	previousDuration := currentDuration
 
@@ -180,7 +217,7 @@ func (s *Server) Stats(c *gin.Context) {
 	previousStart := now.Add(-currentDuration - previousDuration)
 	previousEnd := currentStart
 
-	// Get token consumption statistics
+	// 获取 token 消耗统计
 	currentTokenStats, err := s.getDetailedTokenStats(currentStart, now)
 	if err != nil {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.current_stats_failed")
@@ -203,7 +240,7 @@ func (s *Server) Stats(c *gin.Context) {
 		return
 	}
 
-	// Get key count statistics
+	// 获取密钥数量统计
 	currentKeyStats, err := s.getKeyStats(currentStart, now)
 	if err != nil {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrDatabase, "database.key_stats_failed")
@@ -215,7 +252,7 @@ func (s *Server) Stats(c *gin.Context) {
 		return
 	}
 
-	// Calculate error rates
+	// 计算错误率
 	currentErrorRate := 0.0
 	if currentPeriod.TotalRequests > 0 {
 		currentErrorRate = (float64(currentPeriod.TotalFailures) / float64(currentPeriod.TotalRequests)) * 100
@@ -225,7 +262,7 @@ func (s *Server) Stats(c *gin.Context) {
 		previousErrorRate = (float64(previousPeriod.TotalFailures) / float64(previousPeriod.TotalRequests)) * 100
 	}
 
-	// Calculate non-cached prompt tokens
+	// 计算非缓存的 prompt token
 	currentNonCachedPrompt := currentTokenStats.PromptTokens - currentTokenStats.CachedTokens
 	if currentNonCachedPrompt < 0 {
 		currentNonCachedPrompt = 0
@@ -235,8 +272,11 @@ func (s *Server) Stats(c *gin.Context) {
 		previousNonCachedPrompt = 0
 	}
 
-	// Get security warning information
-	securityWarnings := s.getSecurityWarnings(c)
+	// 获取安全警告信息（仅限已认证用户）
+	var securityWarnings []models.SecurityWarning
+	if s.isAuthenticated(c) {
+		securityWarnings = s.getSecurityWarnings(c)
+	}
 
 	stats := models.DashboardStatsResponse{
 		KeyCount:              trendCard(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys),
@@ -255,7 +295,7 @@ func (s *Server) Stats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
-// Chart Get dashboard chart data
+// Chart 获取仪表板图表数据
 func (s *Server) Chart(c *gin.Context) {
 	viewType := c.DefaultQuery("view", "request")
 	hours := parseHoursParameter(c.DefaultQuery("hours", "5"), 5)
@@ -265,18 +305,18 @@ func (s *Server) Chart(c *gin.Context) {
 	startTime := now.Add(-time.Duration(hours) * time.Hour)
 
 	if viewType == "token" {
-		// Token view - get token statistics from request_logs
+		// Token 视图 - 从 request_logs 获取 token 统计
 		s.getTokenChart(c, startTime, endTime)
 	} else if viewType == "token_speed" {
-		// Token speed view - get token speed statistics from request_logs
+		// Token 速度视图 - 从 request_logs 获取 token 速度统计
 		s.getTokenSpeedChart(c, startTime, endTime)
 	} else {
-		// Request view - get request statistics from group_hourly_stats
+		// 请求视图 - 从 group_hourly_stats 获取请求统计
 		s.getRequestChart(c, startTime, endTime)
 	}
 }
 
-// getRequestChart returns request statistics chart data with dynamic granularity
+// getRequestChart 返回带有动态粒度的请求统计图表数据
 func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 	totalHours := int(endTime.Sub(startTime).Hours())
 	if totalHours < 1 {
@@ -446,7 +486,7 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 	response.Success(c, chartData)
 }
 
-// getTokenChart returns token statistics chart data with dynamic granularity
+// getTokenChart 返回带有动态粒度的 token 统计图表数据
 func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	totalHours := int(endTime.Sub(startTime).Hours())
 	if totalHours < 1 {
@@ -622,7 +662,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	response.Success(c, chartData)
 }
 
-// getTokenSpeedChart returns token speed statistics chart data
+// getTokenSpeedChart 返回 token 速度统计图表数据
 func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time) {
 	totalHours := int(endTime.Sub(startTime).Hours())
 	if totalHours < 1 {
@@ -643,10 +683,10 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		intervalMinutes = interval10Hour
 	}
 
-	// Query with group_id and JOIN groups table to get current group name
+	// 使用 group_id 和 JOIN groups 表查询以获取当前组显示名称
 	type speedRawData struct {
 		GroupID           uint
-		GroupName        string
+		DisplayName       string
 		Model            string
 		Timestamp        time.Time
 		Duration         int64
@@ -655,7 +695,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 
 	var rawData []speedRawData
 	err := s.DB.Model(&models.RequestLog{}).
-		Select("request_logs.group_id, COALESCE(groups.name, request_logs.group_name) as group_name, request_logs.model, request_logs.timestamp, request_logs.duration, request_logs.completion_tokens").
+		Select("request_logs.group_id, COALESCE(groups.display_name, groups.name, request_logs.group_name) as display_name, request_logs.model, request_logs.timestamp, request_logs.duration, request_logs.completion_tokens").
 		Joins("LEFT JOIN `groups` ON groups.id = request_logs.group_id").
 		Where("request_logs.timestamp >= ? AND request_logs.timestamp < ?", startTime, endTime).
 		Where("request_logs.is_success = ? AND request_logs.request_type = ?", true, models.RequestTypeFinal).
@@ -670,23 +710,23 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 
 	type timeComboKey struct {
 		timeSlot time.Time
-		comboID  string // internal identifier: groupID_model
+		comboID  string // 内部标识符：groupID_model
 	}
 	type timeComboData struct {
 		durations        []float64
 		completionTokens []float64
 	}
 	dataByTimeCombo := make(map[timeComboKey]*timeComboData)
-	comboSet := make(map[string]bool) // internal: groupID_model
-	comboDisplayNames := make(map[string]string) // display: groupID_model -> groupName - model
+	comboSet := make(map[string]bool) // 内部：groupID_model
+	comboDisplayNames := make(map[string]string) // 显示：groupID_model -> displayName - model
 
 	for _, data := range rawData {
-		// Use groupID + model as internal identifier
+		// 使用 groupID + model 作为内部标识符
 		comboID := fmt.Sprintf("%d_%s", data.GroupID, data.Model)
 		comboSet[comboID] = true
 
-		// Store display name with current group name from JOIN
-		comboDisplayName := fmt.Sprintf("%s - %s", data.GroupName, data.Model)
+		// 使用来自 JOIN 的显示名称存储
+		comboDisplayName := fmt.Sprintf("%s - %s", data.DisplayName, data.Model)
 		comboDisplayNames[comboID] = comboDisplayName
 
 		slotTime := data.Timestamp.Truncate(time.Duration(intervalMinutes) * time.Minute)
@@ -696,7 +736,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 			dataByTimeCombo[key] = &timeComboData{}
 		}
 
-		// Use duration directly (now contains accurate generation time from first/last token)
+		// 直接使用 duration（现在包含来自首个/最后一个 token 的准确生成时间）
 		if data.Duration > 0 {
 			dataByTimeCombo[key].durations = append(dataByTimeCombo[key].durations, float64(data.Duration)/1000)
 			dataByTimeCombo[key].completionTokens = append(dataByTimeCombo[key].completionTokens, float64(data.CompletionTokens))
@@ -750,8 +790,8 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 				}
 			}
 
-			// Calculate P90 speed (90th percentile)
-			// P90 = 90% of requests can achieve this speed, excluding slowest 10%
+			// 计算 P90 速度（第 90 百分位数）
+			// P90 = 90% 的请求可以达到此速度，排除最慢的 10%
 			p90Speed := 0.0
 			if len(allSpeeds) > 0 {
 				sort.Float64s(allSpeeds)
@@ -765,7 +805,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		}
 	}
 
-	// Calculate P90 speed for each combo across all time intervals
+	// 计算每个组合在所有时间间隔的 P90 速度
 	comboP90Speed := make(map[string]float64)
 	for _, combo := range comboList {
 		var intervalSpeeds []float64
@@ -784,12 +824,12 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		}
 	}
 
-	// Sort combos by P90 speed (descending)
+	// 按 P90 速度排序组合（降序）
 	sort.Slice(comboList, func(i, j int) bool {
 		return comboP90Speed[comboList[i]] > comboP90Speed[comboList[j]]
 	})
 
-	// Select top 7 combos by P90 speed
+	// 按 P90 速度选择前 7 个组合
 	topCount := topCombosLimit
 	if len(comboList) < topCount {
 		topCount = len(comboList)
@@ -802,7 +842,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		for i, val := range datasets[combo] {
 			data[i] = int64(val)
 		}
-		// Use display name for chart label
+		// 使用显示名称作为图表标签
 		displayName := comboDisplayNames[combo]
 		chartDatasets = append(chartDatasets, models.ChartDataset{
 			Label:    displayName,
@@ -811,7 +851,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		})
 	}
 
-	// If no datasets, create an empty dataset to ensure chart renders with axes
+	// 如果没有数据集，创建一个空数据集以确保图表渲染带坐标轴
 	if len(chartDatasets) == 0 {
 		emptyData := make([]int64, intervals)
 		chartDatasets = append(chartDatasets, models.ChartDataset{
@@ -837,8 +877,8 @@ type hourlyStatResult struct {
 func (s *Server) getHourlyStats(startTime, endTime time.Time) (hourlyStatResult, error) {
 	var result hourlyStatResult
 
-	// Query directly from request_logs table for real-time data (same as token stats)
-	// Only count final requests, not retry requests
+	// 直接从 request_logs 表查询实时数据（与 token 统计相同）
+	// 仅统计最终请求，不包含重试请求
 	err := s.DB.Model(&models.RequestLog{}).
 		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
 		Where("group_id NOT IN (?)",
@@ -849,7 +889,7 @@ func (s *Server) getHourlyStats(startTime, endTime time.Time) (hourlyStatResult,
 	return result, err
 }
 
-// getAggregateGroupIDs returns a set of aggregate group IDs for fast lookup
+// getAggregateGroupIDs 返回聚合组 ID 的集合，用于快速查找
 func (s *Server) getAggregateGroupIDs() (map[uint]struct{}, error) {
 	var groupIDs []uint
 	err := s.DB.Table("groups").
@@ -907,15 +947,15 @@ func (s *Server) getRPMStats(now time.Time) (models.StatCard, error) {
 	}, nil
 }
 
-// getSecurityWarnings checks security configuration and returns warning messages
+// getSecurityWarnings 检查安全配置并返回警告信息
 func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 	var warnings []models.SecurityWarning
 
-	// Get AUTH_KEY and ENCRYPTION_KEY
+	// 获取 AUTH_KEY 和 ENCRYPTION_KEY
 	authConfig := s.config.GetAuthConfig()
 	encryptionKey := s.config.GetEncryptionKey()
 
-	// Check AUTH_KEY
+	// 检查 AUTH_KEY
 	if authConfig.Key == "" {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       "AUTH_KEY",
@@ -928,7 +968,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		warnings = append(warnings, authWarnings...)
 	}
 
-	// Check ENCRYPTION_KEY
+	// 检查 ENCRYPTION_KEY
 	if encryptionKey == "" {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       "ENCRYPTION_KEY",
@@ -941,7 +981,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		warnings = append(warnings, encryptionWarnings...)
 	}
 
-	// Check system-level proxy keys
+	// 检查系统级代理密钥
 	systemSettings := s.SettingsManager.GetSettings()
 	if systemSettings.ProxyKeys != "" {
 		proxyKeys := strings.Split(systemSettings.ProxyKeys, ",")
@@ -955,7 +995,7 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 		}
 	}
 
-	// Check group-level proxy keys
+	// 检查组级代理密钥
 	var groups []models.Group
 	if err := s.DB.Where("proxy_keys IS NOT NULL AND proxy_keys != ''").Find(&groups).Error; err == nil {
 		for _, group := range groups {
@@ -976,16 +1016,16 @@ func (s *Server) getSecurityWarnings(c *gin.Context) []models.SecurityWarning {
 	return warnings
 }
 
-// checkPasswordSecurity comprehensively checks password security
+// checkPasswordSecurity 全面的检查密码安全性
 func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.SecurityWarning {
 	var warnings []models.SecurityWarning
 
-	// 1. Length check
+	// 1. 长度检查
 	if len(password) < 16 {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       keyType,
 			Message:    i18n.Message(c, "security.password_too_short", map[string]any{"keyType": keyType, "length": len(password)}),
-			Severity:   "high", // Insufficient length is high risk
+			Severity:   "high", // 长度不足是高风险
 			Suggestion: i18n.Message(c, "security.password_recommendation_16"),
 		})
 	} else if len(password) < 32 {
@@ -997,7 +1037,7 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 		})
 	}
 
-	// 2. Common weak password check
+	// 2. 常见弱密码检查
 	lower := strings.ToLower(password)
 	weakPatterns := utils.WeakPasswordPatterns
 
@@ -1013,7 +1053,7 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 		}
 	}
 
-	// 3. Complexity check (only when length is sufficient)
+	// 3. 复杂度检查（仅在长度足够时）
 	if len(password) >= 16 && !hasGoodComplexity(password) {
 		warnings = append(warnings, models.SecurityWarning{
 			Type:       keyType,
@@ -1026,7 +1066,7 @@ func checkPasswordSecurity(c *gin.Context, password, keyType string) []models.Se
 	return warnings
 }
 
-// hasGoodComplexity checks password complexity
+// hasGoodComplexity 检查密码复杂度
 func hasGoodComplexity(password string) bool {
 	var hasUpper, hasLower, hasDigit, hasSpecial bool
 
@@ -1043,7 +1083,7 @@ func hasGoodComplexity(password string) bool {
 		}
 	}
 
-	// At least 3 types of characters required
+	// 至少需要 3 种字符类型
 	count := 0
 	if hasUpper {
 		count++
@@ -1061,7 +1101,7 @@ func hasGoodComplexity(password string) bool {
 	return count >= 3
 }
 
-// Encryption scenario types
+// 加密场景类型
 const (
 	ScenarioNone             = ""
 	ScenarioDataNotEncrypted = "data_not_encrypted"
@@ -1069,8 +1109,19 @@ const (
 	ScenarioKeyMismatch      = "key_mismatch"
 )
 
-// EncryptionStatus checks if ENCRYPTION_KEY is configured but keys are not encrypted
+// EncryptionStatus 检查是否配置了 ENCRYPTION_KEY 但密钥未加密
 func (s *Server) EncryptionStatus(c *gin.Context) {
+	// 仅向已认证用户返回加密状态
+	if !s.isAuthenticated(c) {
+		response.Success(c, gin.H{
+			"has_mismatch":  false,
+			"scenario_type": "",
+			"message":       "",
+			"suggestion":    "",
+		})
+		return
+	}
+
 	hasMismatch, scenarioType, message, suggestion := s.checkEncryptionMismatch(c)
 
 	response.Success(c, gin.H{
@@ -1081,11 +1132,11 @@ func (s *Server) EncryptionStatus(c *gin.Context) {
 	})
 }
 
-// checkEncryptionMismatch detects encryption configuration mismatches
+// checkEncryptionMismatch 检测加密配置不匹配
 func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, string) {
 	encryptionKey := s.config.GetEncryptionKey()
 
-	// Sample check API keys
+	// 抽样检查 API 密钥
 	var sampleKeys []models.APIKey
 	if err := s.DB.Limit(20).Where("key_hash IS NOT NULL AND key_hash != ''").Find(&sampleKeys).Error; err != nil {
 		logrus.WithError(err).Error("Failed to fetch sample keys for encryption check")
@@ -1093,11 +1144,11 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 	}
 
 	if len(sampleKeys) == 0 {
-		// No keys in database, no mismatch
+		// 数据库中没有密钥，无不匹配
 		return false, ScenarioNone, "", ""
 	}
 
-	// Check hash consistency with unencrypted data
+	// 检查与未加密数据的哈希一致性
 	noopService, err := encryption.NewService("")
 	if err != nil {
 		logrus.WithError(err).Error("Failed to create noop encryption service")
@@ -1106,7 +1157,7 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 
 	unencryptedHashMatchCount := 0
 	for _, key := range sampleKeys {
-		// For unencrypted data: key_hash should match SHA256(key_value)
+		// 对于未加密数据：key_hash 应匹配 SHA256(key_value)
 		expectedHash := noopService.Hash(key.KeyValue)
 		if expectedHash == key.KeyHash {
 			unencryptedHashMatchCount++
@@ -1115,16 +1166,16 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 
 	unencryptedConsistencyRate := float64(unencryptedHashMatchCount) / float64(len(sampleKeys))
 
-	// If ENCRYPTION_KEY is configured, also check if current key can decrypt the data
+	// 如果配置了 ENCRYPTION_KEY，也检查当前密钥是否能解密数据
 	var currentKeyHashMatchCount int
 	if encryptionKey != "" {
 		currentService, err := encryption.NewService(encryptionKey)
 		if err == nil {
 			for _, key := range sampleKeys {
-				// Try to decrypt and re-hash to check if current key matches
+				// 尝试解密并重新哈希以检查当前密钥是否匹配
 				decrypted, err := currentService.Decrypt(key.KeyValue)
 				if err == nil {
-					// Successfully decrypted, check if hash matches
+					// 成功解密，检查哈希是否匹配
 					expectedHash := currentService.Hash(decrypted)
 					if expectedHash == key.KeyHash {
 						currentKeyHashMatchCount++
@@ -1135,7 +1186,7 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 	}
 	currentKeyConsistencyRate := float64(currentKeyHashMatchCount) / float64(len(sampleKeys))
 
-	// Scenario A: ENCRYPTION_KEY configured but data not encrypted
+	// 场景 A：配置了 ENCRYPTION_KEY 但数据未加密
 	if encryptionKey != "" && unencryptedConsistencyRate > 0.8 {
 		return true,
 			ScenarioDataNotEncrypted,
@@ -1143,7 +1194,7 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 			i18n.Message(c, "dashboard.encryption_key_migration_required")
 	}
 
-	// Scenario B: ENCRYPTION_KEY not configured but data is encrypted
+	// 场景 B：未配置 ENCRYPTION_KEY 但数据已加密
 	if encryptionKey == "" && unencryptedConsistencyRate < 0.2 {
 		return true,
 			ScenarioKeyNotConfigured,
@@ -1151,7 +1202,7 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 			i18n.Message(c, "dashboard.configure_same_encryption_key")
 	}
 
-	// Scenario C: ENCRYPTION_KEY configured but doesn't match encrypted data
+	// 场景 C：配置了 ENCRYPTION_KEY 但与加密数据不匹配
 	if encryptionKey != "" && unencryptedConsistencyRate < 0.2 && currentKeyConsistencyRate < 0.2 {
 		return true,
 			ScenarioKeyMismatch,
@@ -1162,7 +1213,7 @@ func (s *Server) checkEncryptionMismatch(c *gin.Context) (bool, string, string, 
 	return false, ScenarioNone, "", ""
 }
 
-// getTokenStats gets token usage statistics for a time period
+// getTokenStats 获取时间段的 token 使用统计
 type tokenStatsResult struct {
 	TotalTokens int64
 }
@@ -1176,7 +1227,7 @@ func (s *Server) getTokenStats(startTime, endTime time.Time) (tokenStatsResult, 
 	return result, err
 }
 
-// detailedTokenStatsResult represents detailed token statistics
+// detailedTokenStatsResult 表示详细的 token 统计
 type detailedTokenStatsResult struct {
 	PromptTokens     int64
 	CompletionTokens int64
@@ -1184,7 +1235,7 @@ type detailedTokenStatsResult struct {
 	CachedTokens     int64
 }
 
-// getDetailedTokenStats gets detailed token usage statistics for a time period
+// getDetailedTokenStats 获取时间段的详细 token 使用统计
 func (s *Server) getDetailedTokenStats(startTime, endTime time.Time) (detailedTokenStatsResult, error) {
 	var result detailedTokenStatsResult
 	err := s.DB.Model(&models.RequestLog{}).
@@ -1194,12 +1245,12 @@ func (s *Server) getDetailedTokenStats(startTime, endTime time.Time) (detailedTo
 	return result, err
 }
 
-// keyStatsResult represents key count statistics
+// keyStatsResult 表示密钥数量统计
 type keyStatsResult struct {
 	TotalKeys int64
 }
 
-// getKeyStats gets key count statistics for a time period
+// getKeyStats 获取时间段的密钥数量统计
 func (s *Server) getKeyStats(startTime, endTime time.Time) (keyStatsResult, error) {
 	var result keyStatsResult
 	err := s.DB.Model(&models.APIKey{}).

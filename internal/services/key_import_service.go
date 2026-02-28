@@ -7,19 +7,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// KeyImportResult holds the result of an import task.
+// KeyImportResult 存储导入任务的结果。
 type KeyImportResult struct {
 	AddedCount   int `json:"added_count"`
 	IgnoredCount int `json:"ignored_count"`
 }
 
-// KeyImportService handles the asynchronous import of a large number of keys.
+// KeyImportService 处理大量密钥的异步导入。
 type KeyImportService struct {
 	TaskService *TaskService
 	KeyService  *KeyService
 }
 
-// NewKeyImportService creates a new KeyImportService.
+// NewKeyImportService 创建一个新的 KeyImportService。
 func NewKeyImportService(taskService *TaskService, keyService *KeyService) *KeyImportService {
 	return &KeyImportService{
 		TaskService: taskService,
@@ -27,7 +27,7 @@ func NewKeyImportService(taskService *TaskService, keyService *KeyService) *KeyI
 	}
 }
 
-// StartImportTask initiates a new asynchronous key import task.
+// StartImportTask 启动一个新的异步密钥导入任务。
 func (s *KeyImportService) StartImportTask(group *models.Group, keysText string) (*TaskStatus, error) {
 	keys := s.KeyService.ParseKeysFromText(keysText)
 	if len(keys) == 0 {

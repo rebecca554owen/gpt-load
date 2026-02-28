@@ -10,14 +10,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// HeaderVariableContext holds context data for variable resolution
+// HeaderVariableContext 保存用于变量解析的上下文数据
 type HeaderVariableContext struct {
 	ClientIP string
 	Group    *models.Group
 	APIKey   *models.APIKey
 }
 
-// ResolveHeaderVariables resolves dynamic variables in header values
+// ResolveHeaderVariables 解析标头值中的动态变量
 func ResolveHeaderVariables(value string, ctx *HeaderVariableContext) string {
 	if ctx == nil {
 		return value
@@ -26,7 +26,7 @@ func ResolveHeaderVariables(value string, ctx *HeaderVariableContext) string {
 	now := time.Now()
 	result := value
 
-	// Replace all supported variables
+	// 替换所有支持的变量
 	variables := map[string]string{
 		"${CLIENT_IP}":    ctx.ClientIP,
 		"${TIMESTAMP_MS}": strconv.FormatInt(now.UnixMilli(), 10),
@@ -41,7 +41,7 @@ func ResolveHeaderVariables(value string, ctx *HeaderVariableContext) string {
 		variables["${API_KEY}"] = ctx.APIKey.KeyValue
 	}
 
-	// Replace variables in the value
+	// 替换值中的变量
 	for variable, replacement := range variables {
 		result = strings.ReplaceAll(result, variable, replacement)
 	}
@@ -49,7 +49,7 @@ func ResolveHeaderVariables(value string, ctx *HeaderVariableContext) string {
 	return result
 }
 
-// ApplyHeaderRules applies header rules to the HTTP request
+// ApplyHeaderRules 将标头规则应用到 HTTP 请求
 func ApplyHeaderRules(req *http.Request, rules []models.HeaderRule, ctx *HeaderVariableContext) {
 	if req == nil || len(rules) == 0 {
 		return
@@ -68,7 +68,7 @@ func ApplyHeaderRules(req *http.Request, rules []models.HeaderRule, ctx *HeaderV
 	}
 }
 
-// NewHeaderVariableContextFromGin creates HeaderVariableContext from Gin context
+// NewHeaderVariableContextFromGin 从 Gin 上下文创建 HeaderVariableContext
 func NewHeaderVariableContextFromGin(c *gin.Context, group *models.Group, apiKey *models.APIKey) *HeaderVariableContext {
 	if c == nil {
 		return nil
@@ -81,7 +81,7 @@ func NewHeaderVariableContextFromGin(c *gin.Context, group *models.Group, apiKey
 	}
 }
 
-// NewHeaderVariableContext creates HeaderVariableContext without Gin context
+// NewHeaderVariableContext 创建不带 Gin 上下文的 HeaderVariableContext
 func NewHeaderVariableContext(group *models.Group, apiKey *models.APIKey) *HeaderVariableContext {
 	return &HeaderVariableContext{
 		ClientIP: "127.0.0.1",

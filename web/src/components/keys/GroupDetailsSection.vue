@@ -145,16 +145,11 @@ function handleNavigateToGroup(groupId: number) {
                           </template>
                           {{ showProxyKeys ? t("keys.hideKeys") : t("keys.showKeys") }}
                         </n-tooltip>
-                        <n-tooltip trigger="hover">
-                          <template #trigger>
-                            <n-button quaternary circle @click="copyProxyKeys">
-                              <template #icon>
-                                <n-icon :component="CopyOutline" />
-                              </template>
-                            </n-button>
+                        <n-button quaternary circle @click="copyProxyKeys" :title="t('keys.copyKeys')">
+                          <template #icon>
+                            <n-icon :component="CopyOutline" />
                           </template>
-                          {{ t("keys.copyKeys") }}
-                        </n-tooltip>
+                        </n-button>
                       </n-button-group>
                     </div>
                   </n-form-item>

@@ -517,7 +517,7 @@ export default {
     completionTokens: "Completion",
     cachedTokens: "Cached",
     totalTokens: "Total",
-    requestModel: "Request Model",
+    originalModel: "Original Model",
     actualModel: "Actual Model",
     totalRecords: "{total} records in total",
     recordsPerPage: "{size} records per page",

@@ -515,7 +515,7 @@ export default {
     completionTokens: "完了",
     cachedTokens: "キャッシュ",
     totalTokens: "合計",
-    requestModel: "リクエストモデル",
+    originalModel: "元モデル",
     actualModel: "実際のモデル",
     totalRecords: "合計 {total} 件",
     recordsPerPage: "1ページ {size} 件",

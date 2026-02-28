@@ -257,9 +257,11 @@ function handleDelete() {
         <div class="model-mapping-names">
           <n-tooltip trigger="hover">
             <template #trigger>
-              <code class="group-url" @click="copyModelAlias">
-                {{ mapping.model }}
-              </code>
+              <span class="group-url-wrapper" @click="copyModelAlias">
+                <code class="group-url">
+                  {{ mapping.model }}
+                </code>
+              </span>
             </template>
             {{ t("keys.clickToCopy") }}
           </n-tooltip>
@@ -490,6 +492,10 @@ html.dark .key-card.status-model-mapping {
   min-width: 0;
 }
 
+.group-url-wrapper {
+  cursor: pointer;
+}
+
 .group-url {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -498,7 +504,6 @@ html.dark .key-card.status-model-mapping {
   border-radius: 4px;
   padding: 2px 6px;
   border: 1px solid var(--border-color);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 

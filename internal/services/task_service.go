@@ -19,7 +19,7 @@ const (
 	TaskTypeKeyDelete     = "KEY_DELETE"
 )
 
-// TaskStatus represents the full lifecycle of a long-running task.
+// TaskStatus 表示长时间运行任务的完整生命周期
 type TaskStatus struct {
 	TaskType        string     `json:"task_type"`
 	IsRunning       bool       `json:"is_running"`
@@ -33,19 +33,19 @@ type TaskStatus struct {
 	DurationSeconds float64    `json:"duration_seconds,omitempty"`
 }
 
-// TaskService manages the state of a single, global, long-running task using the store interface.
+// TaskService 使用存储接口管理单个全局长时间运行任务的状态
 type TaskService struct {
 	store store.Store
 }
 
-// NewTaskService creates a new TaskService.
+// NewTaskService 创建新的 TaskService
 func NewTaskService(store store.Store) *TaskService {
 	return &TaskService{
 		store: store,
 	}
 }
 
-// StartTask attempts to start a new task. It returns an error if a task is already running.
+// StartTask 尝试启动新任务。如果任务已在运行则返回错误
 func (s *TaskService) StartTask(taskType, groupName string, total int) (*TaskStatus, error) {
 	currentStatus, err := s.GetTaskStatus()
 	if err != nil {
@@ -76,7 +76,7 @@ func (s *TaskService) StartTask(taskType, groupName string, total int) (*TaskSta
 	return status, nil
 }
 
-// GetTaskStatus returns the current status of the task.
+// GetTaskStatus 返回当前任务状态
 func (s *TaskService) GetTaskStatus() (*TaskStatus, error) {
 	statusBytes, err := s.store.Get(globalTaskKey)
 	if err != nil {
@@ -98,7 +98,7 @@ func (s *TaskService) GetTaskStatus() (*TaskStatus, error) {
 	return &status, nil
 }
 
-// UpdateProgress updates the progress of the current task.
+// UpdateProgress 更新当前任务的进度
 func (s *TaskService) UpdateProgress(processed int) error {
 	status, err := s.GetTaskStatus()
 	if err != nil {
@@ -117,7 +117,7 @@ func (s *TaskService) UpdateProgress(processed int) error {
 	return s.store.Set(globalTaskKey, statusBytes, ResultTTL)
 }
 
-// EndTask marks the current task as finished and stores its final result.
+// EndTask 标记当前任务为已完成并存储最终结果
 func (s *TaskService) EndTask(resultData any, taskErr error) error {
 	status, err := s.GetTaskStatus()
 	if err != nil {

@@ -5,13 +5,13 @@ import (
 	"strings"
 )
 
-// HasWildcard checks if the pattern contains wildcard characters
+// HasWildcard 检查模式是否包含通配符字符
 func HasWildcard(pattern string) bool {
 	return strings.ContainsAny(pattern, "*?")
 }
 
-// MatchWildcard checks if the text matches the wildcard pattern
-// Supports * and ? wildcards, case-insensitive
+// MatchWildcard 检查文本是否匹配通配符模式
+// 支持 * 和 ? 通配符，不区分大小写
 func MatchWildcard(pattern, text string) bool {
 	pattern = strings.ToLower(pattern)
 	text = strings.ToLower(text)

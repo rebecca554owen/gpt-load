@@ -1,23 +1,23 @@
-// Package config provides configuration constants for the application
+// Package config 提供应用配置常量
 package config
 
-// Proxy configuration constants
+// 代理配置常量
 const (
-	// Request and timeout settings
+	// 请求和超时设置
 	DefaultMaxRetries        = 3
 	DefaultRequestTimeout    = 120
 	MaxRequestBodyLogLength  = 65000
 	MaxRequestPathLogLength  = 500
 	MaxUpstreamAddrLogLength = 500
 
-	// Key service batch sizes
+	// 密钥服务批处理大小
 	MaxRequestKeys = 5000
 	KeyChunkSize   = 500
 
-	// Key pool settings
+	// 密钥池设置
 	DBLoadBatchSize = 10000
 
-	// Password minimum length
+	// 密码最小长度
 	MinPasswordLength       = 16
 	RecommendedPasswordLength = 32
 )

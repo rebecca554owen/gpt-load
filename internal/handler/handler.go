@@ -1,4 +1,4 @@
-// Package handler provides HTTP handlers for the application
+// Package handler 提供应用的 HTTP 处理器
 package handler
 
 import (
@@ -17,7 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Server contains dependencies for HTTP handlers
+// Server 包含 HTTP 处理器的依赖
 type Server struct {
 	DB                         *gorm.DB
 	config                     types.ConfigManager
@@ -36,7 +36,7 @@ type Server struct {
 	EncryptionSvc              encryption.Service
 }
 
-// NewServerParams defines the dependencies for the NewServer constructor.
+// NewServerParams 定义 NewServer 构造函数的依赖
 type NewServerParams struct {
 	dig.In
 	DB                         *gorm.DB
@@ -56,7 +56,7 @@ type NewServerParams struct {
 	EncryptionSvc              encryption.Service
 }
 
-// NewServer creates a new handler instance with dependencies injected by dig.
+// NewServer 创建新的处理器实例，依赖由 dig 注入
 func NewServer(params NewServerParams) *Server {
 	return &Server{
 		DB:                         params.DB,
@@ -77,18 +77,18 @@ func NewServer(params NewServerParams) *Server {
 	}
 }
 
-// LoginRequest represents the login request payload
+// LoginRequest 表示登录请求载荷
 type LoginRequest struct {
 	AuthKey string `json:"auth_key" binding:"required"`
 }
 
-// LoginResponse represents the login response
+// LoginResponse 表示登录响应
 type LoginResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
 
-// Login handles authentication verification
+// Login 处理身份验证
 func (s *Server) Login(c *gin.Context) {
 	var req LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +116,7 @@ func (s *Server) Login(c *gin.Context) {
 	}
 }
 
-// Health handles health check requests
+// Health 处理健康检查请求
 func (s *Server) Health(c *gin.Context) {
 	uptime := "unknown"
 	if startTime, exists := c.Get("serverStartTime"); exists {

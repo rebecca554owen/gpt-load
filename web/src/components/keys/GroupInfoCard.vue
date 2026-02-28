@@ -253,9 +253,11 @@ function resetPage() {
               {{ group ? getGroupDisplayName(group) : t("keys.selectGroup") }}
               <n-tooltip trigger="hover" v-if="group && group.endpoint">
                 <template #trigger>
-                  <code class="group-url" @click="copyUrl(group.endpoint)">
-                    {{ group.endpoint }}
-                  </code>
+                  <span class="group-url-wrapper" @click="copyUrl(group.endpoint)">
+                    <code class="group-url">
+                      {{ group.endpoint }}
+                    </code>
+                  </span>
                 </template>
                 {{ t("keys.clickToCopy") }}
               </n-tooltip>
@@ -375,6 +377,10 @@ function resetPage() {
   gap: 8px;
 }
 
+.group-url-wrapper {
+  cursor: pointer;
+}
+
 .group-url {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -385,7 +391,6 @@ function resetPage() {
   padding: 2px 6px;
   margin-right: 4px;
   border: 1px solid var(--border-color);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 

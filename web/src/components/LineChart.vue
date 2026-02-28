@@ -629,8 +629,8 @@ const datasetsWithColor = computed(() => {
 }
 
 .tooltip-speed {
-  min-width: 200px;
-  max-width: 320px;
+  min-width: 240px;
+  max-width: 400px;
 }
 
 :root:not(.dark) .tooltip-speed {
@@ -669,6 +669,7 @@ const datasetsWithColor = computed(() => {
   font-weight: 700;
   color: #888;
   min-width: 20px;
+  flex-shrink: 0;
 }
 
 :root:not(.dark) .tooltip-rank-text {
@@ -678,8 +679,8 @@ const datasetsWithColor = computed(() => {
 .tooltip-label-text {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: visible;
 }
 
 .tooltip-value-number {
@@ -783,6 +784,32 @@ const datasetsWithColor = computed(() => {
   .chart-svg {
     width: 100%;
     height: auto;
+  }
+
+  /* 移动端 tooltip 特殊处理 */
+  .chart-tooltip {
+    min-width: 160px;
+    max-width: calc(100vw - 32px);
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .tooltip-speed {
+    min-width: 180px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .tooltip-value {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .tooltip-label-text {
+    max-width: 120px;
+  }
+
+  .tooltip-value-number {
+    font-size: 11px;
   }
 }
 

@@ -15,7 +15,7 @@ const (
 	maxSelectionAttemptsMultiplier = 2
 )
 
-// SubGroupManager manages weighted round-robin selection for all aggregate groups
+// SubGroupManager 管理所有聚合组的加权轮询选择
 type SubGroupManager struct {
 	store     store.Store
 	selectors map[uint]*groupSelectors
@@ -29,7 +29,7 @@ type groupSelectors struct {
 	defaultSelector *modelLevelSelector
 }
 
-// modelSelectionItem represents a model with its weight and sub-group info for round-robin
+// modelSelectionItem 表示一个带有权重和子组信息的模型，用于轮询
 type modelSelectionItem struct {
 	model         string
 	subGroupID    uint
@@ -50,14 +50,14 @@ func (m *modelSelectionItem) SetCurrentWeight(w int) {
 	m.currentWeight = w
 }
 
-// SelectionResult captures the selected model and sub-group info
+// SelectionResult 捕获选中的模型和子组信息
 type SelectionResult struct {
 	GroupName     string
 	SubGroupID    uint
 	SelectedModel string
 }
 
-// NewSubGroupManager creates a new sub-group manager service
+// NewSubGroupManager 创建一个新的子组管理器服务
 func NewSubGroupManager(store store.Store) *SubGroupManager {
 	return &SubGroupManager{
 		store:     store,
@@ -65,7 +65,7 @@ func NewSubGroupManager(store store.Store) *SubGroupManager {
 	}
 }
 
-// SelectSubGroup selects an appropriate sub-group for the given aggregate group
+// SelectSubGroup 为给定的聚合组选择合适的子组
 func (m *SubGroupManager) SelectSubGroup(group *models.Group, modelAlias string) (*SelectionResult, error) {
 	if group.GroupType != "aggregate" {
 		return nil, nil
@@ -174,7 +174,7 @@ func (m *SubGroupManager) SelectSubGroup(group *models.Group, modelAlias string)
 	return nil, fmt.Errorf("no available models for model alias '%s' in aggregate group '%s'", alias, group.Name)
 }
 
-// RebuildSelectors rebuild all selectors based on the incoming group
+// RebuildSelectors 根据传入的组重建所有选择器
 func (m *SubGroupManager) RebuildSelectors(groups map[string]*models.Group) {
 	newSelectors := make(map[uint]*groupSelectors)
 
@@ -193,7 +193,7 @@ func (m *SubGroupManager) RebuildSelectors(groups map[string]*models.Group) {
 	logrus.WithField("new_count", len(newSelectors)).Debug("Rebuilt selectors for aggregate groups")
 }
 
-// getSelectors retrieves or creates selectors for the aggregate group
+// getSelectors 获取或创建聚合组的选择器
 func (m *SubGroupManager) getSelectors(group *models.Group) *groupSelectors {
 	m.mu.RLock()
 	if sel, exists := m.selectors[group.ID]; exists {
@@ -221,7 +221,7 @@ func (m *SubGroupManager) getSelectors(group *models.Group) *groupSelectors {
 	return sel
 }
 
-// createGroupSelectors creates model-level selectors for an aggregate group
+// createGroupSelectors 为聚合组创建模型级选择器
 func (m *SubGroupManager) createGroupSelectors(group *models.Group) *groupSelectors {
 	if group.GroupType != "aggregate" || len(group.SubGroups) == 0 {
 		return nil
@@ -369,7 +369,7 @@ func newModelLevelSelector(group *models.Group, alias string, items []modelSelec
 	}
 }
 
-// modelLevelSelector encapsulates the weighted round-robin algorithm at model level
+// modelLevelSelector 在模型级别封装加权轮询算法
 type modelLevelSelector struct {
 	groupID    uint
 	groupName  string
@@ -379,7 +379,7 @@ type modelLevelSelector struct {
 	mu         sync.Mutex
 }
 
-// selectNextModel uses weighted round-robin algorithm to select a model with active keys
+// selectNextModel 使用加权轮询算法选择具有活动密钥的模型
 func (m *modelLevelSelector) selectNextModel() *modelSelectionItem {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -420,7 +420,7 @@ func (m *modelLevelSelector) selectNextModel() *modelSelectionItem {
 	return nil
 }
 
-// selectNextModelExcluding selects a model, excluding specified sub-group IDs
+// selectNextModelExcluding 选择一个模型，排除指定的子组 ID
 func (m *modelLevelSelector) selectNextModelExcluding(excludedIDs utils.UintSet) *modelSelectionItem {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -469,7 +469,7 @@ func (m *modelLevelSelector) selectNextModelExcluding(excludedIDs utils.UintSet)
 	return nil
 }
 
-// selectModelByWeight implements smooth weighted round-robin algorithm for models
+// selectModelByWeight 实现模型的平滑加权轮询算法
 func (m *modelLevelSelector) selectModelByWeight() *modelSelectionItem {
 	items := make([]utils.WeightedItem, len(m.modelItems))
 	for i := range m.modelItems {
@@ -484,7 +484,7 @@ func (m *modelLevelSelector) selectModelByWeight() *modelSelectionItem {
 	return selected.(*modelSelectionItem)
 }
 
-// hasActiveKeys checks if a sub-group has available API keys
+// hasActiveKeys 检查子组是否有可用的 API 密钥
 func (m *modelLevelSelector) hasActiveKeys(groupID uint) bool {
 	key := fmt.Sprintf("group:%d:active_keys", groupID)
 	length, err := m.store.LLen(key)
@@ -494,8 +494,8 @@ func (m *modelLevelSelector) hasActiveKeys(groupID uint) bool {
 	return length > 0
 }
 
-// SelectSubGroupByModelMapping selects a sub-group based on model mapping rules
-// Returns: (subGroupName, actualModelName, error)
+// SelectSubGroupByModelMapping 根据模型映射规则选择子组
+// 返回：(子组名称，实际模型名称，错误)
 func (m *SubGroupManager) SelectSubGroupByModelMapping(
 	group *models.Group,
 	modelAlias string,
@@ -513,7 +513,7 @@ func (m *SubGroupManager) SelectSubGroupByModelMapping(
 	return selection.GroupName, selection.SelectedModel, nil
 }
 
-// SelectSubGroupExcluding selects a sub-group, excluding specified sub-group IDs
+// SelectSubGroupExcluding 选择一个子组，排除指定的子组 ID
 func (m *SubGroupManager) SelectSubGroupExcluding(
 	group *models.Group,
 	modelAlias string,

@@ -14,14 +14,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// ManualValidationResult holds the result of a manual validation task.
+// ManualValidationResult 存储手动验证任务的结果。
 type ManualValidationResult struct {
 	TotalKeys   int `json:"total_keys"`
 	ValidKeys   int `json:"valid_keys"`
 	InvalidKeys int `json:"invalid_keys"`
 }
 
-// KeyManualValidationService handles user-initiated key validation for a group.
+// KeyManualValidationService 处理用户发起的组密钥验证。
 type KeyManualValidationService struct {
 	DB              *gorm.DB
 	Validator       *keypool.KeyValidator
@@ -31,7 +31,7 @@ type KeyManualValidationService struct {
 	EncryptionSvc   encryption.Service
 }
 
-// NewKeyManualValidationService creates a new KeyManualValidationService.
+// NewKeyManualValidationService 创建一个新的 KeyManualValidationService。
 func NewKeyManualValidationService(db *gorm.DB, validator *keypool.KeyValidator, taskService *TaskService, settingsManager *config.SystemSettingsManager, configManager types.ConfigManager, encryptionSvc encryption.Service) *KeyManualValidationService {
 	return &KeyManualValidationService{
 		DB:              db,
@@ -43,7 +43,7 @@ func NewKeyManualValidationService(db *gorm.DB, validator *keypool.KeyValidator,
 	}
 }
 
-// StartValidationTask starts a new manual validation task for a given group.
+// StartValidationTask 为给定组启动新的手动验证任务。
 func (s *KeyManualValidationService) StartValidationTask(group *models.Group, status string) (*TaskStatus, error) {
 	var keys []models.APIKey
 	query := s.DB.Where("group_id = ?", group.ID)
@@ -137,7 +137,7 @@ func (s *KeyManualValidationService) runValidation(group *models.Group, keys []m
 	logrus.Infof("Manual validation finished for group %s: %+v", group.Name, result)
 }
 
-// validationWorker validates keys and sends results
+// validationWorker 验证密钥并发送结果
 func (s *KeyManualValidationService) validationWorker(wg *sync.WaitGroup, group *models.Group, jobs <-chan models.APIKey, results chan<- bool) {
 	defer wg.Done()
 	for key := range jobs {

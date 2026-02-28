@@ -17,9 +17,9 @@ var (
 	strictJSONNumberPattern  = regexp.MustCompile(`^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$`)
 )
 
-// NormalizeJSONRequestBody attempts to normalize non-standard JSON-like bodies
-// (for example unquoted object keys) into strict JSON bytes.
-// Returns (normalizedBytes, true) when normalization succeeds.
+// NormalizeJSONRequestBody 尝试将非标准 JSON 类体（例如未引号的对象键）
+// 规范化为严格 JSON 字节。
+// 规范化成功时返回（normalizedBytes, true）。
 func NormalizeJSONRequestBody(body []byte, contentType string) ([]byte, bool) {
 	trimmed := bytes.TrimSpace(body)
 	if len(trimmed) == 0 {

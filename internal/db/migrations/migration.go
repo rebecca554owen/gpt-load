@@ -4,33 +4,34 @@ import (
 	"gorm.io/gorm"
 )
 
+// MigrateDatabase 运行所有数据库迁移
 func MigrateDatabase(db *gorm.DB) error {
-	// Run v1.0.22 migration
+	// 运行 v1.0.22 迁移
 	if err := V1_0_22_DropRetriesColumn(db); err != nil {
 		return err
 	}
 
-	// Run v1.1.0 migration
+	// 运行 v1.1.0 迁移
 	if err := V1_1_0_AddKeyHashColumn(db); err != nil {
 		return err
 	}
 
-	// Run v1.4.4 migration
+	// 运行 v1.4.4 迁移
 	if err := V1_4_4_AddTokenColumns(db); err != nil {
 		return err
 	}
 
-	// Run v1.4.6 migration
+	// 运行 v1.4.6 迁移
 	if err := V1_4_6_AddModelMappingColumn(db); err != nil {
 		return err
 	}
 
-	// Run v1.4.5 migration
+	// 运行 v1.4.5 迁移
 	if err := V1_4_5_AddOriginalModelColumn(db); err != nil {
 		return err
 	}
 
-	// Run v1.4.7 migration
+	// 运行 v1.4.7 迁移
 	if err := V1_4_7_AddRequestLogCompositeIndex(db); err != nil {
 		return err
 	}
@@ -38,7 +39,7 @@ func MigrateDatabase(db *gorm.DB) error {
 	return nil
 }
 
-// HandleLegacyIndexes removes old indexes from previous versions to prevent migration errors
+// HandleLegacyIndexes 移除旧版本的索引以防止迁移错误
 func HandleLegacyIndexes(db *gorm.DB) {
 	if db.Dialector.Name() == "mysql" {
 		var indexCount int64

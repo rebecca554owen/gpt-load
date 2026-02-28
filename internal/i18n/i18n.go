@@ -15,12 +15,12 @@ var (
 	bundle *i18n.Bundle
 )
 
-// Init initializes i18n
+// Init 初始化 i18n
 func Init() error {
 	bundle = i18n.NewBundle(language.Chinese)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
 
-	// Load supported language files
+	// 加载支持的语言文件
 	languages := []string{"zh-CN", "en-US", "ja-JP"}
 	for _, lang := range languages {
 		if err := loadMessageFile(lang); err != nil {
@@ -31,9 +31,9 @@ func Init() error {
 	return nil
 }
 
-// loadMessageFile loads language file
+// loadMessageFile 加载语言文件
 func loadMessageFile(lang string) error {
-	// Set messages based on language
+	// 根据语言设置消息
 	messages := getMessages(lang)
 	for id, msg := range messages {
 		bundle.AddMessages(language.MustParse(lang), &i18n.Message{
@@ -45,12 +45,12 @@ func loadMessageFile(lang string) error {
 	return nil
 }
 
-// GetLocalizer gets localizer
+// GetLocalizer 获取本地化器
 func GetLocalizer(acceptLang string) *i18n.Localizer {
-	// Parse Accept-Language header
+	// 解析 Accept-Language 标头
 	langs := parseAcceptLanguage(acceptLang)
 
-	// Default to Chinese if no language specified
+	// 如果未指定语言，默认使用中文
 	if len(langs) == 0 {
 		langs = []string{"zh-CN"}
 	}
@@ -58,22 +58,22 @@ func GetLocalizer(acceptLang string) *i18n.Localizer {
 	return i18n.NewLocalizer(bundle, langs...)
 }
 
-// parseAcceptLanguage parses Accept-Language header
+// parseAcceptLanguage 解析 Accept-Language 标头
 func parseAcceptLanguage(acceptLang string) []string {
 	if acceptLang == "" {
 		return nil
 	}
 
-	// Simple parsing, only take the first language
+	// 简单解析，仅取第一个语言
 	parts := strings.Split(acceptLang, ",")
 	if len(parts) > 0 {
 		lang := strings.TrimSpace(parts[0])
-		// Remove quality factor (q=...)
+		// 移除质量因子（q=...）
 		if idx := strings.Index(lang, ";"); idx > 0 {
 			lang = lang[:idx]
 		}
 
-		// Normalize language code
+		// 规范化语言代码
 		lang = normalizeLanguageCode(lang)
 		return []string{lang}
 	}
@@ -81,11 +81,11 @@ func parseAcceptLanguage(acceptLang string) []string {
 	return nil
 }
 
-// normalizeLanguageCode normalizes language code
+// normalizeLanguageCode 规范化语言代码
 func normalizeLanguageCode(lang string) string {
 	lang = strings.TrimSpace(lang)
 
-	// Map common language codes
+	// 映射常见语言代码
 	switch strings.ToLower(lang) {
 	case "zh", "zh-cn", "zh-hans":
 		return "zh-CN"
@@ -94,7 +94,7 @@ func normalizeLanguageCode(lang string) string {
 	case "ja", "ja-jp":
 		return "ja-JP"
 	default:
-		// Try to match prefix
+		// 尝试匹配前缀
 		if strings.HasPrefix(strings.ToLower(lang), "zh") {
 			return "zh-CN"
 		}
@@ -104,12 +104,12 @@ func normalizeLanguageCode(lang string) string {
 		if strings.HasPrefix(strings.ToLower(lang), "ja") {
 			return "ja-JP"
 		}
-		// Default to Chinese
+		// 默认使用中文
 		return "zh-CN"
 	}
 }
 
-// T translates message
+// T 翻译消息
 func T(localizer *i18n.Localizer, msgID string, data ...map[string]any) string {
 	config := &i18n.LocalizeConfig{
 		MessageID: msgID,
@@ -121,14 +121,14 @@ func T(localizer *i18n.Localizer, msgID string, data ...map[string]any) string {
 
 	msg, err := localizer.Localize(config)
 	if err != nil {
-		// Return message ID if translation fails
+		// 如果翻译失败，返回消息 ID
 		return msgID
 	}
 
 	return msg
 }
 
-// getMessages gets language messages
+// getMessages 获取语言消息
 func getMessages(lang string) map[string]string {
 	switch lang {
 	case "en-US":

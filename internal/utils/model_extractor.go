@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-// ExtractModelFromBody extracts the model name from request body
+// ExtractModelFromBody 从请求体中提取模型名称
 func ExtractModelFromBody(bodyBytes []byte) string {
 	var requestData map[string]any
 	if err := json.Unmarshal(bodyBytes, &requestData); err != nil {

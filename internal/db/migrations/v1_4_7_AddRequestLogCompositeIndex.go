@@ -4,9 +4,10 @@ import (
 	"gorm.io/gorm"
 )
 
+// V1_4_7_AddRequestLogCompositeIndex 添加请求日志复合索引
 func V1_4_7_AddRequestLogCompositeIndex(db *gorm.DB) error {
 	if db.Dialector.Name() == "mysql" {
-		// Drop old index if exists
+		// 删除旧索引（如果存在）
 		var oldIndexCount int64
 		db.Raw(`
 			SELECT COUNT(*)
@@ -21,7 +22,7 @@ func V1_4_7_AddRequestLogCompositeIndex(db *gorm.DB) error {
 			}
 		}
 
-		// Create new covering index
+		// 创建新的覆盖索引
 		var newIndexCount int64
 		if err := db.Raw(`
 			SELECT COUNT(*)

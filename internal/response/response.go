@@ -1,4 +1,4 @@
-// Package response provides standardized JSON response helpers.
+// Package response 提供标准化的 JSON 响应辅助函数。
 package response
 
 import (
@@ -9,20 +9,20 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SuccessResponse defines the standard JSON success response structure.
+// SuccessResponse 定义标准 JSON 成功响应结构。
 type SuccessResponse struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Data    any    `json:"data,omitempty"`
 }
 
-// ErrorResponse defines the standard JSON error response structure.
+// ErrorResponse 定义标准 JSON 错误响应结构。
 type ErrorResponse struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
 
-// Success sends a standardized success response.
+// Success 发送标准化的成功响应。
 func Success(c *gin.Context, data any) {
 	message := i18n.Message(c, "common.success")
 	c.JSON(http.StatusOK, SuccessResponse{
@@ -32,7 +32,7 @@ func Success(c *gin.Context, data any) {
 	})
 }
 
-// Error sends a standardized error response using an APIError.
+// Error 使用 APIError 发送标准化错误响应。
 func Error(c *gin.Context, apiErr *app_errors.APIError) {
 	c.JSON(apiErr.HTTPStatus, ErrorResponse{
 		Code:    apiErr.Code,
@@ -40,7 +40,7 @@ func Error(c *gin.Context, apiErr *app_errors.APIError) {
 	})
 }
 
-// SuccessI18n sends a standardized success response with i18n message.
+// SuccessI18n 发送带有 i18n 消息的标准化成功响应。
 func SuccessI18n(c *gin.Context, msgID string, data any, templateData ...map[string]any) {
 	message := i18n.Message(c, msgID, templateData...)
 	c.JSON(http.StatusOK, SuccessResponse{
@@ -50,7 +50,7 @@ func SuccessI18n(c *gin.Context, msgID string, data any, templateData ...map[str
 	})
 }
 
-// ErrorI18n sends a standardized error response with i18n message.
+// ErrorI18n 发送带有 i18n 消息的标准化错误响应。
 func ErrorI18n(c *gin.Context, httpStatus int, code string, msgID string, templateData ...map[string]any) {
 	message := i18n.Message(c, msgID, templateData...)
 	c.JSON(httpStatus, ErrorResponse{
@@ -59,7 +59,7 @@ func ErrorI18n(c *gin.Context, httpStatus int, code string, msgID string, templa
 	})
 }
 
-// ErrorI18nFromAPIError sends a standardized error response using an APIError with i18n message.
+// ErrorI18nFromAPIError 使用 APIError 和 i18n 消息发送标准化错误响应。
 func ErrorI18nFromAPIError(c *gin.Context, apiErr *app_errors.APIError, msgID string, templateData ...map[string]any) {
 	message := i18n.Message(c, msgID, templateData...)
 	c.JSON(apiErr.HTTPStatus, ErrorResponse{

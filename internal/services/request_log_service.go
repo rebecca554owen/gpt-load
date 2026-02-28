@@ -24,7 +24,7 @@ const (
 	DefaultLogFlushBatchSize = 200
 )
 
-// HourlyStat represents aggregated hourly statistics in memory buffer
+// HourlyStat 表示内存缓冲区中的聚合每小时统计
 type HourlyStat struct {
 	Time         time.Time
 	GroupID      uint
@@ -32,7 +32,7 @@ type HourlyStat struct {
 	FailureCount int64
 }
 
-// RequestLogService is responsible for managing request logs.
+// RequestLogService 负责管理请求日志。
 type RequestLogService struct {
 	db              *gorm.DB
 	store           store.Store
@@ -45,7 +45,7 @@ type RequestLogService struct {
 	statsFlushChan  chan struct{}
 }
 
-// NewRequestLogService creates a new RequestLogService instance
+// NewRequestLogService 创建一个新的 RequestLogService 实例
 func NewRequestLogService(db *gorm.DB, store store.Store, sm *config.SystemSettingsManager) *RequestLogService {
 	return &RequestLogService{
 		db:              db,
@@ -57,7 +57,7 @@ func NewRequestLogService(db *gorm.DB, store store.Store, sm *config.SystemSetti
 	}
 }
 
-// Start initializes the service and starts the periodic flush routine
+// Start 初始化服务并启动定期刷新程序
 func (s *RequestLogService) Start() {
 	s.wg.Add(2)
 	go s.runLoop()
@@ -96,7 +96,7 @@ func (s *RequestLogService) runLoop() {
 	}
 }
 
-// Stop gracefully stops the RequestLogService
+// Stop 优雅地停止 RequestLogService
 func (s *RequestLogService) Stop(ctx context.Context) {
 	close(s.stopChan)
 
@@ -116,7 +116,7 @@ func (s *RequestLogService) Stop(ctx context.Context) {
 	}
 }
 
-// Record logs a request to the database and cache
+// Record 将请求记录到数据库和缓存
 func (s *RequestLogService) Record(log *models.RequestLog) error {
 	log.ID = uuid.NewString()
 	log.Timestamp = time.Now()
@@ -145,7 +145,7 @@ func (s *RequestLogService) Record(log *models.RequestLog) error {
 	return s.store.SAdd(PendingLogKeysSet, cacheKey)
 }
 
-// flush data from cache to database
+// flush 将数据从缓存刷新到数据库
 func (s *RequestLogService) flush() {
 	if s.settingsManager.GetSettings().RequestLogWriteIntervalMinutes == 0 {
 		logrus.Debug("Sync mode enabled, skipping scheduled log flush.")
@@ -217,7 +217,7 @@ func (s *RequestLogService) flush() {
 	}
 }
 
-// writeLogsToDB writes a batch of request logs to the database
+// writeLogsToDB 将一批请求日志写入数据库
 func (s *RequestLogService) writeLogsToDB(logs []*models.RequestLog) error {
 	if len(logs) == 0 {
 		return nil
@@ -301,7 +301,7 @@ func isDeadlockError(err error) bool {
 		strings.Contains(err.Error(), "Deadlock found")
 }
 
-// runStatsFlusher runs periodic stats flusher in background
+// runStatsFlusher 在后台运行定期统计刷新程序
 func (s *RequestLogService) runStatsFlusher() {
 	defer s.wg.Done()
 
@@ -323,7 +323,7 @@ func (s *RequestLogService) runStatsFlusher() {
 	}
 }
 
-// updateStatsBuffer updates the in-memory stats buffer from logs
+// updateStatsBuffer 从日志更新内存中的统计缓冲区
 func (s *RequestLogService) updateStatsBuffer(logs []*models.RequestLog) {
 	s.statsBufferMu.Lock()
 	defer s.statsBufferMu.Unlock()
@@ -366,7 +366,7 @@ func (s *RequestLogService) updateStatsBuffer(logs []*models.RequestLog) {
 	}
 }
 
-// FlushStats flushes buffered stats to database (single-threaded to avoid deadlock)
+// FlushStats 将缓冲的统计信息刷新到数据库（单线程以避免死锁）
 func (s *RequestLogService) FlushStats() {
 	s.statsBufferMu.Lock()
 	if len(s.statsBuffer) == 0 {
@@ -444,8 +444,8 @@ func (s *RequestLogService) FlushStats() {
 	logrus.WithField("count", len(statsToUpsert)).Debug("Successfully flushed stats to database")
 }
 
-// GetPendingLogs retrieves logs from Redis cache that haven't been flushed to database yet
-// This is used for real-time statistics in dashboard
+// GetPendingLogs 从 Redis 缓存中检索尚未刷新到数据库的日志
+// 这用于仪表盘的实时统计
 func (s *RequestLogService) GetPendingLogs() ([]*models.RequestLog, error) {
 	keys, err := s.store.SMembers(PendingLogKeysSet)
 	if err != nil {
@@ -479,8 +479,8 @@ func (s *RequestLogService) GetPendingLogs() ([]*models.RequestLog, error) {
 	return logs, nil
 }
 
-// GetPendingStats returns a snapshot of the current stats buffer
-// This is used for real-time statistics in dashboard
+// GetPendingStats 返回当前统计缓冲区的快照
+// 这用于仪表盘的实时统计
 func (s *RequestLogService) GetPendingStats() map[string]*HourlyStat {
 	s.statsBufferMu.Lock()
 	defer s.statsBufferMu.Unlock()

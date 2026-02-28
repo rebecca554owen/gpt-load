@@ -12,12 +12,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// LogResponse defines the structure for log entries in the API response
+// LogResponse 定义 API 响应中日志条目的结构
 type LogResponse struct {
 	models.RequestLog
 }
 
-// GetLogs handles fetching request logs with filtering and pagination.
+// GetLogs 处理获取请求日志，支持过滤和分页
 func (s *Server) GetLogs(c *gin.Context) {
 	query := s.LogService.GetLogsQuery(c)
 
@@ -29,7 +29,7 @@ func (s *Server) GetLogs(c *gin.Context) {
 		return
 	}
 
-	// Decrypt all keys in logs for frontend display
+	// 为前端显示解密日志中的所有密钥
 	for i := range logs {
 		if logs[i].KeyValue != "" {
 			decryptedValue, err := s.EncryptionSvc.Decrypt(logs[i].KeyValue)
@@ -46,13 +46,13 @@ func (s *Server) GetLogs(c *gin.Context) {
 	response.Success(c, pagination)
 }
 
-// ExportLogs handles exporting filtered log keys to a CSV file.
+// ExportLogs 处理导出过滤后的日志密钥到 CSV 文件
 func (s *Server) ExportLogs(c *gin.Context) {
 	filename := fmt.Sprintf("log_keys_export_%s.csv", time.Now().Format("20060102150405"))
 	c.Header("Content-Disposition", "attachment; filename="+filename)
 	c.Header("Content-Type", "text/csv; charset=utf-8")
 
-	// Stream the response
+	// 流式传输响应
 	err := s.LogService.StreamLogKeysToCSV(c, c.Writer)
 	if err != nil {
 		logrus.WithError(err).Error("Failed to stream log keys to CSV")

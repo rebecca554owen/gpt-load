@@ -27,12 +27,12 @@ func newOpenAIChannel(f *Factory, group *models.Group) (ChannelProxy, error) {
 	}, nil
 }
 
-// ModifyRequest sets the Authorization header for the OpenAI service.
+// ModifyRequest 为 OpenAI 服务设置 Authorization 头
 func (ch *OpenAIChannel) ModifyRequest(req *http.Request, apiKey *models.APIKey, group *models.Group) {
 	req.Header.Set("Authorization", "Bearer "+apiKey.KeyValue)
 }
 
-// ValidateKey checks if the given API key is valid by making a chat completion request.
+// ValidateKey 通过发送聊天完成请求检查给定的 API 密钥是否有效
 func (ch *OpenAIChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error) {
 	return ch.validateKeyCommon(ctx, apiKey, group, model, ValidateKeyConfig{
 		BuildPayload: func(testModel string) (map[string]any, error) {

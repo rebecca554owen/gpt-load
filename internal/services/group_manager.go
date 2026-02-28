@@ -16,7 +16,7 @@ import (
 
 const GroupUpdateChannel = "groups:updated"
 
-// GroupManager manages the caching of group data.
+// GroupManager 管理组数据的缓存。
 type GroupManager struct {
 	syncer          *syncer.CacheSyncer[map[string]*models.Group]
 	db              *gorm.DB
@@ -25,7 +25,7 @@ type GroupManager struct {
 	subGroupManager *SubGroupManager
 }
 
-// NewGroupManager creates a new, uninitialized GroupManager.
+// NewGroupManager 创建一个新的未初始化的 GroupManager。
 func NewGroupManager(
 	db *gorm.DB,
 	store store.Store,
@@ -40,7 +40,7 @@ func NewGroupManager(
 	}
 }
 
-// Initialize sets up the CacheSyncer. This is called separately to handle potential
+// Initialize 设置 CacheSyncer。此方法单独调用以处理潜在的
 func (gm *GroupManager) Initialize() error {
 	loader := func() (map[string]*models.Group, error) {
 		var groups []*models.Group
@@ -180,7 +180,7 @@ func (gm *GroupManager) Initialize() error {
 	return nil
 }
 
-// GetGroupByName retrieves a single group by its name from the cache.
+// GetGroupByName 从缓存中通过名称获取单个组。
 func (gm *GroupManager) GetGroupByName(name string) (*models.Group, error) {
 	if gm.syncer == nil {
 		return nil, fmt.Errorf("GroupManager is not initialized")
@@ -194,7 +194,7 @@ func (gm *GroupManager) GetGroupByName(name string) (*models.Group, error) {
 	return group, nil
 }
 
-// Invalidate triggers a cache reload across all instances.
+// Invalidate 触发所有实例的缓存重载。
 func (gm *GroupManager) Invalidate() error {
 	if gm.syncer == nil {
 		return fmt.Errorf("GroupManager is not initialized")
@@ -202,7 +202,7 @@ func (gm *GroupManager) Invalidate() error {
 	return gm.syncer.Invalidate()
 }
 
-// Stop gracefully stops the GroupManager's background syncer.
+// Stop 优雅地停止 GroupManager 的后台同步器。
 func (gm *GroupManager) Stop(ctx context.Context) {
 	if gm.syncer != nil {
 		gm.syncer.Stop()

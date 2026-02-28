@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// CleanupConfig log cleanup configuration
+// CleanupConfig 日志清理配置
 type CleanupConfig struct {
 	RetentionDays      int           `json:"retention_days"`       // Retention days
 	BaseInterval       time.Duration `json:"base_interval"`        // Base interval
@@ -25,7 +25,7 @@ type CleanupConfig struct {
 	EnableAdaptive     bool          `json:"enable_adaptive"`      // Enable adaptive adjustment
 }
 
-// CleanupMetrics cleanup metrics
+// CleanupMetrics 清理指标
 type CleanupMetrics struct {
 	LastDeleteTime       time.Time     `json:"last_delete_time"`
 	DeletedCountTotal    int64         `json:"deleted_count_total"`
@@ -36,7 +36,7 @@ type CleanupMetrics struct {
 	AdaptiveAdjustments  int           `json:"adaptive_adjustments"`
 }
 
-// LogCleanupService responsible for cleaning expired request logs
+// LogCleanupService 负责清理过期的请求日志
 type LogCleanupService struct {
 	db              *gorm.DB
 	settingsManager *config.SystemSettingsManager
@@ -46,7 +46,7 @@ type LogCleanupService struct {
 	wg              sync.WaitGroup
 }
 
-// NewLogCleanupService creates new log cleanup service
+// NewLogCleanupService 创建新的日志清理服务
 func NewLogCleanupService(db *gorm.DB, settingsManager *config.SystemSettingsManager) *LogCleanupService {
 	return &LogCleanupService{
 		db:              db,
@@ -64,14 +64,14 @@ func NewLogCleanupService(db *gorm.DB, settingsManager *config.SystemSettingsMan
 	}
 }
 
-// Start starts log cleanup service
+// Start 启动日志清理服务
 func (s *LogCleanupService) Start() {
 	s.wg.Add(1)
 	go s.run()
 	logrus.Debug("Log cleanup service started with dynamic interval")
 }
 
-// Stop stops log cleanup service
+// Stop 停止日志清理服务
 func (s *LogCleanupService) Stop(ctx context.Context) {
 	close(s.stopCh)
 
@@ -89,7 +89,7 @@ func (s *LogCleanupService) Stop(ctx context.Context) {
 	}
 }
 
-// run runs log cleanup main loop
+// run 运行日志清理主循环
 func (s *LogCleanupService) run() {
 	defer s.wg.Done()
 
@@ -113,7 +113,7 @@ func (s *LogCleanupService) run() {
 	}
 }
 
-// calculateInterval calculates dynamic deletion interval
+// calculateInterval 计算动态删除间隔
 func (s *LogCleanupService) calculateInterval() time.Duration {
 	settings := s.settingsManager.GetSettings()
 	retentionDays := settings.RequestLogRetentionDays
@@ -154,7 +154,7 @@ func (s *LogCleanupService) calculateInterval() time.Duration {
 	return interval
 }
 
-// getOldestLogAge gets age of oldest log (in hours)
+// getOldestLogAge 获取最旧日志的年龄（以小时为单位）
 func (s *LogCleanupService) getOldestLogAge() int {
 	var count int64
 	err := s.db.Model(&models.RequestLog{}).
@@ -178,7 +178,7 @@ func (s *LogCleanupService) getOldestLogAge() int {
 	return int(time.Since(oldestTime).Hours())
 }
 
-// cleanupExpiredLogs cleans expired request logs (batch deletion)
+// cleanupExpiredLogs 清理过期的请求日志（批量删除）
 func (s *LogCleanupService) cleanupExpiredLogs() {
 	start := time.Now()
 
@@ -264,7 +264,7 @@ func (s *LogCleanupService) cleanupExpiredLogs() {
 	}
 }
 
-// GetMetrics gets cleanup metrics
+// GetMetrics 获取清理指标
 func (s *LogCleanupService) GetMetrics() CleanupMetrics {
 	s.metrics.DataAgeHours = s.getOldestLogAge()
 	return s.metrics

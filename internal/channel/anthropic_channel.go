@@ -27,13 +27,13 @@ func newAnthropicChannel(f *Factory, group *models.Group) (ChannelProxy, error) 
 	}, nil
 }
 
-// ModifyRequest sets the required headers for the Anthropic API.
+// ModifyRequest 设置 Anthropic API 所需的请求头
 func (ch *AnthropicChannel) ModifyRequest(req *http.Request, apiKey *models.APIKey, group *models.Group) {
 	req.Header.Set("x-api-key", apiKey.KeyValue)
 	req.Header.Set("anthropic-version", "2023-06-01")
 }
 
-// ValidateKey checks if the given API key is valid by making a messages request.
+// ValidateKey 通过发送 messages 请求检查给定的 API 密钥是否有效
 func (ch *AnthropicChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error) {
 	return ch.validateKeyCommon(ctx, apiKey, group, model, ValidateKeyConfig{
 		BuildPayload: func(testModel string) (map[string]any, error) {

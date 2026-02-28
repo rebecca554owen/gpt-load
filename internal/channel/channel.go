@@ -9,44 +9,43 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ChannelProxy defines the interface for different API channel proxies.
+// ChannelProxy 定义不同 API 通道代理的接口
 type ChannelProxy interface {
-	// BuildUpstreamURL constructs the target URL for the upstream service.
+	// BuildUpstreamURL 构建上游服务的目标 URL
 	BuildUpstreamURL(originalURL *url.URL, groupName string) (string, error)
 
-	// BuildUpstreamURLForAggregate constructs the target URL for aggregate group sub-groups.
-	// It uses the validation endpoint instead of the request path to ensure compatibility
-	// with different upstream endpoints.
+	// BuildUpstreamURLForAggregate 为聚合组的子组构建目标 URL
+	// 它使用验证端点而非请求路径，以确保与不同上游端点的兼容性
 	BuildUpstreamURLForAggregate(originalURL *url.URL, groupName string) (string, error)
 
-	// IsConfigStale checks if the channel's configuration is stale compared to the provided group.
+	// IsConfigStale 检查通道的配置是否相对于提供的组已过期
 	IsConfigStale(group *models.Group) bool
 
-	// GetHTTPClient returns the client for standard requests.
+	// GetHTTPClient 返回用于标准请求的客户端
 	GetHTTPClient() *http.Client
 
-	// GetStreamClient returns the client for streaming requests.
+	// GetStreamClient 返回用于流式请求的客户端
 	GetStreamClient() *http.Client
 
-	// ModifyRequest allows the channel to add specific headers or modify the request
+	// ModifyRequest 允许通道添加特定的头或修改请求
 	ModifyRequest(req *http.Request, apiKey *models.APIKey, group *models.Group)
 
-	// IsStreamRequest checks if the request is for a streaming response,
+	// IsStreamRequest 检查请求是否为流式响应
 	IsStreamRequest(c *gin.Context, bodyBytes []byte) bool
 
-	// ExtractModel extracts the model name from the request.
+	// ExtractModel 从请求中提取模型名称
 	ExtractModel(c *gin.Context, bodyBytes []byte) string
 
-	// ValidateKey checks if the given API key is valid.
-	// The model parameter is optional and overrides the channel's TestModel if provided.
+	// ValidateKey 检查给定的 API 密钥是否有效
+	// model 参数是可选的，如果提供则覆盖通道的 TestModel
 	ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error)
 
-	// ApplyModelRedirect applies model redirection based on the group's redirect rules.
+	// ApplyModelRedirect 根据组的重定向规则应用模型重定向
 	ApplyModelRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error)
 
-	// TransformModelList transforms the model list response based on redirect rules.
+	// TransformModelList 根据重定向规则转换模型列表响应
 	TransformModelList(req *http.Request, bodyBytes []byte, group *models.Group) (map[string]any, error)
 
-	// GetChannelType returns the channel type identifier.
+	// GetChannelType 返回通道类型标识符
 	GetChannelType() string
 }

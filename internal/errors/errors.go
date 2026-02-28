@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// APIError defines a standard error structure for API responses.
+// APIError 定义 API 响应的标准错误结构。
 type APIError struct {
 	HTTPStatus int
 	Code       string
@@ -23,8 +23,8 @@ func (e *APIError) Error() string {
 	return e.Message
 }
 
-// ServiceError defines a structured error for service layer operations.
-// It can be wrapped and compared using errors.Is().
+// ServiceError 定义服务层操作的结构化错误。
+// 可以使用 errors.Is() 进行包装和比较。
 type ServiceError struct {
 	Err     error
 	Message string
@@ -38,18 +38,18 @@ func (e *ServiceError) Error() string {
 	return e.Err.Error()
 }
 
-// Unwrap implements the error unwrapping interface for errors.Is/As.
+// Unwrap 实现 errors.Is/As 的错误解包接口。
 func (e *ServiceError) Unwrap() error {
 	return e.Err
 }
 
-// Predefined service layer errors that can be compared with errors.Is
+// 预定义的服务层错误，可以使用 errors.Is 进行比较
 var (
 	ErrBatchSizeExceedsLimit = errors.New("batch size exceeds the limit")
 	ErrNoValidKeysFound      = errors.New("no valid keys found")
 )
 
-// Predefined API errors
+// 预定义的 API 错误
 var (
 	ErrBadRequest         = &APIError{HTTPStatus: http.StatusBadRequest, Code: "BAD_REQUEST", Message: "Invalid request parameters"}
 	ErrInvalidJSON        = &APIError{HTTPStatus: http.StatusBadRequest, Code: "INVALID_JSON", Message: "Invalid JSON format"}
@@ -67,7 +67,7 @@ var (
 	ErrNoKeysAvailable    = &APIError{HTTPStatus: http.StatusServiceUnavailable, Code: "NO_KEYS_AVAILABLE", Message: "No API keys available to process the request"}
 )
 
-// NewServiceError creates a new ServiceError wrapping a base error with a custom message.
+// NewServiceError 创建一个新的 ServiceError，包装基础错误并附带自定义消息。
 func NewServiceError(baseErr error, message string) error {
 	return &ServiceError{
 		Err:     baseErr,
@@ -75,7 +75,7 @@ func NewServiceError(baseErr error, message string) error {
 	}
 }
 
-// NewServiceErrorf creates a new ServiceError wrapping a base error with a formatted message.
+// NewServiceErrorf 创建一个新的 ServiceError，包装基础错误并附带格式化消息。
 func NewServiceErrorf(baseErr error, format string, args ...any) error {
 	return &ServiceError{
 		Err:     baseErr,
@@ -83,7 +83,7 @@ func NewServiceErrorf(baseErr error, format string, args ...any) error {
 	}
 }
 
-// NewAPIError creates a new APIError with a custom message.
+// NewAPIError 创建一个带有自定义消息的新 APIError。
 func NewAPIError(base *APIError, message string) *APIError {
 	return &APIError{
 		HTTPStatus: base.HTTPStatus,
@@ -92,7 +92,7 @@ func NewAPIError(base *APIError, message string) *APIError {
 	}
 }
 
-// NewAPIErrorWithUpstream creates a new APIError specifically for wrapping raw upstream errors.
+// NewAPIErrorWithUpstream 创建一个专门用于包装原始上游错误的新 APIError。
 func NewAPIErrorWithUpstream(statusCode int, code string, upstreamMessage string) *APIError {
 	return &APIError{
 		HTTPStatus: statusCode,
@@ -101,7 +101,7 @@ func NewAPIErrorWithUpstream(statusCode int, code string, upstreamMessage string
 	}
 }
 
-// ParseDBError intelligently converts a GORM error into a standard APIError.
+// ParseDBError 智能地将 GORM 错误转换为标准 APIError。
 func ParseDBError(err error) *APIError {
 	if err == nil {
 		return nil
@@ -119,7 +119,7 @@ func ParseDBError(err error) *APIError {
 		return ErrDuplicateResource
 	}
 
-	// Generic check for SQLite
+	// SQLite 通用检查
 	if strings.Contains(strings.ToLower(err.Error()), "unique constraint failed") {
 		return ErrDuplicateResource
 	}
