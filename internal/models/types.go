@@ -13,7 +13,7 @@ const (
 	KeyStatusInvalid = "invalid"
 )
 
-// SystemSetting corresponds to system_settings table
+// SystemSetting 对应 system_settings 表
 type SystemSetting struct {
 	ID           uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	SettingKey   string    `gorm:"type:varchar(255);not null;unique" json:"setting_key"`
@@ -23,7 +23,7 @@ type SystemSetting struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// GroupConfig stores group-specific configuration
+// GroupConfig 存储组特定配置
 type GroupConfig struct {
 	RequestTimeout               *int    `json:"request_timeout,omitempty"`
 	IdleConnTimeout              *int    `json:"idle_conn_timeout,omitempty"`
@@ -40,14 +40,14 @@ type GroupConfig struct {
 	EnableRequestBodyLogging     *bool   `json:"enable_request_body_logging,omitempty"`
 }
 
-// HeaderRule defines a single rule for header manipulation.
+// HeaderRule 定义单个标头操作规则。
 type HeaderRule struct {
 	Key    string `json:"key"`
 	Value  string `json:"value"`
 	Action string `json:"action"` // "set" or "remove"
 }
 
-// GroupSubGroup association table for aggregate groups and sub-groups
+// GroupSubGroup 聚合组和子组的关联表
 type GroupSubGroup struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	GroupID    uint      `gorm:"not null;uniqueIndex:idx_group_sub" json:"group_id"`
@@ -56,11 +56,11 @@ type GroupSubGroup struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
-	// Lightweight association - only store necessary info for performance
+	// 轻量级关联 - 仅存储性能所需的信息
 	SubGroupName string `gorm:"-" json:"sub_group_name,omitempty"`
 }
 
-// SubGroupInfo sub-group information for API response
+// SubGroupInfo API 响应的子组信息
 type SubGroupInfo struct {
 	Group       Group `json:"group"`
 	Weight      int   `json:"weight"`
@@ -69,7 +69,7 @@ type SubGroupInfo struct {
 	InvalidKeys int64 `json:"invalid_keys"`
 }
 
-// ParentAggregateGroupInfo parent aggregate group information for API response
+// ParentAggregateGroupInfo API 响应的父聚合组信息
 type ParentAggregateGroupInfo struct {
 	GroupID     uint   `json:"group_id"`
 	Name        string `json:"name"`
@@ -77,22 +77,22 @@ type ParentAggregateGroupInfo struct {
 	Weight      int    `json:"weight"`
 }
 
-// ModelMappingTarget defines a single target for model mapping
+// ModelMappingTarget 定义模型映射的单个目标
 type ModelMappingTarget struct {
 	SubGroupID   uint     `json:"sub_group_id"`
 	Weight       int      `json:"weight"`
 	SubGroupName string   `json:"sub_group_name,omitempty"`
-	Model        string   `json:"model"`  // For backward compatibility
-	Models       []string `json:"models"` // Multi-model support
+	Model        string   `json:"model"`  // 向后兼容
+	Models       []string `json:"models"` // 多模型支持
 }
 
-// ModelMapping defines mapping from model name to sub-group collection
+// ModelMapping 定义从模型名称到子组集合的映射
 type ModelMapping struct {
 	Model   string               `json:"model"`
 	Targets []ModelMappingTarget `json:"targets"`
 }
 
-// Group corresponds to groups table
+// Group 对应 groups 表
 type Group struct {
 	ID                  uint                 `gorm:"primaryKey;autoIncrement" json:"id"`
 	EffectiveConfig     types.SystemSettings `gorm:"-" json:"effective_config,omitempty"`
@@ -121,13 +121,13 @@ type Group struct {
 	CreatedAt           time.Time            `json:"created_at"`
 	UpdatedAt           time.Time            `json:"updated_at"`
 
-	// For cache
+	// 用于缓存
 	ProxyKeysMap     map[string]struct{} `gorm:"-" json:"-"`
 	HeaderRuleList   []HeaderRule        `gorm:"-" json:"-"`
 	ModelRedirectMap map[string]string   `gorm:"-" json:"-"`
 }
 
-// APIKey corresponds to api_keys table
+// APIKey 对应 api_keys 表
 type APIKey struct {
 	ID           uint       `gorm:"primaryKey;autoIncrement;index:idx_api_keys_group_last_used_id,priority:3" json:"id"`
 	KeyValue     string     `gorm:"type:text;not null" json:"key_value"`
@@ -142,13 +142,13 @@ type APIKey struct {
 	UpdatedAt    time.Time  `json:"updated_at"`
 }
 
-// RequestType request type constants
+// RequestType 请求类型常量
 const (
 	RequestTypeRetry = "retry"
 	RequestTypeFinal = "final"
 )
 
-// RequestLog corresponds to request_logs table
+// RequestLog 对应 request_logs 表
 type RequestLog struct {
 	ID              string    `gorm:"type:varchar(36);primaryKey" json:"id"`
 	Timestamp       time.Time `gorm:"not null;index:idx_request_logs_timestamp_request_type,priority:1" json:"timestamp"`
@@ -159,7 +159,7 @@ type RequestLog struct {
 	KeyValue        string    `gorm:"type:text" json:"key_value"`
 	KeyHash         string    `gorm:"type:varchar(128);index" json:"key_hash"`
 	Model           string    `gorm:"type:varchar(255);index" json:"model"`
-	OriginalModel   string    `gorm:"type:varchar(255);index" json:"original_model"` // Original requested model name, to distinguish from mapped model
+	OriginalModel   string    `gorm:"type:varchar(255);index" json:"original_model"` // 原始请求的模型名称，用于与映射模型区分
 	IsSuccess       bool      `gorm:"not null" json:"is_success"`
 	SourceIP        string    `gorm:"type:varchar(64)" json:"source_ip"`
 	StatusCode      int       `gorm:"not null" json:"status_code"`
@@ -171,14 +171,14 @@ type RequestLog struct {
 	UpstreamAddr    string    `gorm:"type:varchar(500)" json:"upstream_addr"`
 	IsStream        bool      `gorm:"not null" json:"is_stream"`
 	RequestBody     string    `gorm:"type:text" json:"request_body"`
-	// Token statistics fields
-	PromptTokens     int64 `gorm:"default:0" json:"prompt_tokens"`     // Input prompt tokens
-	CompletionTokens int64 `gorm:"default:0" json:"completion_tokens"` // Output completion tokens
-	TotalTokens      int64 `gorm:"default:0" json:"total_tokens"`      // Total tokens
-	CachedTokens     int64 `gorm:"default:0" json:"cached_tokens"`     // Cached tokens (Claude)
+	// Token 统计字段
+	PromptTokens     int64 `gorm:"default:0" json:"prompt_tokens"`     // 输入提示 tokens
+	CompletionTokens int64 `gorm:"default:0" json:"completion_tokens"` // 输出完成 tokens
+	TotalTokens      int64 `gorm:"default:0" json:"total_tokens"`      // 总 tokens
+	CachedTokens     int64 `gorm:"default:0" json:"cached_tokens"`     // 缓存的 tokens (Claude)
 }
 
-// StatCard stat card data for dashboard
+// StatCard 仪表板的统计卡片数据
 type StatCard struct {
 	Value         float64 `json:"value"`
 	SubValue      int64   `json:"sub_value,omitempty"`
@@ -187,46 +187,46 @@ type StatCard struct {
 	TrendIsGrowth bool    `json:"trend_is_growth"`
 }
 
-// SecurityWarning security warning information
+// SecurityWarning 安全警告信息
 type SecurityWarning struct {
-	Type       string `json:"type"`       // Warning type: auth_key, encryption_key, etc.
-	Message    string `json:"message"`    // Warning message
-	Severity   string `json:"severity"`   // Severity level: low, medium, high
-	Suggestion string `json:"suggestion"` // Suggested solution
+	Type       string `json:"type"`       // 警告类型：auth_key、encryption_key 等
+	Message    string `json:"message"`    // 警告消息
+	Severity   string `json:"severity"`   // 严重程度级别：low、medium、high
+	Suggestion string `json:"suggestion"` // 建议的解决方案
 }
 
-// DashboardStatsResponse API response for dashboard basic statistics
+// DashboardStatsResponse 仪表板基本统计的 API 响应
 type DashboardStatsResponse struct {
-	KeyCount             StatCard          `json:"key_count"`               // Key count
-	TokenConsumption     StatCard          `json:"token_consumption"`       // Total tokens
-	PromptTokens         StatCard          `json:"prompt_tokens"`           // Input tokens
-	NonCachedPromptTokens StatCard          `json:"non_cached_prompt_tokens"` // Non-cached input tokens
-	CachedTokens         StatCard          `json:"cached_tokens"`           // Cached tokens (input)
-	CompletionTokens     StatCard          `json:"completion_tokens"`       // Completion tokens (output)
-	TotalTokens          StatCard          `json:"total_tokens"`            // Total tokens
+	KeyCount             StatCard          `json:"key_count"`               // 密钥数量
+	TokenConsumption     StatCard          `json:"token_consumption"`       // 总 tokens
+	PromptTokens         StatCard          `json:"prompt_tokens"`           // 输入 tokens
+	NonCachedPromptTokens StatCard          `json:"non_cached_prompt_tokens"` // 非缓存输入 tokens
+	CachedTokens         StatCard          `json:"cached_tokens"`           // 缓存的 tokens (输入)
+	CompletionTokens     StatCard          `json:"completion_tokens"`       // 完成 tokens (输出)
+	TotalTokens          StatCard          `json:"total_tokens"`            // 总 tokens
 	RPM                  StatCard          `json:"rpm"`                     // RPM
-	RequestCount         StatCard          `json:"request_count"`           // Request count
-	ErrorRate            StatCard          `json:"error_rate"`              // Error rate
+	RequestCount         StatCard          `json:"request_count"`           // 请求数量
+	ErrorRate            StatCard          `json:"error_rate"`              // 错误率
 	SecurityWarnings     []SecurityWarning `json:"security_warnings"`
 }
 
-// ChartDataset dataset for charts
+// ChartDataset 图表数据集
 type ChartDataset struct {
-	Label     string  `json:"label"`     // Translated display name
-	LabelKey  string  `json:"label_key"` // i18n key for color mapping
+	Label     string  `json:"label"`     // 翻译的显示名称
+	LabelKey  string  `json:"label_key"` // 用于颜色映射的 i18n 键
 	Data      []int64 `json:"data"`
 }
 
-// ChartData API response for charts
+// ChartData 图表的 API 响应
 type ChartData struct {
 	Labels   []string       `json:"labels"`
 	Datasets []ChartDataset `json:"datasets"`
 }
 
-// GroupHourlyStat corresponds to group_hourly_stats table, stores hourly request statistics for each group
+// GroupHourlyStat 对应 group_hourly_stats 表，存储每个组的每小时请求统计
 type GroupHourlyStat struct {
 	ID           uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Time         time.Time `gorm:"not null;uniqueIndex:idx_group_time" json:"time"` // Hourly timestamp
+	Time         time.Time `gorm:"not null;uniqueIndex:idx_group_time" json:"time"` // 每小时时间戳
 	GroupID      uint      `gorm:"not null;uniqueIndex:idx_group_time" json:"group_id"`
 	SuccessCount int64     `gorm:"not null;default:0" json:"success_count"`
 	FailureCount int64     `gorm:"not null;default:0" json:"failure_count"`

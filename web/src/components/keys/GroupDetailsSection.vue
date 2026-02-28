@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Group, GroupConfigOption, ParentAggregateGroup } from "@/types/models";
 import { maskProxyKeys } from "@/utils/display";
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { CopyOutline, EyeOffOutline, EyeOutline, HelpCircleOutline } from "@vicons/ionicons5";
 import {
   NCollapse,
@@ -38,6 +38,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>();
 const { t } = useI18n();
+const { copyWithFeedback } = useCopy();
 
 const showProxyKeys = ref(false);
 
@@ -68,12 +69,7 @@ async function copyProxyKeys() {
     return;
   }
   const keysToCopy = props.group.proxy_keys.replace(/,/g, "\n");
-  const success = await copy(keysToCopy);
-  if (success) {
-    window.$message.success(t("keys.proxyKeysCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(keysToCopy);
 }
 
 function getConfigDisplayName(key: string): string {
@@ -145,16 +141,16 @@ function handleNavigateToGroup(groupId: number) {
                           </template>
                           {{ showProxyKeys ? t("keys.hideKeys") : t("keys.showKeys") }}
                         </n-tooltip>
-                        <n-tooltip trigger="hover">
-                          <template #trigger>
-                            <n-button quaternary circle @click="copyProxyKeys">
-                              <template #icon>
-                                <n-icon :component="CopyOutline" />
-                              </template>
-                            </n-button>
+                        <n-button
+                          quaternary
+                          circle
+                          @click="copyProxyKeys"
+                          :title="t('keys.copyKeys')"
+                        >
+                          <template #icon>
+                            <n-icon :component="CopyOutline" />
                           </template>
-                          {{ t("keys.copyKeys") }}
-                        </n-tooltip>
+                        </n-button>
                       </n-button-group>
                     </div>
                   </n-form-item>

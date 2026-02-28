@@ -39,6 +39,8 @@ export default {
     deselectAll: "選択を解除",
     moreActions: "その他の操作",
     viewDetails: "詳細を表示",
+    copySuccess: "クリップボードにコピーしました",
+    copyFailed: "コピーに失敗しました",
   },
   login: {
     title: "GPT Load",
@@ -515,7 +517,7 @@ export default {
     completionTokens: "完了",
     cachedTokens: "キャッシュ",
     totalTokens: "合計",
-    requestModel: "リクエストモデル",
+    originalModel: "元モデル",
     actualModel: "実際のモデル",
     totalRecords: "合計 {total} 件",
     recordsPerPage: "1ページ {size} 件",

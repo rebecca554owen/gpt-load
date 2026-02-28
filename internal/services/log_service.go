@@ -14,20 +14,20 @@ import (
 	"gorm.io/gorm"
 )
 
-// ExportableLogKey defines the structure for the data to be exported to CSV.
+// ExportableLogKey 定义要导出到 CSV 的数据结构。
 type ExportableLogKey struct {
 	KeyValue   string `gorm:"column:key_value"`
 	GroupName  string `gorm:"column:group_name"`
 	StatusCode int    `gorm:"column:status_code"`
 }
 
-// LogService provides services related to request logs.
+// LogService 提供与请求日志相关的服务。
 type LogService struct {
 	DB            *gorm.DB
 	EncryptionSvc encryption.Service
 }
 
-// NewLogService creates a new LogService.
+// NewLogService 创建一个新的 LogService。
 func NewLogService(db *gorm.DB, encryptionSvc encryption.Service) *LogService {
 	return &LogService{
 		DB:            db,
@@ -35,7 +35,7 @@ func NewLogService(db *gorm.DB, encryptionSvc encryption.Service) *LogService {
 	}
 }
 
-// logFiltersScope returns a GORM scope function that applies filters from the Gin context.
+// logFiltersScope 返回应用 Gin 上下文过滤器的 GORM scope 函数。
 func (s *LogService) logFiltersScope(c *gin.Context) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if parentGroupName := c.Query("parent_group_name"); parentGroupName != "" {
@@ -84,12 +84,12 @@ func (s *LogService) logFiltersScope(c *gin.Context) func(db *gorm.DB) *gorm.DB 
 	}
 }
 
-// GetLogsQuery returns a GORM query for fetching logs with filters.
+// GetLogsQuery 返回用于获取带过滤器的日志的 GORM 查询。
 func (s *LogService) GetLogsQuery(c *gin.Context) *gorm.DB {
 	return s.DB.Model(&models.RequestLog{}).Scopes(s.logFiltersScope(c))
 }
 
-// StreamLogKeysToCSV fetches unique keys from logs based on filters and streams them as a CSV.
+// StreamLogKeysToCSV 根据过滤器从日志中获取唯一密钥，并将它们作为 CSV 流式传输。
 func (s *LogService) StreamLogKeysToCSV(c *gin.Context, writer io.Writer) error {
 	// Create a CSV writer
 	csvWriter := csv.NewWriter(writer)

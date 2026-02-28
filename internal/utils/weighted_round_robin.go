@@ -1,21 +1,21 @@
 package utils
 
-// WeightedItem represents an item with a weight for weighted round-robin selection.
+// WeightedItem 表示用于加权轮询选择的带权重的项。
 type WeightedItem interface {
 	GetWeight() int
 	GetCurrentWeight() int
 	SetCurrentWeight(int)
 }
 
-// SelectByWeightedRoundRobin selects an item using smooth weighted round-robin algorithm.
-// The algorithm ensures fair distribution based on weights while maintaining smooth selection order.
+// SelectByWeightedRoundRobin 使用平滑加权轮询算法选择项。
+// 该算法确保根据权重公平分配，同时保持平滑的选择顺序。
 //
-// Steps:
-// 1. Add each item's weight to its current weight
-// 2. Select the item with the highest current weight
-// 3. Subtract the total weight from the selected item's current weight
+// 步骤：
+// 1. 将每个项的权重加到其当前权重
+// 2. 选择当前权重最高的项
+// 3. 从选中项的当前权重中减去总权重
 //
-// This is the Nginx smooth weighted round-robin algorithm.
+// 这是 Nginx 平滑加权轮询算法。
 func SelectByWeightedRoundRobin(items []WeightedItem) WeightedItem {
 	if len(items) == 0 {
 		return nil

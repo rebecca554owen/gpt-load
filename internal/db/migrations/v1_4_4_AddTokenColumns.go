@@ -5,7 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_4_4_AddTokenColumns adds token statistics columns to request_logs table
+// V1_4_4_AddTokenColumns 向 request_logs 表添加 token 统计列
 func V1_4_4_AddTokenColumns(db *gorm.DB) error {
 	logrus.Info("Running v1.4.4 migration: Adding token columns to request_logs table")
 
@@ -33,7 +33,7 @@ func V1_4_4_AddTokenColumns(db *gorm.DB) error {
 	return nil
 }
 
-// requestLogTable is a minimal model for migration purposes
+// requestLogTable 迁移用的最小模型
 type requestLogTable struct {
 	PromptTokens     int64  `gorm:"default:0"`
 	CompletionTokens int64  `gorm:"default:0"`

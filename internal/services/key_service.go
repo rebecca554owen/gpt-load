@@ -22,28 +22,28 @@ const (
 	chunkSize      = 500
 )
 
-// AddKeysResult holds the result of adding multiple keys.
+// AddKeysResult 存储添加多个密钥的结果。
 type AddKeysResult struct {
 	AddedCount   int   `json:"added_count"`
 	IgnoredCount int   `json:"ignored_count"`
 	TotalInGroup int64 `json:"total_in_group"`
 }
 
-// DeleteKeysResult holds the result of deleting multiple keys.
+// DeleteKeysResult 存储删除多个密钥的结果。
 type DeleteKeysResult struct {
 	DeletedCount int   `json:"deleted_count"`
 	IgnoredCount int   `json:"ignored_count"`
 	TotalInGroup int64 `json:"total_in_group"`
 }
 
-// RestoreKeysResult holds the result of restoring multiple keys.
+// RestoreKeysResult 存储恢复多个密钥的结果。
 type RestoreKeysResult struct {
 	RestoredCount int   `json:"restored_count"`
 	IgnoredCount  int   `json:"ignored_count"`
 	TotalInGroup  int64 `json:"total_in_group"`
 }
 
-// KeyService provides services related to API keys.
+// KeyService 提供与 API 密钥相关的服务。
 type KeyService struct {
 	DB            *gorm.DB
 	KeyProvider   *keypool.KeyProvider
@@ -51,7 +51,7 @@ type KeyService struct {
 	EncryptionSvc encryption.Service
 }
 
-// NewKeyService creates a new KeyService.
+// NewKeyService 创建一个新的 KeyService。
 func NewKeyService(db *gorm.DB, keyProvider *keypool.KeyProvider, keyValidator *keypool.KeyValidator, encryptionSvc encryption.Service) *KeyService {
 	return &KeyService{
 		DB:            db,
@@ -61,8 +61,8 @@ func NewKeyService(db *gorm.DB, keyProvider *keypool.KeyProvider, keyValidator *
 	}
 }
 
-// AddMultipleKeys handles the business logic of creating new keys from a text block.
-// deprecated: use KeyImportService for large imports
+// AddMultipleKeys 处理从文本块创建新密钥的业务逻辑。
+// 已废弃：对于大批量导入请使用 KeyImportService
 func (s *KeyService) AddMultipleKeys(groupID uint, keysText string) (*AddKeysResult, error) {
 	keys, err := s.parseAndValidateKeys(keysText)
 	if err != nil {
@@ -86,7 +86,7 @@ func (s *KeyService) AddMultipleKeys(groupID uint, keysText string) (*AddKeysRes
 	}, nil
 }
 
-// processAndCreateKeys is the lowest-level reusable function for adding keys.
+// processAndCreateKeys 是添加密钥的最低级别可复用函数。
 func (s *KeyService) processAndCreateKeys(
 	groupID uint,
 	keys []string,
@@ -157,8 +157,8 @@ func (s *KeyService) processAndCreateKeys(
 	return addedCount, len(keys) - addedCount, nil
 }
 
-// ParseKeysFromText parses a string of keys from various formats into a string slice.
-// This function is exported to be shared with the handler layer.
+// ParseKeysFromText 将各种格式的密钥字符串解析为字符串切片。
+// 此函数已导出，可与处理层共享。
 func (s *KeyService) ParseKeysFromText(text string) []string {
 	var keys []string
 
@@ -181,7 +181,7 @@ func (s *KeyService) ParseKeysFromText(text string) []string {
 	return s.filterValidKeys(keys)
 }
 
-// filterValidKeys validates and filters potential API keys
+// filterValidKeys 验证并过滤潜在的 API 密钥
 func (s *KeyService) filterValidKeys(keys []string) []string {
 	var validKeys []string
 	for _, key := range keys {
@@ -193,12 +193,12 @@ func (s *KeyService) filterValidKeys(keys []string) []string {
 	return validKeys
 }
 
-// isValidKeyFormat performs basic validation on key format
+// isValidKeyFormat 对密钥格式执行基本验证
 func (s *KeyService) isValidKeyFormat(key string) bool {
 	return strings.TrimSpace(key) != ""
 }
 
-// RestoreMultipleKeys handles the business logic of restoring keys from a text block.
+// RestoreMultipleKeys 处理从文本块恢复密钥的业务逻辑。
 func (s *KeyService) RestoreMultipleKeys(groupID uint, keysText string) (*RestoreKeysResult, error) {
 	keys, err := s.parseAndValidateKeys(keysText)
 	if err != nil {
@@ -224,22 +224,22 @@ func (s *KeyService) RestoreMultipleKeys(groupID uint, keysText string) (*Restor
 	}, nil
 }
 
-// RestoreAllInvalidKeys sets the status of all 'inactive' keys in a group to 'active'.
+// RestoreAllInvalidKeys 将组内所有 'inactive' 密钥的状态设置为 'active'。
 func (s *KeyService) RestoreAllInvalidKeys(groupID uint) (int64, error) {
 	return s.KeyProvider.RestoreKeys(groupID)
 }
 
-// ClearAllInvalidKeys deletes all 'inactive' keys from a group.
+// ClearAllInvalidKeys 从组中删除所有 'inactive' 密钥。
 func (s *KeyService) ClearAllInvalidKeys(groupID uint) (int64, error) {
 	return s.KeyProvider.RemoveInvalidKeys(groupID)
 }
 
-// ClearAllKeys deletes all keys from a group.
+// ClearAllKeys 从组中删除所有密钥。
 func (s *KeyService) ClearAllKeys(groupID uint) (int64, error) {
 	return s.KeyProvider.RemoveAllKeys(groupID)
 }
 
-// DeleteMultipleKeys handles the business logic of deleting keys from a text block.
+// DeleteMultipleKeys 处理从文本块删除密钥的业务逻辑。
 func (s *KeyService) DeleteMultipleKeys(groupID uint, keysText string) (*DeleteKeysResult, error) {
 	keys, err := s.parseAndValidateKeys(keysText)
 	if err != nil {
@@ -265,7 +265,7 @@ func (s *KeyService) DeleteMultipleKeys(groupID uint, keysText string) (*DeleteK
 	}, nil
 }
 
-// ListKeysInGroupQuery builds a query to list all keys within a specific group, filtered by status.
+// ListKeysInGroupQuery 构建查询以列出特定组内的所有密钥，按状态过滤。
 func (s *KeyService) ListKeysInGroupQuery(groupID uint, statusFilter string, searchHash string) *gorm.DB {
 	query := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID)
 
@@ -287,8 +287,8 @@ func (s *KeyService) ListKeysInGroupQuery(groupID uint, statusFilter string, sea
 	return query
 }
 
-// TestMultipleKeys handles a one-off validation test for multiple keys.
-// The model parameter is optional and overrides the group's test_model if provided.
+// TestMultipleKeys 处理多个密钥的一次性验证测试。
+// model 参数是可选的，如果提供则覆盖组的 test_model。
 func (s *KeyService) TestMultipleKeys(group *models.Group, keysText string, model string) ([]keypool.KeyTestResult, error) {
 	keys, err := s.parseAndValidateKeys(keysText)
 	if err != nil {
@@ -308,7 +308,7 @@ func (s *KeyService) TestMultipleKeys(group *models.Group, keysText string, mode
 	return allResults, err
 }
 
-// StreamKeysToWriter fetches keys from the database in batches and writes them to the provided writer.
+// StreamKeysToWriter 从数据库批量获取密钥并将其写入提供的 writer。
 func (s *KeyService) StreamKeysToWriter(groupID uint, statusFilter string, writer io.Writer) error {
 	query := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Select("id, key_value")
 
@@ -338,7 +338,7 @@ func (s *KeyService) StreamKeysToWriter(groupID uint, statusFilter string, write
 	return err
 }
 
-// parseAndValidateKeys parses and validates keys from text.
+// parseAndValidateKeys 从文本解析和验证密钥。
 func (s *KeyService) parseAndValidateKeys(keysText string) ([]string, error) {
 	keys := s.ParseKeysFromText(keysText)
 	if len(keys) > maxRequestKeys {
@@ -350,7 +350,7 @@ func (s *KeyService) parseAndValidateKeys(keysText string) ([]string, error) {
 	return keys, nil
 }
 
-// countKeysInGroup returns the total number of keys in a group.
+// countKeysInGroup 返回组中密钥的总数。
 func (s *KeyService) countKeysInGroup(groupID uint) (int64, error) {
 	var totalInGroup int64
 	if err := s.DB.Model(&models.APIKey{}).Where("group_id = ?", groupID).Count(&totalInGroup).Error; err != nil {
@@ -359,10 +359,10 @@ func (s *KeyService) countKeysInGroup(groupID uint) (int64, error) {
 	return totalInGroup, nil
 }
 
-// batchOperationFunc defines a batch operation that returns a count.
+// batchOperationFunc 定义返回计数的批量操作。
 type batchOperationFunc func(chunk []string) (int64, error)
 
-// processBatchWithResult processes items in batches and returns total count.
+// processBatchWithResult 批量处理项目并返回总计数。
 func (s *KeyService) processBatchWithResult(items []string, operation batchOperationFunc) (int64, error) {
 	var totalCount int64
 	for i := 0; i < len(items); i += chunkSize {
@@ -377,10 +377,10 @@ func (s *KeyService) processBatchWithResult(items []string, operation batchOpera
 	return totalCount, nil
 }
 
-// batchFunc defines a batch operation without return value.
+// batchFunc 定义无返回值的批量操作。
 type batchFunc func(chunk []string) error
 
-// processBatch processes items in batches.
+// processBatch 批量处理项目。
 func (s *KeyService) processBatch(items []string, operation batchFunc) (int, error) {
 	for i := 0; i < len(items); i += chunkSize {
 		end := min(i+chunkSize, len(items))

@@ -17,7 +17,7 @@ const (
 	streamingChunkSize      = 4 * 1024
 )
 
-// handleStreamingResponse handles streaming SSE responses and returns token usage
+// handleStreamingResponse 处理流式 SSE 响应并返回 token 使用情况
 func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy, model string, requestBody []byte) *TokenUsage {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -34,13 +34,13 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 
 	tailBuffer := newTailBuffer(streamingTailBufferSize)
 
-	// Check if we need to manually decompress the response body
-	// Go's http.Client auto-decompresses gzip/deflate but NOT brotli (br)
+	// 检查是否需要手动解压响应体
+	// Go 的 http.Client 自动解压 gzip/deflate，但不会解压 brotli (br)
 	var bodyReader io.Reader = resp.Body
 	if contentEncoding == "br" {
-		// brotli.Reader doesn't implement io.ReadCloser, use it directly as io.Reader
+		// brotli.Reader 未实现 io.ReadCloser，直接作为 io.Reader 使用
 		bodyReader = brotli.NewReader(resp.Body)
-		// Remove Content-Encoding header since we're decompressing
+		// 移除 Content-Encoding 头，因为我们正在解压
 		c.Header("Content-Encoding", "")
 	} else if contentEncoding == "gzip" {
 		gzReader, err := gzip.NewReader(resp.Body)
@@ -49,7 +49,7 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 		} else {
 			defer gzReader.Close()
 			bodyReader = gzReader
-			// Remove Content-Encoding header since we're decompressing
+			// 移除 Content-Encoding 头，因为我们正在解压
 			c.Header("Content-Encoding", "")
 		}
 	}
@@ -72,11 +72,11 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 		}
 	}
 
-	// Try to parse usage from upstream response first
+	// 首先尝试从上游响应解析使用情况
 	channelType := channelHandler.GetChannelType()
 	usage := ParseUsageFromStream(tailBuffer.Bytes(), channelType)
 
-	// If parsing failed, estimate tokens as fallback
+	// 如果解析失败，估算 token 作为回退
 	if usage == nil {
 		usage = estimateTokensFromStream(model, requestBody, tailBuffer.Bytes())
 	}
@@ -84,7 +84,7 @@ func (ps *ProxyServer) handleStreamingResponse(c *gin.Context, resp *http.Respon
 	return usage
 }
 
-// handleNormalResponse handles non-streaming responses and returns token usage
+// handleNormalResponse 处理非流式响应并返回 token 使用情况
 func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response, channelHandler channel.ChannelProxy, model string, requestBody []byte) *TokenUsage {
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -92,13 +92,13 @@ func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response,
 		return nil
 	}
 
-	// For parsing usage, we may need to decompress brotli
-	// Go's http.Client auto-decompresses gzip/deflate but NOT brotli
+	// 为了解析使用情况，可能需要解压 brotli
+	// Go 的 http.Client 自动解压 gzip/deflate，但不会解压 brotli
 	var bodyToParse []byte = body
 	contentEncoding := resp.Header.Get("Content-Encoding")
 
 	if contentEncoding == "br" && len(body) > 0 {
-		// Brotli compressed - decompress for parsing
+		// Brotli 压缩 - 解压以进行解析
 		reader := brotli.NewReader(bytes.NewReader(body))
 		decompressed, err := io.ReadAll(reader)
 		if err == nil {
@@ -120,7 +120,7 @@ func (ps *ProxyServer) handleNormalResponse(c *gin.Context, resp *http.Response,
 	return usage
 }
 
-// tailBuffer is a circular buffer that keeps only the last N bytes
+// tailBuffer 是一个环形缓冲区，仅保留最后 N 个字节
 type tailBuffer struct {
 	buf     []byte
 	maxSize int
@@ -137,16 +137,16 @@ func newTailBuffer(maxSize int) *tailBuffer {
 func (tb *tailBuffer) Write(p []byte) (int, error) {
 	n := len(p)
 	if n > tb.maxSize {
-		// If the write is larger than the buffer, only keep the last part
+		// 如果写入大于缓冲区，仅保留最后部分
 		copy(tb.buf, p[len(p)-tb.maxSize:])
 		tb.size = tb.maxSize
 		return n, nil
 	}
 
-	// Check if we need to wrap around
+	// 检查是否需要回绕
 	remaining := tb.maxSize - tb.size
 	if n <= remaining {
-		// Fits in the remaining space
+		// 适合剩余空间
 		copy(tb.buf[tb.size:], p)
 		tb.size += n
 	} else {

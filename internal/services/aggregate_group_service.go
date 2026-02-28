@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sync"
 
 	app_errors "gpt-load/internal/errors"
@@ -9,28 +11,29 @@ import (
 	"gpt-load/internal/utils"
 
 	"github.com/sirupsen/logrus"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// SubGroupInput defines the input payload for aggregate group member configuration.
+// SubGroupInput 定义聚合组成员的输入参数。
 type SubGroupInput struct {
 	GroupID uint `json:"group_id"`
 	Weight  int  `json:"weight"`
 }
 
-// AggregateValidationResult captures the normalized aggregate group parameters.
+// AggregateValidationResult 捕获规范化后的聚合组参数。
 type AggregateValidationResult struct {
 	ValidationEndpoint string
 	SubGroups          []models.GroupSubGroup
 }
 
-// AggregateGroupService encapsulates aggregate group specific behaviours.
+// AggregateGroupService 封装聚合组的特定行为。
 type AggregateGroupService struct {
 	db           *gorm.DB
 	groupManager *GroupManager
 }
 
-// NewAggregateGroupService constructs an AggregateGroupService instance.
+// NewAggregateGroupService 构造一个 AggregateGroupService 实例。
 func NewAggregateGroupService(db *gorm.DB, groupManager *GroupManager) *AggregateGroupService {
 	return &AggregateGroupService{
 		db:           db,
@@ -38,7 +41,7 @@ func NewAggregateGroupService(db *gorm.DB, groupManager *GroupManager) *Aggregat
 	}
 }
 
-// ValidateSubGroups validates sub-groups with an optional existing validation endpoint for consistency check.
+// ValidateSubGroups 验证子组，可选的现有验证端点用于一致性检查。
 func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelType string, inputs []SubGroupInput, existingEndpoint string) (*AggregateValidationResult, error) {
 	if len(inputs) == 0 {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_groups_required", nil)
@@ -98,7 +101,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 	}, nil
 }
 
-// GetSubGroups returns sub groups for an aggregate group with complete information
+// GetSubGroups 返回聚合组的子组，包含完整信息
 func (s *AggregateGroupService) GetSubGroups(ctx context.Context, groupID uint) ([]models.SubGroupInfo, error) {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
@@ -158,7 +161,7 @@ func (s *AggregateGroupService) GetSubGroups(ctx context.Context, groupID uint) 
 	return subGroups, nil
 }
 
-// AddSubGroups adds new sub groups to an aggregate group
+// AddSubGroups 向聚合组添加新的子组
 func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, inputs []SubGroupInput) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
@@ -221,7 +224,7 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 	return nil
 }
 
-// UpdateSubGroupWeight updates the weight of a specific sub group
+// UpdateSubGroupWeight 更新特定子组的权重
 func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupID, subGroupID uint, weight int) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
@@ -273,7 +276,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 	return nil
 }
 
-// DeleteSubGroup removes a sub group from an aggregate group
+// DeleteSubGroup 从聚合组中移除一个子组，并同步清理模型映射中的相关条目
 func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, subGroupID uint) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
@@ -287,19 +290,25 @@ func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, sub
 		return NewI18nError(app_errors.ErrBadRequest, "group.not_aggregate", nil)
 	}
 
-	result := s.db.WithContext(ctx).
-		Where("group_id = ? AND sub_group_id = ?", groupID, subGroupID).
-		Delete(&models.GroupSubGroup{})
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		result := tx.Where("group_id = ? AND sub_group_id = ?", groupID, subGroupID).
+			Delete(&models.GroupSubGroup{})
 
-	if result.Error != nil {
-		return result.Error
+		if result.Error != nil {
+			return result.Error
+		}
+
+		if result.RowsAffected == 0 {
+			return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
+		}
+
+		return s.cleanupModelMappingsForSubGroup(ctx, tx, &group, subGroupID)
+	})
+
+	if err != nil {
+		return err
 	}
 
-	if result.RowsAffected == 0 {
-		return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
-	}
-
-	// Trigger cache update
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after deleting sub group")
 	}
@@ -307,7 +316,66 @@ func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, sub
 	return nil
 }
 
-// CountAggregateGroupsUsingSubGroup returns the number of aggregate groups that use the specified group as a sub-group
+// cleanupModelMappingsForSubGroup 清理模型映射中引用已删除子组的条目
+func (s *AggregateGroupService) cleanupModelMappingsForSubGroup(ctx context.Context, tx *gorm.DB, group *models.Group, subGroupID uint) error {
+	if len(group.ModelMappings) == 0 {
+		return nil
+	}
+
+	var mappings []models.ModelMapping
+	if err := json.Unmarshal(group.ModelMappings, &mappings); err != nil {
+		logrus.WithContext(ctx).WithFields(logrus.Fields{
+			"group_id": group.ID,
+			"error":    err,
+		}).Warn("Failed to parse model mappings during sub-group deletion")
+		return nil
+	}
+
+	updatedMappings := make([]models.ModelMapping, 0, len(mappings))
+	for _, mapping := range mappings {
+		var filteredTargets []models.ModelMappingTarget
+		for _, target := range mapping.Targets {
+			if target.SubGroupID != subGroupID {
+				filteredTargets = append(filteredTargets, target)
+			}
+		}
+
+		if len(filteredTargets) > 0 {
+			mapping.Targets = filteredTargets
+			updatedMappings = append(updatedMappings, mapping)
+		}
+	}
+
+	// No changes needed if mapping count unchanged
+	if len(updatedMappings) == len(mappings) {
+		return nil
+	}
+
+	// Log removed targets
+	removedCount := len(mappings) - len(updatedMappings)
+	if removedCount > 0 {
+		logrus.WithContext(ctx).WithFields(logrus.Fields{
+			"group_id":        group.ID,
+			"deleted_subgroup": subGroupID,
+			"removed_mappings": removedCount,
+		}).Info("Cleaned up model mappings after sub-group deletion")
+	}
+
+	updatedJSON, err := json.Marshal(updatedMappings)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated model mappings: %w", err)
+	}
+
+	if err := tx.WithContext(ctx).Model(&models.Group{}).
+		Where("id = ?", group.ID).
+		Update("model_mappings", datatypes.JSON(updatedJSON)).Error; err != nil {
+		return fmt.Errorf("failed to update model mappings: %w", err)
+	}
+
+	return nil
+}
+
+// CountAggregateGroupsUsingSubGroup 返回使用指定组作为子组的聚合组数量
 func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroup(ctx context.Context, subGroupID uint) (int64, error) {
 	var count int64
 	err := s.db.WithContext(ctx).
@@ -322,7 +390,7 @@ func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroup(ctx context.Co
 	return count, nil
 }
 
-// CountAggregateGroupsUsingSubGroupTx returns number of aggregate groups that use specified group as a sub-group (transaction version)
+// CountAggregateGroupsUsingSubGroupTx 返回使用指定组作为子组的聚合组数量（事务版本）
 func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroupTx(ctx context.Context, subGroupID uint, tx *gorm.DB) (int64, error) {
 	var count int64
 	err := tx.WithContext(ctx).
@@ -337,7 +405,7 @@ func (s *AggregateGroupService) CountAggregateGroupsUsingSubGroupTx(ctx context.
 	return count, nil
 }
 
-// GetParentAggregateGroups returns the aggregate groups that use the specified group as a sub-group
+// GetParentAggregateGroups 返回使用指定组作为子组的聚合组
 func (s *AggregateGroupService) GetParentAggregateGroups(ctx context.Context, subGroupID uint) ([]models.ParentAggregateGroupInfo, error) {
 	var groupSubGroups []models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("sub_group_id = ?", subGroupID).Find(&groupSubGroups).Error; err != nil {
@@ -374,7 +442,7 @@ func (s *AggregateGroupService) GetParentAggregateGroups(ctx context.Context, su
 	return parentGroups, nil
 }
 
-// keyStatsResult stores key statistics for a single group
+// keyStatsResult 存储单个组的密钥统计数据
 type keyStatsResult struct {
 	GroupID     uint
 	TotalKeys   int64
@@ -383,7 +451,7 @@ type keyStatsResult struct {
 	Err         error
 }
 
-// fetchSubGroupsKeyStats batch fetches key statistics for multiple sub-groups concurrently
+// fetchSubGroupsKeyStats 并发批量获取多个子组的密钥统计信息
 func (s *AggregateGroupService) fetchSubGroupsKeyStats(ctx context.Context, groupIDs []uint) map[uint]keyStatsResult {
 	results := make(map[uint]keyStatsResult)
 	var mu sync.Mutex

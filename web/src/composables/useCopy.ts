@@ -8,8 +8,8 @@ export function useCopy() {
 
   async function copyWithFeedback(
     content: string,
-    successKey: string,
-    errorKey: string,
+    successKey: string = "common.copySuccess",
+    errorKey: string = "common.copyFailed",
     params?: Record<string, unknown>
   ): Promise<boolean> {
     const success = await copy(content);

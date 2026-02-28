@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetTaskStatus handles requests for the status of the global long-running task.
+// GetTaskStatus 处理全局长运行任务的状态请求
 func (s *Server) GetTaskStatus(c *gin.Context) {
 	taskStatus, err := s.TaskService.GetTaskStatus()
 	if err != nil {

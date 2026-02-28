@@ -163,10 +163,8 @@ const formatJsonString = (jsonStr: string) => {
   }
 };
 
-async function copyContent(content: string, type: string) {
-  const successKey = "logs.copiedToClipboard";
-  const errorKey = "logs.copyFailed";
-  await copyWithFeedback(content, successKey, errorKey, { type });
+async function copyContent(content: string, _type: string) {
+  await copyWithFeedback(content);
 }
 
 // Column visibility management
@@ -765,7 +763,7 @@ const deselectAllColumns = () => {
                 <span class="detail-value-compact">{{ selectedLog.group_name }}</span>
               </div>
               <div class="detail-item-compact">
-                <span class="detail-label-compact">{{ t("logs.requestModel") }}:</span>
+                <span class="detail-label-compact">{{ t("logs.originalModel") }}:</span>
                 <span class="detail-value-compact">{{ selectedLog.original_model || "-" }}</span>
               </div>
               <div class="detail-item-compact">

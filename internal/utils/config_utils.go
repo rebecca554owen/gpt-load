@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// GenerateSettingsMetadata generates metadata from SystemSettings struct using reflection
+// GenerateSettingsMetadata 使用反射从 SystemSettings 结构生成元数据
 func GenerateSettingsMetadata(s *types.SystemSettings) []models.SystemSettingInfo {
 	var settingsInfo []models.SystemSettingInfo
 	v := reflect.ValueOf(s).Elem()
@@ -65,7 +65,7 @@ func GenerateSettingsMetadata(s *types.SystemSettings) []models.SystemSettingInf
 	return settingsInfo
 }
 
-// DefaultSystemSettings returns default system configuration
+// DefaultSystemSettings 返回默认系统配置
 func DefaultSystemSettings() types.SystemSettings {
 	s := types.SystemSettings{}
 	v := reflect.ValueOf(&s).Elem()
@@ -88,7 +88,7 @@ func DefaultSystemSettings() types.SystemSettings {
 	return s
 }
 
-// SetFieldFromString sets a struct field's value from a string, based on the field's kind.
+// SetFieldFromString 根据字段的类型从字符串设置结构字段的值。
 func SetFieldFromString(fieldValue reflect.Value, value string) error {
 	if !fieldValue.CanSet() {
 		return fmt.Errorf("field cannot be set")
@@ -115,7 +115,7 @@ func SetFieldFromString(fieldValue reflect.Value, value string) error {
 	return nil
 }
 
-// ParseInteger parses integer environment variable
+// ParseInteger 解析整数环境变量
 func ParseInteger(value string, defaultValue int) int {
 	if value == "" {
 		return defaultValue
@@ -126,7 +126,7 @@ func ParseInteger(value string, defaultValue int) int {
 	return defaultValue
 }
 
-// ParseBoolean parses boolean environment variable
+// ParseBoolean 解析布尔环境变量
 func ParseBoolean(value string, defaultValue bool) bool {
 	if value == "" {
 		return defaultValue
@@ -143,7 +143,7 @@ func ParseBoolean(value string, defaultValue bool) bool {
 	}
 }
 
-// ParseArray parses array environment variable (comma-separated)
+// ParseArray 解析数组环境变量（逗号分隔）
 func ParseArray(value string, defaultValue []string) []string {
 	if value == "" {
 		return defaultValue
@@ -163,7 +163,7 @@ func ParseArray(value string, defaultValue []string) []string {
 	return result
 }
 
-// GetEnvOrDefault gets environment variable or default value
+// GetEnvOrDefault 获取环境变量或默认值
 func GetEnvOrDefault(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -171,13 +171,13 @@ func GetEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-// GetValidationEndpoint returns the effective validation endpoint for a group.
+// GetValidationEndpoint 返回组的有效验证端点。
 func GetValidationEndpoint(group *models.Group) string {
 	if group.ValidationEndpoint != "" {
 		return group.ValidationEndpoint
 	}
 
-	// Return default validation endpoint based on channel type
+	// 根据通道类型返回默认验证端点
 	switch group.ChannelType {
 	case "openai":
 		return "/v1/chat/completions"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { Copy, Key } from "@vicons/ionicons5";
 import { NButton, NIcon, NInput, NInputNumber, NModal, NSpace, useMessage } from "naive-ui";
 import { ref } from "vue";
@@ -24,6 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const message = useMessage();
+const { copyWithFeedback } = useCopy();
 
 // Key generator modal related state
 const showKeyGeneratorModal = ref(false);
@@ -104,12 +105,7 @@ async function copyProxyKeys() {
     .filter(key => key.length > 0)
     .join("\n");
 
-  const success = await copy(formattedKeys);
-  if (success) {
-    message.success(t("keys.keysCopiedToClipboard"));
-  } else {
-    message.error(t("keys.copyFailedManual"));
-  }
+  await copyWithFeedback(formattedKeys);
 }
 
 // Handle input value change

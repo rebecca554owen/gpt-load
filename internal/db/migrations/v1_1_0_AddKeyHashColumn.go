@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_1_0_AddKeyHashColumn adds key_hash column to api_keys and request_logs tables
+// V1_1_0_AddKeyHashColumn 向 api_keys 和 request_logs 表添加 key_hash 列
 func V1_1_0_AddKeyHashColumn(db *gorm.DB) error {
 	// First check if there are any records need migration
 	var needMigrateCount int64

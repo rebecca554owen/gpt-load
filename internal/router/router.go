@@ -50,7 +50,7 @@ func NewRouter(
 
 	router := gin.New()
 
-	// Register global middleware
+	// 注册全局中间件
 	router.Use(middleware.Recovery())
 	router.Use(middleware.ErrorHandler())
 	router.Use(middleware.Logger(configManager.GetLogConfig()))
@@ -63,7 +63,7 @@ func NewRouter(
 		c.Next()
 	})
 
-	// Register routes
+	// 注册路由
 	registerSystemRoutes(router, serverHandler)
 	registerAPIRoutes(router, serverHandler, configManager)
 	registerProxyRoutes(router, proxyServer, groupManager, serverHandler)
@@ -72,12 +72,12 @@ func NewRouter(
 	return router
 }
 
-// registerSystemRoutes registers system-level routes
+// registerSystemRoutes 注册系统级路由
 func registerSystemRoutes(router *gin.Engine, serverHandler *handler.Server) {
 	router.GET("/health", serverHandler.Health)
 }
 
-// registerAPIRoutes registers API routes
+// registerAPIRoutes 注册 API 路由
 func registerAPIRoutes(
 	router *gin.Engine,
 	serverHandler *handler.Server,
@@ -97,7 +97,7 @@ func registerAPIRoutes(
 	registerProtectedAPIRoutes(protectedAPI, serverHandler)
 }
 
-// registerPublicAPIRoutes registers public API routes
+// registerPublicAPIRoutes 注册公共 API 路由
 func registerPublicAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server) {
 	api.POST("/auth/login", serverHandler.Login)
 	api.GET("/integration/info", serverHandler.GetIntegrationInfo)
@@ -111,7 +111,7 @@ func registerPublicAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server
 	}
 }
 
-// registerProtectedAPIRoutes registers authenticated API routes
+// registerProtectedAPIRoutes 注册需要认证的 API 路由
 func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server) {
 	api.GET("/channel-types", serverHandler.CommonHandler.GetChannelTypes)
 
@@ -133,7 +133,7 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		groups.GET("/:id/parent-aggregate-groups", serverHandler.GetParentAggregateGroups)
 	}
 
-	// Key Management Routes
+	// 密钥管理路由
 	keys := api.Group("/keys")
 	{
 		keys.GET("", serverHandler.ListKeysInGroup)
@@ -170,7 +170,7 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 	}
 }
 
-// registerProxyRoutes registers proxy routes
+// registerProxyRoutes 注册代理路由
 func registerProxyRoutes(
 	router *gin.Engine,
 	proxyServer *proxy.ProxyServer,
@@ -185,7 +185,7 @@ func registerProxyRoutes(
 	proxyGroup.Any("/*path", proxyServer.HandleProxy)
 }
 
-// registerFrontendRoutes registers frontend routes
+// registerFrontendRoutes 注册前端路由
 func registerFrontendRoutes(router *gin.Engine, buildFS embed.FS, indexPage []byte) {
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 	router.NoMethod(func(c *gin.Context) {
@@ -201,7 +201,7 @@ func registerFrontendRoutes(router *gin.Engine, buildFS embed.FS, indexPage []by
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
-		// HTML pages not cached, ensure updates take effect immediately
+		// HTML 页面不缓存，确保更新立即生效
 		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")

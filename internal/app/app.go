@@ -1,4 +1,4 @@
-// Package app provides the main application logic and lifecycle management.
+// Package app 提供应用主逻辑和生命周期管理
 package app
 
 import (
@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// App holds all services and manages the application lifecycle.
+// App 持有所有服务并管理应用生命周期
 type App struct {
 	engine            *gin.Engine
 	configManager     types.ConfigManager
@@ -41,7 +41,7 @@ type App struct {
 	httpServer        *http.Server
 }
 
-// AppParams defines the dependencies for the App.
+// AppParams 定义 App 的依赖项
 type AppParams struct {
 	dig.In
 	Engine            *gin.Engine
@@ -57,7 +57,7 @@ type AppParams struct {
 	DB                *gorm.DB
 }
 
-// NewApp is the constructor for App, with dependencies injected by dig.
+// NewApp 是 App 的构造函数，通过 dig 注入依赖
 func NewApp(params AppParams) *App {
 	return &App{
 		engine:            params.Engine,
@@ -74,7 +74,7 @@ func NewApp(params AppParams) *App {
 	}
 }
 
-// Start runs the application, it is a non-blocking call.
+// Start 启动应用，非阻塞调用
 func (a *App) Start() error {
 	// Initialize i18n
 	if err := i18n.Init(); err != nil {
@@ -173,7 +173,7 @@ func (a *App) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the application.
+// Stop 优雅关闭应用
 func (a *App) Stop(ctx context.Context) {
 	logrus.Info("Shutting down server...")
 

@@ -35,7 +35,7 @@ func (ps *ProxyServer) applyParamOverrides(bodyBytes []byte, group *models.Group
 	return finalBody, nil
 }
 
-// logUpstreamError provides a centralized way to log errors from upstream interactions.
+// logUpstreamError 提供集中记录上游交互错误的方式
 func logUpstreamError(context string, err error) {
 	if err == nil {
 		return
@@ -47,7 +47,7 @@ func logUpstreamError(context string, err error) {
 	}
 }
 
-// handleGzipCompression checks for gzip encoding and decompresses the body if necessary.
+// handleGzipCompression 检查 gzip 编码并在需要时解压响应体
 func handleGzipCompression(resp *http.Response, bodyBytes []byte) []byte {
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		reader, gzipErr := gzip.NewReader(bytes.NewReader(bodyBytes))

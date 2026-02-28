@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
 import { useModelTestStatus } from "@/composables/useModelTestStatus";
+import { useCopy } from "@/composables/useCopy";
 import type { Group, ModelMapping, ModelMappingTarget, SubGroupInfo } from "@/types/models";
-import { copy } from "@/utils/clipboard";
 import { formatDuration } from "@/utils/format";
 import {
   CheckmarkCircle,
@@ -38,6 +38,7 @@ const emit = defineEmits<Emits>();
 
 const { t } = useI18n();
 const message = useMessage();
+const { copyWithFeedback } = useCopy();
 
 const {
   startTesting,
@@ -226,12 +227,7 @@ function getTestButtonText(testKey: string): string {
 }
 
 async function copyModelAlias() {
-  const success = await copy(props.mapping.model);
-  if (success) {
-    message.success(t("modelMappings.copySuccess", { alias: props.mapping.model }));
-  } else {
-    message.error(t("modelMappings.copyFailed"));
-  }
+  await copyWithFeedback(props.mapping.model);
 }
 
 function handleEdit() {
@@ -257,9 +253,11 @@ function handleDelete() {
         <div class="model-mapping-names">
           <n-tooltip trigger="hover">
             <template #trigger>
-              <code class="group-url" @click="copyModelAlias">
-                {{ mapping.model }}
-              </code>
+              <span class="group-url-wrapper" @click="copyModelAlias">
+                <code class="group-url">
+                  {{ mapping.model }}
+                </code>
+              </span>
             </template>
             {{ t("keys.clickToCopy") }}
           </n-tooltip>
@@ -490,6 +488,10 @@ html.dark .key-card.status-model-mapping {
   min-width: 0;
 }
 
+.group-url-wrapper {
+  cursor: pointer;
+}
+
 .group-url {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -498,7 +500,6 @@ html.dark .key-card.status-model-mapping {
   border-radius: 4px;
   padding: 2px 6px;
   border: 1px solid var(--border-color);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 

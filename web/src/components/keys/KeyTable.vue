@@ -6,7 +6,7 @@ defineOptions({
 });
 import type { Group, KeyRow, KeyStatus } from "@/types/models";
 import { useAppStateStore } from "@/stores/appState";
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { getGroupDisplayName, maskKey } from "@/utils/display";
 import { formatDuration } from "@/utils/format";
 import { PAGINATION } from "@/constants/chart";
@@ -21,6 +21,7 @@ import KeyPagination from "./KeyPagination.vue";
 import { useVirtualGrid } from "@/composables/useVirtualList";
 
 const { t } = useI18n();
+const { copyWithFeedback } = useCopy();
 
 const appState = useAppStateStore();
 
@@ -216,12 +217,7 @@ async function handleBatchDeleteSuccess() {
 }
 
 async function copyKey(key: KeyRow) {
-  const success = await copy(key.key_value);
-  if (success) {
-    window.$message.success(t("keys.keyCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(key.key_value);
 }
 
 async function testKey(_key: KeyRow) {

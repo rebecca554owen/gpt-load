@@ -2,8 +2,8 @@ package utils
 
 import "encoding/json"
 
-// ModifyJSONField modifies a field in a JSON object and returns the new JSON bytes.
-// If parsing or marshaling fails, returns the original bytes unchanged.
+// ModifyJSONField 修改 JSON 对象中的字段并返回新的 JSON 字节。
+// 如果解析或序列化失败，返回原始字节不变。
 func ModifyJSONField(bodyBytes []byte, field string, value any) []byte {
 	var requestData map[string]any
 	if err := json.Unmarshal(bodyBytes, &requestData); err != nil {
@@ -20,8 +20,8 @@ func ModifyJSONField(bodyBytes []byte, field string, value any) []byte {
 	return newBodyBytes
 }
 
-// ModifyJSONFields modifies multiple fields in a JSON object and returns the new JSON bytes.
-// If parsing or marshaling fails, returns the original bytes unchanged.
+// ModifyJSONFields 修改 JSON 对象中的多个字段并返回新的 JSON 字节。
+// 如果解析或序列化失败，返回原始字节不变。
 func ModifyJSONFields(bodyBytes []byte, fields map[string]any) []byte {
 	var requestData map[string]any
 	if err := json.Unmarshal(bodyBytes, &requestData); err != nil {

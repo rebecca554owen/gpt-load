@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// NewStore creates a new store based on the application configuration.
+// NewStore 根据应用配置创建新的存储。
 func NewStore(cfg types.ConfigManager) (Store, error) {
 	redisDSN := cfg.GetRedisDSN()
 	if redisDSN != "" {

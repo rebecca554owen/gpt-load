@@ -239,7 +239,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	req, err := http.NewRequestWithContext(ctx, c.Request.Method, upstreamURL, bytes.NewReader(bodyBytes))
 	if err != nil {
 		logrus.Errorf("Failed to create upstream request: %v", err)
-		response.Error(c, app_errors.ErrInternalServer)
+		response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, "Failed to create upstream request"))
 		return
 	}
 	req.ContentLength = int64(len(bodyBytes))

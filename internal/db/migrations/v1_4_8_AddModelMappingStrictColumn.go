@@ -5,7 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_4_8_AddModelMappingStrictColumn adds model_mapping_strict column to groups table
+// V1_4_8_AddModelMappingStrictColumn 向 groups 表添加 model_mapping_strict 列
 func V1_4_8_AddModelMappingStrictColumn(db *gorm.DB) error {
 	logrus.Info("Running v1.4.8 migration: Adding model_mapping_strict column to groups table")
 
@@ -25,7 +25,7 @@ func V1_4_8_AddModelMappingStrictColumn(db *gorm.DB) error {
 	return nil
 }
 
-// groupTableStrict is a minimal model for migration purposes
+// groupTableStrict 迁移用的最小模型
 type groupTableStrict struct {
 	ModelMappingStrict bool `gorm:"default:false"`
 }

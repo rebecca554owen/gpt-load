@@ -39,6 +39,8 @@ export default {
     deselectAll: "取消选中",
     moreActions: "更多操作",
     viewDetails: "查看详情",
+    copySuccess: "已复制到剪贴板",
+    copyFailed: "复制失败",
   },
   login: {
     title: "GPT Load",
@@ -499,7 +501,7 @@ export default {
     completionTokens: "输出",
     cachedTokens: "缓存",
     totalTokens: "总计",
-    requestModel: "请求模型",
+    originalModel: "原始模型",
     actualModel: "实际模型",
     totalRecords: "共 {total} 条",
     recordsPerPage: "每页 {size} 条",

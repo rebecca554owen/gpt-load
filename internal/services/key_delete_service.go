@@ -11,19 +11,19 @@ const (
 	deleteChunkSize = 1000
 )
 
-// KeyDeleteResult holds the result of a delete task.
+// KeyDeleteResult 存储删除任务的结果。
 type KeyDeleteResult struct {
 	DeletedCount int `json:"deleted_count"`
 	IgnoredCount int `json:"ignored_count"`
 }
 
-// KeyDeleteService handles the asynchronous deletion of a large number of keys.
+// KeyDeleteService 处理大量密钥的异步删除。
 type KeyDeleteService struct {
 	TaskService *TaskService
 	KeyService  *KeyService
 }
 
-// NewKeyDeleteService creates a new KeyDeleteService.
+// NewKeyDeleteService 创建一个新的 KeyDeleteService。
 func NewKeyDeleteService(taskService *TaskService, keyService *KeyService) *KeyDeleteService {
 	return &KeyDeleteService{
 		TaskService: taskService,
@@ -31,7 +31,7 @@ func NewKeyDeleteService(taskService *TaskService, keyService *KeyService) *KeyD
 	}
 }
 
-// StartDeleteTask initiates a new asynchronous key deletion task.
+// StartDeleteTask 启动一个新的异步密钥删除任务。
 func (s *KeyDeleteService) StartDeleteTask(group *models.Group, keysText string) (*TaskStatus, error) {
 	keys := s.KeyService.ParseKeysFromText(keysText)
 	if len(keys) == 0 {
@@ -73,7 +73,7 @@ func (s *KeyDeleteService) runDelete(group *models.Group, keys []string) {
 	}
 }
 
-// processAndDeleteKeys is the core function for deleting keys with progress tracking.
+// processAndDeleteKeys 是带进度跟踪的删除密钥的核心函数。
 func (s *KeyDeleteService) processAndDeleteKeys(
 	groupID uint,
 	keys []string,

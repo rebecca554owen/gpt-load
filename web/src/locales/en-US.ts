@@ -39,6 +39,8 @@ export default {
     deselectAll: "Deselect All",
     moreActions: "More Actions",
     viewDetails: "View Details",
+    copySuccess: "Copied to clipboard",
+    copyFailed: "Failed to copy",
   },
   login: {
     title: "GPT Load",
@@ -517,7 +519,7 @@ export default {
     completionTokens: "Completion",
     cachedTokens: "Cached",
     totalTokens: "Total",
-    requestModel: "Request Model",
+    originalModel: "Original Model",
     actualModel: "Actual Model",
     totalRecords: "{total} records in total",
     recordsPerPage: "{size} records per page",

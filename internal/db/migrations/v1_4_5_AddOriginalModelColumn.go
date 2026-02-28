@@ -5,7 +5,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_4_5_AddOriginalModelColumn adds original_model column to request_logs table
+// V1_4_5_AddOriginalModelColumn 向 request_logs 表添加 original_model 列
 func V1_4_5_AddOriginalModelColumn(db *gorm.DB) error {
 	logrus.Info("Running v1.4.5 migration: Adding original_model column to request_logs table")
 

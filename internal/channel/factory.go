@@ -14,15 +14,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// channelConstructor defines the function signature for creating a new channel proxy.
+// channelConstructor 定义创建新通道代理的函数签名
 type channelConstructor func(f *Factory, group *models.Group) (ChannelProxy, error)
 
 var (
-	// channelRegistry holds the mapping from channel type string to its constructor.
+	// channelRegistry 保存从通道类型字符串到其构造函数的映射
 	channelRegistry = make(map[string]channelConstructor)
 )
 
-// Register adds a new channel constructor to the registry.
+// Register 添加一个新的通道构造函数到注册表
 func Register(channelType string, constructor channelConstructor) {
 	if _, exists := channelRegistry[channelType]; exists {
 		panic(fmt.Sprintf("channel type '%s' is already registered", channelType))
@@ -30,7 +30,7 @@ func Register(channelType string, constructor channelConstructor) {
 	channelRegistry[channelType] = constructor
 }
 
-// GetChannels returns a slice of all registered channel type names.
+// GetChannels 返回所有已注册的通道类型名称的切片
 func GetChannels() []string {
 	supportedTypes := make([]string, 0, len(channelRegistry))
 	for t := range channelRegistry {
@@ -39,7 +39,7 @@ func GetChannels() []string {
 	return supportedTypes
 }
 
-// Factory is responsible for creating channel proxies.
+// Factory 负责创建通道代理
 type Factory struct {
 	settingsManager *config.SystemSettingsManager
 	clientManager   *httpclient.HTTPClientManager
@@ -47,7 +47,7 @@ type Factory struct {
 	cacheLock       sync.Mutex
 }
 
-// NewFactory creates a new channel factory.
+// NewFactory 创建一个新的通道工厂
 func NewFactory(settingsManager *config.SystemSettingsManager, clientManager *httpclient.HTTPClientManager) *Factory {
 	return &Factory{
 		settingsManager: settingsManager,
@@ -56,7 +56,7 @@ func NewFactory(settingsManager *config.SystemSettingsManager, clientManager *ht
 	}
 }
 
-// GetChannel returns a channel proxy based on the group's channel type.
+// GetChannel 根据组的通道类型返回通道代理
 func (f *Factory) GetChannel(group *models.Group) (ChannelProxy, error) {
 	f.cacheLock.Lock()
 	defer f.cacheLock.Unlock()
@@ -81,7 +81,7 @@ func (f *Factory) GetChannel(group *models.Group) (ChannelProxy, error) {
 	return channel, nil
 }
 
-// newBaseChannel is a helper function to create and configure a BaseChannel.
+// newBaseChannel 是创建和配置 BaseChannel 的辅助函数
 func (f *Factory) newBaseChannel(name string, group *models.Group) (*BaseChannel, error) {
 	type upstreamDef struct {
 		URL    string `json:"url"`
@@ -109,7 +109,7 @@ func (f *Factory) newBaseChannel(name string, group *models.Group) (*BaseChannel
 		upstreamInfos = append(upstreamInfos, UpstreamInfo{URL: u, Weight: def.Weight})
 	}
 
-	// Base configuration for regular requests, derived from the group's effective settings.
+	// 基于组有效设置的常规请求基础配置
 	clientConfig := &httpclient.Config{
 		ConnectTimeout:        time.Duration(group.EffectiveConfig.ConnectTimeout) * time.Second,
 		RequestTimeout:        time.Duration(group.EffectiveConfig.RequestTimeout) * time.Second,
@@ -126,17 +126,17 @@ func (f *Factory) newBaseChannel(name string, group *models.Group) (*BaseChannel
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 
-	// Create a dedicated configuration for streaming requests.
+	// 为流式请求创建专用配置
 	streamConfig := *clientConfig
 	streamConfig.RequestTimeout = 0
 	streamConfig.DisableCompression = true
 	streamConfig.WriteBufferSize = 0
 	streamConfig.ReadBufferSize = 0
-	// Use a larger, independent connection pool for streaming clients to avoid exhaustion.
+	// 为流式客户端使用更大、独立的连接池以避免耗尽
 	streamConfig.MaxIdleConns = max(group.EffectiveConfig.MaxIdleConns*2, 50)
 	streamConfig.MaxIdleConnsPerHost = max(group.EffectiveConfig.MaxIdleConnsPerHost*2, 20)
 
-	// Get both clients from the manager using their respective configurations.
+	// 使用各自的配置从管理器获取两个客户端
 	httpClient := f.clientManager.GetClient(clientConfig)
 	streamClient := f.clientManager.GetClient(&streamConfig)
 

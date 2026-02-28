@@ -7,7 +7,7 @@ import type {
   SubGroupInfo,
 } from "@/types/models";
 import { keysApi } from "@/api/keys";
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { useAppStateStore } from "@/stores/appState";
 import { getGroupDisplayName } from "@/utils/display";
 import { CopyOutline, Pencil, Trash } from "@vicons/ionicons5";
@@ -22,6 +22,7 @@ import GroupStatsSection from "./GroupStatsSection.vue";
 
 const { t } = useI18n();
 const appState = useAppStateStore();
+const { copyWithFeedback } = useCopy();
 
 interface Props {
   group: Group | null;
@@ -229,12 +230,7 @@ async function copyUrl(url: string) {
   if (!url) {
     return;
   }
-  const success = await copy(url);
-  if (success) {
-    window.$message.success(t("keys.urlCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(url);
 }
 
 function resetPage() {
@@ -253,9 +249,11 @@ function resetPage() {
               {{ group ? getGroupDisplayName(group) : t("keys.selectGroup") }}
               <n-tooltip trigger="hover" v-if="group && group.endpoint">
                 <template #trigger>
-                  <code class="group-url" @click="copyUrl(group.endpoint)">
-                    {{ group.endpoint }}
-                  </code>
+                  <span class="group-url-wrapper" @click="copyUrl(group.endpoint)">
+                    <code class="group-url">
+                      {{ group.endpoint }}
+                    </code>
+                  </span>
                 </template>
                 {{ t("keys.clickToCopy") }}
               </n-tooltip>
@@ -375,6 +373,10 @@ function resetPage() {
   gap: 8px;
 }
 
+.group-url-wrapper {
+  cursor: pointer;
+}
+
 .group-url {
   font-size: 0.8rem;
   color: var(--primary-color);
@@ -385,7 +387,6 @@ function resetPage() {
   padding: 2px 6px;
   margin-right: 4px;
   border: 1px solid var(--border-color);
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 

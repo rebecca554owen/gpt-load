@@ -1,4 +1,4 @@
-// Package config provides configuration management for the application
+// Package config 提供应用配置管理
 package config
 
 import (
@@ -14,7 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Constants represents configuration constants
+// Constants 表示配置常量
 type Constants struct {
 	MinPort               int
 	MaxPort               int
@@ -24,7 +24,7 @@ type Constants struct {
 	DefaultMaxFreeSockets int
 }
 
-// DefaultConstants holds default configuration values
+// DefaultConstants 保存默认配置值
 var DefaultConstants = Constants{
 	MinPort:               1,
 	MaxPort:               65535,
@@ -34,13 +34,13 @@ var DefaultConstants = Constants{
 	DefaultMaxFreeSockets: 10,
 }
 
-// Manager implements the ConfigManager interface
+// Manager 实现 ConfigManager 接口
 type Manager struct {
 	config          *Config
 	settingsManager *SystemSettingsManager
 }
 
-// Config represents the application configuration
+// Config 表示应用配置
 type Config struct {
 	Server        types.ServerConfig
 	Auth          types.AuthConfig
@@ -52,7 +52,7 @@ type Config struct {
 	EncryptionKey string
 }
 
-// NewManager creates a new configuration manager
+// NewManager 创建新的配置管理器
 func NewManager(settingsManager *SystemSettingsManager) (types.ConfigManager, error) {
 	manager := &Manager{
 		settingsManager: settingsManager,
@@ -63,7 +63,7 @@ func NewManager(settingsManager *SystemSettingsManager) (types.ConfigManager, er
 	return manager, nil
 }
 
-// ReloadConfig reloads the configuration from environment variables
+// ReloadConfig 从环境变量重新加载配置
 func (m *Manager) ReloadConfig() error {
 	if err := godotenv.Load(); err != nil {
 		logrus.Info("Info: Create .env file to support environment variable configuration")
@@ -114,52 +114,52 @@ func (m *Manager) ReloadConfig() error {
 	return nil
 }
 
-// IsMaster returns Server mode
+// IsMaster 返回服务器模式
 func (m *Manager) IsMaster() bool {
 	return m.config.Server.IsMaster
 }
 
-// GetAuthConfig returns authentication configuration
+// GetAuthConfig 返回认证配置
 func (m *Manager) GetAuthConfig() types.AuthConfig {
 	return m.config.Auth
 }
 
-// GetCORSConfig returns CORS configuration
+// GetCORSConfig 返回 CORS 配置
 func (m *Manager) GetCORSConfig() types.CORSConfig {
 	return m.config.CORS
 }
 
-// GetPerformanceConfig returns performance configuration
+// GetPerformanceConfig 返回性能配置
 func (m *Manager) GetPerformanceConfig() types.PerformanceConfig {
 	return m.config.Performance
 }
 
-// GetLogConfig returns logging configuration
+// GetLogConfig 返回日志配置
 func (m *Manager) GetLogConfig() types.LogConfig {
 	return m.config.Log
 }
 
-// GetRedisDSN returns the Redis DSN string.
+// GetRedisDSN 返回 Redis DSN 字符串
 func (m *Manager) GetRedisDSN() string {
 	return m.config.RedisDSN
 }
 
-// GetDatabaseConfig returns the database configuration.
+// GetDatabaseConfig 返回数据库配置
 func (m *Manager) GetDatabaseConfig() types.DatabaseConfig {
 	return m.config.Database
 }
 
-// GetEncryptionKey returns the encryption key.
+// GetEncryptionKey 返回加密密钥
 func (m *Manager) GetEncryptionKey() string {
 	return m.config.EncryptionKey
 }
 
-// GetEffectiveServerConfig returns server configuration merged with system settings
+// GetEffectiveServerConfig 返回与系统设置合并后的服务器配置
 func (m *Manager) GetEffectiveServerConfig() types.ServerConfig {
 	return m.config.Server
 }
 
-// Validate validates the configuration
+// Validate 验证配置
 func (m *Manager) Validate() error {
 	var validationErrors []string
 
@@ -204,7 +204,7 @@ func (m *Manager) Validate() error {
 	return nil
 }
 
-// DisplayServerConfig displays current server-related configuration information
+// DisplayServerConfig 显示当前服务器相关配置信息
 func (m *Manager) DisplayServerConfig() {
 	serverConfig := m.GetEffectiveServerConfig()
 	corsConfig := m.GetCORSConfig()

@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// handleKeyServiceError handles common key service errors with consistent response.
+// handleKeyServiceError 使用一致的响应处理常见的密钥服务错误
 func handleKeyServiceError(c *gin.Context, err error) {
 	if errors.Is(err, app_errors.ErrBatchSizeExceedsLimit) || errors.Is(err, app_errors.ErrNoValidKeysFound) {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, err.Error()))
@@ -28,8 +28,8 @@ func handleKeyServiceError(c *gin.Context, err error) {
 	response.Error(c, app_errors.ParseDBError(err))
 }
 
-// parseUintParam parses a uint from a string parameter.
-// Returns the parsed uint and true, or 0 and false if parsing fails (error is already sent to client).
+// parseUintParam 解析字符串参数为 uint
+// 返回解析后的 uint 和 true，或解析失败时返回 0 和 false（错误已发送给客户端）
 func parseUintParam(c *gin.Context, value string, i18nKey string) (uint, bool) {
 	if value == "" {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, i18nKey)
@@ -45,14 +45,14 @@ func parseUintParam(c *gin.Context, value string, i18nKey string) (uint, bool) {
 	return uint(parsed), true
 }
 
-// validateGroupIDFromQuery validates and parses group ID from a query parameter.
-// Returns 0 and false if validation fails (error is already sent to client)
+// validateGroupIDFromQuery 验证并解析来自查询参数的组 ID
+// 如果验证失败返回 0 和 false（错误已发送给客户端）
 func validateGroupIDFromQuery(c *gin.Context) (uint, bool) {
 	return parseUintParam(c, c.Query("group_id"), "validation.group_id_required")
 }
 
-// validateKeysText validates the keys text input
-// Returns false if validation fails (error is already sent to client)
+// validateKeysText 验证密钥文本输入
+// 如果验证失败返回 false（错误已发送给客户端）
 func validateKeysText(c *gin.Context, keysText string) bool {
 	if strings.TrimSpace(keysText) == "" {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrValidation, "validation.keys_text_empty")
@@ -62,7 +62,7 @@ func validateKeysText(c *gin.Context, keysText string) bool {
 	return true
 }
 
-// findGroupByID is a helper function to find a group by its ID.
+// findGroupByID 是根据 ID 查找组的辅助函数
 func (s *Server) findGroupByID(c *gin.Context, groupID uint) (*models.Group, bool) {
 	var group models.Group
 	if err := s.DB.First(&group, groupID).Error; err != nil {
@@ -76,25 +76,25 @@ func (s *Server) findGroupByID(c *gin.Context, groupID uint) (*models.Group, boo
 	return &group, true
 }
 
-// KeyTextRequest defines a generic payload for operations requiring a group ID and a text block of keys.
+// KeyTextRequest 定义需要组 ID 和密钥文本块操作的通用载荷
 type KeyTextRequest struct {
 	GroupID  uint   `json:"group_id" binding:"required"`
 	KeysText string `json:"keys_text" binding:"required"`
-	Model    string `json:"model"` // Optional model override for testing
+	Model    string `json:"model"` // 可选的模型覆盖用于测试
 }
 
-// GroupIDRequest defines a generic payload for operations requiring only a group ID.
+// GroupIDRequest 定义只需要组 ID 的操作的通用载荷
 type GroupIDRequest struct {
 	GroupID uint `json:"group_id" binding:"required"`
 }
 
-// ValidateGroupKeysRequest defines the payload for validating keys in a group.
+// ValidateGroupKeysRequest 定义验证组内密钥的载荷
 type ValidateGroupKeysRequest struct {
 	GroupID uint   `json:"group_id" binding:"required"`
 	Status  string `json:"status,omitempty"`
 }
 
-// AddMultipleKeys handles creating new keys from a text block within a specific group.
+// AddMultipleKeys 处理在特定组中从文本块创建新密钥
 func (s *Server) AddMultipleKeys(c *gin.Context) {
 	var req KeyTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -119,12 +119,12 @@ func (s *Server) AddMultipleKeys(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// AddMultipleKeysAsync handles creating new keys from a text block or file within a specific group.
+// AddMultipleKeysAsync 处理在特定组中从文本块或文件创建新密钥
 func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 	var groupID uint
 	var keysText string
 
-	// Check content type to determine if it's a file upload or JSON request
+	// 检查内容类型以确定是文件上传还是 JSON 请求
 	contentType := c.ContentType()
 
 	if strings.Contains(contentType, "multipart/form-data") {
@@ -134,21 +134,21 @@ func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 		}
 		groupID = parsedGroupID
 
-		// Get uploaded file
+		// 获取上传的文件
 		file, err := c.FormFile("file")
 		if err != nil {
 			response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.file_required")
 			return
 		}
 
-		// Validate file extension
+		// 验证文件扩展名
 		ext := strings.ToLower(filepath.Ext(file.Filename))
 		if ext != ".txt" {
 			response.ErrorI18nFromAPIError(c, app_errors.ErrValidation, "validation.only_txt_supported")
 			return
 		}
 
-		// Read file content
+		// 读取文件内容
 		fileContent, err := file.Open()
 		if err != nil {
 			response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.failed_to_open_file")
@@ -156,7 +156,7 @@ func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 		}
 		defer fileContent.Close()
 
-		// Read file content as string using io.ReadAll
+		// 使用 io.ReadAll 将文件内容读取为字符串
 		buf, err := io.ReadAll(fileContent)
 		if err != nil {
 			response.ErrorI18nFromAPIError(c, app_errors.ErrBadRequest, "validation.failed_to_read_file")
@@ -164,7 +164,7 @@ func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 		}
 		keysText = string(buf)
 	} else {
-		// Handle JSON request (original behavior)
+		// 处理 JSON 请求（原始行为）
 		var req KeyTextRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
 			response.Error(c, app_errors.NewAPIError(app_errors.ErrInvalidJSON, err.Error()))
@@ -192,7 +192,7 @@ func (s *Server) AddMultipleKeysAsync(c *gin.Context) {
 	response.Success(c, taskStatus)
 }
 
-// ListKeysInGroup handles listing all keys within a specific group with pagination.
+// ListKeysInGroup 处理列出特定组内的所有密钥，支持分页
 func (s *Server) ListKeysInGroup(c *gin.Context) {
 	groupID, ok := validateGroupIDFromQuery(c)
 	if !ok {
@@ -224,7 +224,7 @@ func (s *Server) ListKeysInGroup(c *gin.Context) {
 		return
 	}
 
-	// Decrypt all keys for display
+	// 解密所有密钥用于显示
 	for i := range keys {
 		decryptedValue, err := s.EncryptionSvc.Decrypt(keys[i].KeyValue)
 		if err != nil {
@@ -239,7 +239,7 @@ func (s *Server) ListKeysInGroup(c *gin.Context) {
 	response.Success(c, paginatedResult)
 }
 
-// DeleteMultipleKeys handles deleting keys from a text block within a specific group.
+// DeleteMultipleKeys 处理从特定组的文本块中删除密钥
 func (s *Server) DeleteMultipleKeys(c *gin.Context) {
 	var req KeyTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -264,7 +264,7 @@ func (s *Server) DeleteMultipleKeys(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// DeleteMultipleKeysAsync handles deleting keys from a text block within a specific group using async task.
+// DeleteMultipleKeysAsync 处理使用异步任务从特定组的文本块中删除密钥
 func (s *Server) DeleteMultipleKeysAsync(c *gin.Context) {
 	var req KeyTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -290,7 +290,7 @@ func (s *Server) DeleteMultipleKeysAsync(c *gin.Context) {
 	response.Success(c, taskStatus)
 }
 
-// RestoreMultipleKeys handles restoring keys from a text block within a specific group.
+// RestoreMultipleKeys 处理从特定组的文本块中恢复密钥
 func (s *Server) RestoreMultipleKeys(c *gin.Context) {
 	var req KeyTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -315,7 +315,7 @@ func (s *Server) RestoreMultipleKeys(c *gin.Context) {
 	response.Success(c, result)
 }
 
-// TestMultipleKeys handles a one-off validation test for multiple keys.
+// TestMultipleKeys 处理多个密钥的一次性验证测试
 func (s *Server) TestMultipleKeys(c *gin.Context) {
 	var req KeyTextRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -352,13 +352,13 @@ func (s *Server) TestMultipleKeys(c *gin.Context) {
 	})
 }
 
-// TestNextKeyRequest defines the payload for testing the next key using round-robin.
+// TestNextKeyRequest 定义使用轮询测试下一个密钥的载荷
 type TestNextKeyRequest struct {
 	GroupID uint   `json:"group_id" binding:"required"`
-	Model   string `json:"model"` // Optional model override for testing
+	Model   string `json:"model"` // 可选的模型覆盖用于测试
 }
 
-// TestNextKey handles testing the next key from the pool using round-robin selection.
+// TestNextKey 处理使用轮询选择测试池中的下一个密钥
 func (s *Server) TestNextKey(c *gin.Context) {
 	var req TestNextKeyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -379,14 +379,14 @@ func (s *Server) TestNextKey(c *gin.Context) {
 
 	start := time.Now()
 
-	// Use round-robin mechanism to select next key
+	// 使用轮询机制选择下一个密钥
 	apiKey, err := s.KeyService.KeyProvider.SelectKey(group.ID)
 	if err != nil {
 		response.Error(c, app_errors.ErrNoActiveKeys)
 		return
 	}
 
-	// Execute validation
+	// 执行验证
 	isValid, validationErr := s.KeyService.KeyValidator.ValidateSingleKey(apiKey, group, req.Model)
 
 	duration := time.Since(start).Milliseconds()
@@ -406,7 +406,7 @@ func (s *Server) TestNextKey(c *gin.Context) {
 	})
 }
 
-// ValidateGroupKeys initiates a manual validation task for all keys in a group.
+// ValidateGroupKeys 启动组内所有密钥的手动验证任务
 func (s *Server) ValidateGroupKeys(c *gin.Context) {
 	var req ValidateGroupKeysRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -414,7 +414,7 @@ func (s *Server) ValidateGroupKeys(c *gin.Context) {
 		return
 	}
 
-	// Validate status if provided
+	// 如果提供则验证状态
 	if req.Status != "" && req.Status != models.KeyStatusActive && req.Status != models.KeyStatusInvalid {
 		response.ErrorI18nFromAPIError(c, app_errors.ErrValidation, "validation.invalid_status_value")
 		return
@@ -440,7 +440,7 @@ func (s *Server) ValidateGroupKeys(c *gin.Context) {
 	response.Success(c, taskStatus)
 }
 
-// RestoreAllInvalidKeys sets the status of all 'inactive' keys in a group to 'active'.
+// RestoreAllInvalidKeys 将组中所有 'inactive' 密钥的状态设置为 'active'
 func (s *Server) RestoreAllInvalidKeys(c *gin.Context) {
 	var req GroupIDRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -461,7 +461,7 @@ func (s *Server) RestoreAllInvalidKeys(c *gin.Context) {
 	response.SuccessI18n(c, "success.keys_restored", nil, map[string]any{"count": rowsAffected})
 }
 
-// ClearAllInvalidKeys deletes all 'inactive' keys from a group.
+// ClearAllInvalidKeys 从组中删除所有 'inactive' 密钥
 func (s *Server) ClearAllInvalidKeys(c *gin.Context) {
 	var req GroupIDRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -482,7 +482,7 @@ func (s *Server) ClearAllInvalidKeys(c *gin.Context) {
 	response.SuccessI18n(c, "success.invalid_keys_cleared", nil, map[string]any{"count": rowsAffected})
 }
 
-// ClearAllKeys deletes all keys from a group.
+// ClearAllKeys 从组中删除所有密钥
 func (s *Server) ClearAllKeys(c *gin.Context) {
 	var req GroupIDRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -503,7 +503,7 @@ func (s *Server) ClearAllKeys(c *gin.Context) {
 	response.SuccessI18n(c, "success.all_keys_cleared", nil, map[string]any{"count": rowsAffected})
 }
 
-// ExportKeys handles exporting keys to a text file.
+// ExportKeys 处理将密钥导出到文本文件
 func (s *Server) ExportKeys(c *gin.Context) {
 	groupID, ok := validateGroupIDFromQuery(c)
 	if !ok {
@@ -536,12 +536,12 @@ func (s *Server) ExportKeys(c *gin.Context) {
 	}
 }
 
-// UpdateKeyNotesRequest defines the payload for updating a key's notes.
+// UpdateKeyNotesRequest 定义更新密钥备注的载荷
 type UpdateKeyNotesRequest struct {
 	Notes string `json:"notes"`
 }
 
-// UpdateKeyNotes handles updating the notes of a specific API key.
+// UpdateKeyNotes 处理更新特定 API 密钥的备注
 func (s *Server) UpdateKeyNotes(c *gin.Context) {
 	keyID, ok := parseUintParam(c, c.Param("id"), "validation.invalid_id_format")
 	if !ok {
@@ -554,14 +554,14 @@ func (s *Server) UpdateKeyNotes(c *gin.Context) {
 		return
 	}
 
-	// Normalize and enforce length explicitly
+	// 规范化并明确强制执行长度
 	req.Notes = strings.TrimSpace(req.Notes)
 	if utf8.RuneCountInString(req.Notes) > 255 {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrValidation, "notes length must be <= 255 characters"))
 		return
 	}
 
-	// Check if the key exists and update its notes
+	// 检查密钥是否存在并更新其备注
 	var key models.APIKey
 	if err := s.DB.First(&key, keyID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -572,7 +572,7 @@ func (s *Server) UpdateKeyNotes(c *gin.Context) {
 		return
 	}
 
-	// Update notes
+	// 更新备注
 	if err := s.DB.Model(&key).Update("notes", req.Notes).Error; err != nil {
 		response.Error(c, app_errors.ParseDBError(err))
 		return

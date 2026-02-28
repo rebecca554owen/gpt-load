@@ -14,14 +14,14 @@ import (
 	"gorm.io/gorm"
 )
 
-// KeyTestResult holds the validation result for a single key.
+// KeyTestResult 保存单个密钥的验证结果。
 type KeyTestResult struct {
 	KeyValue string `json:"key_value"`
 	IsValid  bool   `json:"is_valid"`
 	Error    string `json:"error,omitempty"`
 }
 
-// KeyValidator provides methods to validate API keys.
+// KeyValidator 提供验证 API 密钥的方法。
 type KeyValidator struct {
 	DB              *gorm.DB
 	channelFactory  *channel.Factory
@@ -39,7 +39,7 @@ type KeyValidatorParams struct {
 	EncryptionSvc   encryption.Service
 }
 
-// NewKeyValidator creates a new KeyValidator.
+// NewKeyValidator 创建一个新的 KeyValidator。
 func NewKeyValidator(params KeyValidatorParams) *KeyValidator {
 	return &KeyValidator{
 		DB:              params.DB,
@@ -50,8 +50,8 @@ func NewKeyValidator(params KeyValidatorParams) *KeyValidator {
 	}
 }
 
-// ValidateSingleKey performs a validation check on a single API key.
-// The model parameter is optional and overrides the channel's TestModel if provided.
+// ValidateSingleKey 对单个 API 密钥执行验证检查。
+// model 参数是可选的，如果提供则覆盖通道的 TestModel。
 func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group, model string) (bool, error) {
 	if group.EffectiveConfig.AppUrl == "" {
 		group.EffectiveConfig = s.SettingsManager.GetEffectiveConfig(group.Config)
@@ -89,12 +89,12 @@ func (s *KeyValidator) ValidateSingleKey(key *models.APIKey, group *models.Group
 	return true, nil
 }
 
-// TestMultipleKeys performs a synchronous validation for a list of key values within a specific group.
-// The model parameter is optional and overrides the group's test_model if provided.
+// TestMultipleKeys 对特定组中的密钥值列表执行同步验证。
+// model 参数是可选的，如果提供则覆盖组的 test_model。
 func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string, model string) ([]KeyTestResult, error) {
 	results := make([]KeyTestResult, len(keyValues))
 
-	// Generate hashes for all key values
+	// 为所有密钥值生成哈希
 	var keyHashes []string
 	for _, keyValue := range keyValues {
 		keyHash := s.encryptionSvc.Hash(keyValue)
@@ -104,7 +104,7 @@ func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string,
 		keyHashes = append(keyHashes, keyHash)
 	}
 
-	// Find which of the provided keys actually exist in the database for this group
+	// 查找提供的密钥中哪些实际存在于该组的数据库中
 	var existingKeys []models.APIKey
 	if len(keyHashes) > 0 {
 		if err := s.DB.Where("group_id = ? AND key_hash IN ?", group.ID, keyHashes).Find(&existingKeys).Error; err != nil {
@@ -112,7 +112,7 @@ func (s *KeyValidator) TestMultipleKeys(group *models.Group, keyValues []string,
 		}
 	}
 
-	// Create a map of key_hash to APIKey for quick lookup
+	// 创建 key_hash 到 APIKey 的映射以便快速查找
 	existingKeyMap := make(map[string]models.APIKey)
 	for _, k := range existingKeys {
 		existingKeyMap[k.KeyHash] = k

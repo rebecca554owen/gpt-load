@@ -218,29 +218,29 @@ func (u *TokenUsage) Total() int64 {
 }
 
 func extractTokenFields(u map[string]interface{}, usage *TokenUsage, channelType string) {
-	// Extract prompt/input tokens
+	// 提取 prompt/input tokens
 	if pt, ok := u["prompt_tokens"].(float64); ok {
 		usage.PromptTokens = int64(pt)
 	} else if it, ok := u["input_tokens"].(float64); ok {
 		usage.PromptTokens = int64(it)
 	}
 
-	// Extract completion/output tokens
+	// 提取 completion/output tokens
 	if ct, ok := u["completion_tokens"].(float64); ok {
 		usage.CompletionTokens = int64(ct)
 	} else if ot, ok := u["output_tokens"].(float64); ok {
 		usage.CompletionTokens = int64(ot)
 	}
 
-	// Extract cached tokens from various locations
+	// 从各个位置提取缓存 tokens
 	extractCachedTokens(u, usage)
 
-	// Process cache tokens based on channel type
+	// 根据通道类型处理缓存 token
 	processCacheByChannel(usage, channelType)
 }
 
 func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
-	// Try OpenAI prompt_tokens_details.cached_tokens
+	// 尝试 OpenAI prompt_tokens_details.cached_tokens
 	if usage.CachedTokens == 0 {
 		if ptd, ok := u["prompt_tokens_details"].(map[string]interface{}); ok {
 			if ct, ok := ptd["cached_tokens"].(float64); ok {
@@ -249,7 +249,7 @@ func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
 		}
 	}
 
-	// Try OpenAI compatible input_tokens_details.cached_tokens
+	// 尝试 OpenAI 兼容的 input_tokens_details.cached_tokens
 	if usage.CachedTokens == 0 {
 		if itd, ok := u["input_tokens_details"].(map[string]interface{}); ok {
 			if ct, ok := itd["cached_tokens"].(float64); ok {
@@ -258,7 +258,7 @@ func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
 		}
 	}
 
-	// Try Anthropic cache_read_input_tokens
+	// 尝试 Anthropic cache_read_input_tokens
 	if usage.CachedTokens == 0 {
 		if ct, ok := u["cache_read_input_tokens"].(float64); ok {
 			usage.CachedTokens = int64(ct)
@@ -269,15 +269,15 @@ func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
 func processCacheByChannel(usage *TokenUsage, channelType string) {
 	switch channelType {
 	case "anthropic":
-		// Claude's input_tokens does not include cache_read_input_tokens
-		// We need to add them to get the total prompt tokens
+		// Claude 的 input_tokens 不包含 cache_read_input_tokens
+		// 需要将它们相加以获得总 prompt tokens
 		if usage.CachedTokens > 0 {
 			usage.PromptTokens += usage.CachedTokens
 		}
 
 	default:
-		// OpenAI and other channels: prompt_tokens already includes cached_tokens
-		// Validate that cached_tokens does not exceed prompt_tokens
+		// OpenAI 和其他通道：prompt_tokens 已包含 cached_tokens
+		// 验证 cached_tokens 不超过 prompt_tokens
 		if usage.CachedTokens > usage.PromptTokens && usage.PromptTokens > 0 {
 			logrus.WithFields(logrus.Fields{
 				"cached_tokens": usage.CachedTokens,
@@ -304,7 +304,7 @@ func ParseUsage(body []byte, channelType string) *TokenUsage {
 	if u, ok := resp["usage"].(map[string]interface{}); ok {
 		extractTokenFields(u, usage, channelType)
 	} else {
-		// Try Anthropic format (top-level fields)
+		// 尝试 Anthropic 格式（顶级字段）
 		if it, ok := resp["input_tokens"].(float64); ok {
 			usage.PromptTokens = int64(it)
 		}
@@ -314,7 +314,7 @@ func ParseUsage(body []byte, channelType string) *TokenUsage {
 		if ct, ok := resp["cache_read_input_tokens"].(float64); ok {
 			usage.CachedTokens = int64(ct)
 		}
-		// Process cache for Anthropic format
+		// 为 Anthropic 格式处理缓存
 		processCacheByChannel(usage, channelType)
 	}
 
@@ -380,7 +380,7 @@ func ParseUsageFromStream(tailData []byte, channelType string) *TokenUsage {
 	return lastUsage
 }
 
-// estimateTokens estimates token usage from request and response bodies
+// estimateTokens 从请求和响应体估算 token 使用情况
 func estimateTokens(model string, requestBody, responseBody []byte) *TokenUsage {
 	if len(requestBody) == 0 || len(responseBody) == 0 {
 		return nil
@@ -388,13 +388,13 @@ func estimateTokens(model string, requestBody, responseBody []byte) *TokenUsage 
 
 	usage := &TokenUsage{}
 
-	// Extract prompt text from request messages
+	// 从请求消息中提取提示文本
 	promptText := extractPromptFromRequest(requestBody)
 	if promptText != "" {
 		usage.PromptTokens = int64(EstimateTokenByModel(model, promptText))
 	}
 
-	// Extract completion text from response
+	// 从响应中提取完成文本
 	completionText := extractCompletionFromResponse(responseBody)
 	if completionText != "" {
 		usage.CompletionTokens = int64(EstimateTokenByModel(model, completionText))
@@ -407,7 +407,7 @@ func estimateTokens(model string, requestBody, responseBody []byte) *TokenUsage 
 	return usage
 }
 
-// estimateTokensFromStream estimates token usage from streaming response
+// estimateTokensFromStream 从流式响应估算 token 使用情况
 func estimateTokensFromStream(model string, requestBody, streamData []byte) *TokenUsage {
 	if len(requestBody) == 0 || len(streamData) == 0 {
 		return nil
@@ -415,13 +415,13 @@ func estimateTokensFromStream(model string, requestBody, streamData []byte) *Tok
 
 	usage := &TokenUsage{}
 
-	// Extract prompt text from request messages
+	// 从请求消息中提取提示文本
 	promptText := extractPromptFromRequest(requestBody)
 	if promptText != "" {
 		usage.PromptTokens = int64(EstimateTokenByModel(model, promptText))
 	}
 
-	// Extract completion text from streaming SSE data
+	// 从流式 SSE 数据中提取完成文本
 	completionText := extractCompletionFromStream(streamData)
 	if completionText != "" {
 		usage.CompletionTokens = int64(EstimateTokenByModel(model, completionText))
@@ -434,7 +434,7 @@ func estimateTokensFromStream(model string, requestBody, streamData []byte) *Tok
 	return usage
 }
 
-// extractPromptFromRequest extracts prompt text from request body
+// extractPromptFromRequest 从请求体中提取提示文本
 func extractPromptFromRequest(body []byte) string {
 	var req map[string]interface{}
 	if err := json.Unmarshal(body, &req); err != nil {
@@ -443,16 +443,16 @@ func extractPromptFromRequest(body []byte) string {
 
 	var textBuilder strings.Builder
 
-	// Extract from messages array (OpenAI/Claude format)
+	// 从消息数组提取（OpenAI/Claude 格式）
 	if messages, ok := req["messages"].([]interface{}); ok {
 		for _, msg := range messages {
 			if m, ok := msg.(map[string]interface{}); ok {
-				// Handle content as string
+				// 处理内容为字符串的情况
 				if content, ok := m["content"].(string); ok {
 					textBuilder.WriteString(content)
 					textBuilder.WriteString(" ")
 				}
-				// Handle content as array (multimodal)
+				// 处理内容为数组的情况（多模态）
 				if contentArr, ok := m["content"].([]interface{}); ok {
 					for _, item := range contentArr {
 						if itemMap, ok := item.(map[string]interface{}); ok {
@@ -467,7 +467,7 @@ func extractPromptFromRequest(body []byte) string {
 		}
 	}
 
-	// Extract from prompt field (completion API)
+	// 从提示字段提取（completion API）
 	if prompt, ok := req["prompt"].(string); ok {
 		textBuilder.WriteString(prompt)
 	}
@@ -475,7 +475,7 @@ func extractPromptFromRequest(body []byte) string {
 	return textBuilder.String()
 }
 
-// extractCompletionFromResponse extracts completion text from response body
+// extractCompletionFromResponse 从响应体中提取完成文本
 func extractCompletionFromResponse(body []byte) string {
 	var resp map[string]interface{}
 	if err := json.Unmarshal(body, &resp); err != nil {
@@ -484,7 +484,7 @@ func extractCompletionFromResponse(body []byte) string {
 
 	var textBuilder strings.Builder
 
-	// OpenAI format: choices[].message.content
+	// OpenAI 格式：choices[].message.content
 	if choices, ok := resp["choices"].([]interface{}); ok {
 		for _, choice := range choices {
 			if c, ok := choice.(map[string]interface{}); ok {
@@ -494,7 +494,7 @@ func extractCompletionFromResponse(body []byte) string {
 						textBuilder.WriteString(" ")
 					}
 				}
-				// Handle text field (completion API)
+				// 处理文本字段（completion API）
 				if text, ok := c["text"].(string); ok {
 					textBuilder.WriteString(text)
 					textBuilder.WriteString(" ")
@@ -503,7 +503,7 @@ func extractCompletionFromResponse(body []byte) string {
 		}
 	}
 
-	// Claude format: content[].text
+	// Claude 格式：content[].text
 	if content, ok := resp["content"].([]interface{}); ok {
 		for _, item := range content {
 			if itemMap, ok := item.(map[string]interface{}); ok {
@@ -518,7 +518,7 @@ func extractCompletionFromResponse(body []byte) string {
 	return textBuilder.String()
 }
 
-// parseStreamChunks parses SSE data chunks and calls the provided function for each chunk
+// parseStreamChunks 解析 SSE 数据块并对每个块调用提供的函数
 func parseStreamChunks(data []byte, fn func(chunk map[string]interface{})) {
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
@@ -544,11 +544,11 @@ func parseStreamChunks(data []byte, fn func(chunk map[string]interface{})) {
 	}
 }
 
-// extractCompletionFromStream extracts completion text from SSE streaming data
+// extractCompletionFromStream 从 SSE 流式数据中提取完成文本
 func extractCompletionFromStream(streamData []byte) string {
 	var textBuilder strings.Builder
 	parseStreamChunks(streamData, func(data map[string]interface{}) {
-		// OpenAI format: choices[].delta.content
+		// OpenAI 格式：choices[].delta.content
 		if choices, ok := data["choices"].([]interface{}); ok {
 			for _, choice := range choices {
 				if c, ok := choice.(map[string]interface{}); ok {
@@ -560,7 +560,7 @@ func extractCompletionFromStream(streamData []byte) string {
 				}
 			}
 		}
-		// Claude format: delta.text
+		// Claude 格式：delta.text
 		if delta, ok := data["delta"].(map[string]interface{}); ok {
 			if text, ok := delta["text"].(string); ok {
 				textBuilder.WriteString(text)
@@ -570,11 +570,11 @@ func extractCompletionFromStream(streamData []byte) string {
 	return textBuilder.String()
 }
 
-// containsContent checks if the chunk contains actual token content (not just control messages)
+// containsContent 检查数据块是否包含实际的 token 内容（不仅仅是控制消息）
 func containsContent(chunk []byte) bool {
 	found := false
 	parseStreamChunks(chunk, func(data map[string]interface{}) {
-		// OpenAI format: choices[].delta.content
+		// OpenAI 格式：choices[].delta.content
 		if choices, ok := data["choices"].([]interface{}); ok {
 			for _, choice := range choices {
 				if c, ok := choice.(map[string]interface{}); ok {
@@ -587,7 +587,7 @@ func containsContent(chunk []byte) bool {
 				}
 			}
 		}
-		// Claude format: delta.text
+		// Claude 格式：delta.text
 		if delta, ok := data["delta"].(map[string]interface{}); ok {
 			if text, ok := delta["text"].(string); ok && text != "" {
 				found = true
