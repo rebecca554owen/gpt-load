@@ -202,7 +202,7 @@ func (b *BaseChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte, gr
 		logrus.WithFields(logrus.Fields{
 			"group":          group.Name,
 			"original_model": model,
-			"target_model":   targetModel,
+			"model":          targetModel,
 			"channel":        "json_body",
 		}).Debug("Model redirected")
 

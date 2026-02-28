@@ -1,16 +1,18 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"fmt"
+	"sort"
+	"strings"
+	"time"
+
 	"gpt-load/internal/encryption"
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/i18n"
 	"gpt-load/internal/models"
 	"gpt-load/internal/response"
 	"gpt-load/internal/utils"
-	"sort"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -30,6 +32,41 @@ const (
 	// Token speed chart configuration
 	topCombosLimit = 7 // Number of top group-model combinations to track
 )
+
+// extractAuthKey extracts auth key from various sources
+func extractAuthKey(c *gin.Context) string {
+	if key := c.Query("key"); key != "" {
+		query := c.Request.URL.Query()
+		query.Del("key")
+		c.Request.URL.RawQuery = query.Encode()
+		return key
+	}
+
+	authHeader := c.GetHeader("Authorization")
+	if authHeader != "" {
+		const bearerPrefix = "Bearer "
+		if strings.HasPrefix(authHeader, bearerPrefix) {
+			return authHeader[len(bearerPrefix):]
+		}
+	}
+
+	if key := c.GetHeader("X-Api-Key"); key != "" {
+		return key
+	}
+
+	if key := c.GetHeader("X-Goog-Api-Key"); key != "" {
+		return key
+	}
+
+	return ""
+}
+
+// isAuthenticated checks if the request is authenticated
+func (s *Server) isAuthenticated(c *gin.Context) bool {
+	key := extractAuthKey(c)
+	authConfig := s.config.GetAuthConfig()
+	return key != "" && subtle.ConstantTimeCompare([]byte(key), []byte(authConfig.Key)) == 1
+}
 
 type timeGranularity int
 
@@ -235,8 +272,11 @@ func (s *Server) Stats(c *gin.Context) {
 		previousNonCachedPrompt = 0
 	}
 
-	// Get security warning information
-	securityWarnings := s.getSecurityWarnings(c)
+	// Get security warning information (only for authenticated users)
+	var securityWarnings []models.SecurityWarning
+	if s.isAuthenticated(c) {
+		securityWarnings = s.getSecurityWarnings(c)
+	}
 
 	stats := models.DashboardStatsResponse{
 		KeyCount:              trendCard(currentKeyStats.TotalKeys, previousKeyStats.TotalKeys),
@@ -1071,6 +1111,17 @@ const (
 
 // EncryptionStatus checks if ENCRYPTION_KEY is configured but keys are not encrypted
 func (s *Server) EncryptionStatus(c *gin.Context) {
+	// Only return encryption status to authenticated users
+	if !s.isAuthenticated(c) {
+		response.Success(c, gin.H{
+			"has_mismatch":  false,
+			"scenario_type": "",
+			"message":       "",
+			"suggestion":    "",
+		})
+		return
+	}
+
 	hasMismatch, scenarioType, message, suggestion := s.checkEncryptionMismatch(c)
 
 	response.Success(c, gin.H{

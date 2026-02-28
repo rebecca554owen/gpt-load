@@ -136,7 +136,7 @@ func (ch *GeminiChannel) applyNativeFormatRedirect(req *http.Request, bodyBytes 
 				logrus.WithFields(logrus.Fields{
 					"group":          group.Name,
 					"original_model": originalModel,
-					"target_model":   targetModel,
+					"model":          targetModel,
 					"channel":        "gemini_native",
 					"original_path":  path,
 					"new_path":       req.URL.Path,

@@ -76,6 +76,13 @@ func NewDB(configManager types.ConfigManager) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
+	// Fix MySQL table charset to utf8mb4 if needed
+	if strings.Contains(dsn, "@tcp") {
+		if err := fixMysqlCharset(DB); err != nil {
+			log.Printf("Warning: failed to fix MySQL charset: %v", err)
+		}
+	}
+
 	// Configure connection pool from environment variables
 	maxIdleConns := getEnvInt("DB_MAX_IDLE_CONNS", 50)
 	maxOpenConns := getEnvInt("DB_MAX_OPEN_CONNS", 500)
@@ -113,4 +120,48 @@ func GetSQLDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("database not initialized")
 	}
 	return DB.DB()
+}
+
+// fixMysqlCharset ensures all tables use utf8mb4 charset
+func fixMysqlCharset(db *gorm.DB) error {
+	tables := []string{
+		"request_logs",
+		"api_keys",
+		"groups",
+		"group_sub_groups",
+		"system_settings",
+		"group_hourly_stats",
+	}
+
+	for _, table := range tables {
+		var exists int
+		err := db.Raw("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?", table).Scan(&exists).Error
+		if err != nil || exists == 0 {
+			continue // Table doesn't exist yet, will be created by AutoMigrate
+		}
+
+		var charset string
+		err = db.Raw(`
+			SELECT CCSA.CHARACTER_SET_NAME
+			FROM information_schema.TABLES T
+			JOIN information_schema.COLLATION_CHARACTER_SET_APPLICABILITY CCSA
+				ON T.TABLE_COLLATION = CCSA.COLLATION_NAME
+			WHERE T.TABLE_SCHEMA = DATABASE() AND T.TABLE_NAME = ?
+		`, table).Scan(&charset).Error
+
+		if err != nil {
+			continue
+		}
+
+		if charset != "utf8mb4" {
+			result := db.Exec(fmt.Sprintf("ALTER TABLE %s CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci", table))
+			if result.Error != nil {
+				log.Printf("Warning: failed to convert table %s to utf8mb4: %v", table, result.Error)
+			} else {
+				log.Printf("Converted table %s from %s to utf8mb4", table, charset)
+			}
+		}
+	}
+
+	return nil
 }
