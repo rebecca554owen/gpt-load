@@ -20,9 +20,11 @@ import (
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/keypool"
 	"gpt-load/internal/models"
+	"gpt-load/internal/modifier"
 	"gpt-load/internal/response"
 	"gpt-load/internal/services"
 	"gpt-load/internal/utils"
+	"gpt-load/internal/utils/jsonutil"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -88,13 +90,6 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 	}
 	c.Request.Body.Close()
 
-	if normalizedBody, normalized := utils.NormalizeJSONRequestBody(bodyBytes, c.GetHeader("Content-Type")); normalized {
-		logrus.WithFields(logrus.Fields{
-			"group": originalGroup.Name,
-		}).Debug("request body normalized from lenient JSON")
-		bodyBytes = normalizedBody
-	}
-
 	var channelHandler channel.ChannelProxy
 	if originalGroup.GroupType == "aggregate" {
 		// For aggregate groups, use first subgroup to extract model name
@@ -156,56 +151,29 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		}
 	}
 
-	// Collect all modifications to apply them in a single pass
-	// This avoids multiple JSON marshal/unmarshal cycles that could corrupt the request body
-	modifications := make(map[string]any)
-
-	// Collect model modification from model mapping
-	if selectedModel != "" {
-		modifications["model"] = selectedModel
+	// Create modification context
+	modCtx := &modifier.ModificationContext{
+		Context:       c.Request.Context(),
+		OriginalGroup: originalGroup,
+		SelectedGroup: group,
+		OriginalModel: model,
+		SelectedModel: selectedModel,
+		IsAggregate:   originalGroup.GroupType == "aggregate",
+		RequestPath:   c.Request.URL.Path,
 	}
 
-	// Collect model modification from model redirect
-	// Note: Model redirect uses the FINAL model value (after model mapping)
-	finalModel := selectedModel
-	if finalModel == "" {
-		finalModel = model // Use original model if no mapping was applied
-	}
+	// Create modifier chain
+	chain := modifier.NewModifierChain(
+		modifier.NewModelMappingModifier(),
+		modifier.NewModelRedirectModifier(),
+		modifier.NewParamOverrideModifier(),
+	)
 
-	if len(group.ModelRedirectMap) > 0 {
-		if actualModel, found := group.ModelRedirectMap[finalModel]; found {
-			modifications["model"] = actualModel
-			logrus.WithFields(logrus.Fields{
-				"group":          group.Name,
-				"original_model": finalModel,
-				"redirected_to":  actualModel,
-			}).Debug("Model redirect applied")
-		} else if group.ModelRedirectStrict {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, fmt.Sprintf("model '%s' is not configured in redirect rules", finalModel)))
-			return
-		}
-	}
-
-	// Collect ParamOverrides: aggregate first, then subgroup (subgroup takes precedence)
-	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
-		// Apply aggregate group's ParamOverrides first (base configuration)
-		for key, value := range originalGroup.ParamOverrides {
-			modifications[key] = value
-		}
-		// Then apply subgroup's ParamOverrides (takes precedence on conflicts)
-		for key, value := range group.ParamOverrides {
-			modifications[key] = value
-		}
-	} else {
-		for key, value := range group.ParamOverrides {
-			modifications[key] = value
-		}
-	}
-
-	// Apply all modifications in a single pass
-	finalBodyBytes := bodyBytes
-	if len(modifications) > 0 {
-		finalBodyBytes = utils.ModifyJSONFields(bodyBytes, modifications)
+	// Apply modifications
+	finalBodyBytes, err := chain.Apply(modCtx, bodyBytes)
+	if err != nil {
+		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, err.Error()))
+		return
 	}
 
 	isStream := channelHandler.IsStreamRequest(c, bodyBytes)
@@ -525,7 +493,12 @@ func (ps *ProxyServer) trySwitchToAnotherSubGroup(
 	updatedBodyBytes := bodyBytes
 	updatedSelectedModel := newSelection.SelectedModel
 	if updatedSelectedModel != "" && updatedSelectedModel != currentModel.Model {
-		updatedBodyBytes = utils.ModifyJSONField(bodyBytes, "model", updatedSelectedModel)
+		var err error
+		updatedBodyBytes, err = jsonutil.SetField(bodyBytes, "model", updatedSelectedModel)
+		if err != nil {
+			logrus.WithError(err).Error("Failed to update model field for cross-sub-group retry")
+			return false
+		}
 	}
 
 	ps.executeRequestWithRetry(c, newChannelHandler, originalGroup, newGroup, updatedBodyBytes, isStream, startTime, 0, modelAlias, excludedSubGroupIDs)
