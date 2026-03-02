@@ -199,7 +199,11 @@ watch(
 watch(
   () => formData.channel_type,
   (_newChannelType, oldChannelType) => {
-    if (!props.group && oldChannelType) {
+    if (!oldChannelType) {
+      return;
+    }
+
+    if (!props.group) {
       if (
         !userModifiedFields.value.test_model ||
         formData.test_model === getOldDefaultTestModel(oldChannelType)
@@ -217,6 +221,8 @@ watch(
         userModifiedFields.value.upstream = false;
       }
     }
+
+    formData.validation_endpoint = "";
   }
 );
 
@@ -267,7 +273,7 @@ function resetForm() {
     channel_type: defaultChannelType,
     sort: 1,
     test_model: isCreateMode ? testModelPlaceholder.value : "",
-    validation_endpoint: isCreateMode ? validationEndpointPlaceholder.value : "",
+    validation_endpoint: "",
     param_overrides: "",
     model_redirect_rules: "",
     model_redirect_strict: false,
