@@ -173,45 +173,11 @@ func (b *BaseChannel) GetStreamClient() *http.Client {
 }
 
 // ApplyModelRedirect 根据组的重定向规则应用模型重定向
+// Note: For most channels, model redirect is already applied in HandleProxy (server.go)
+// This method is kept for channel-specific implementations (e.g., Gemini native format)
 func (b *BaseChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error) {
-	if len(group.ModelRedirectMap) == 0 || len(bodyBytes) == 0 {
-		return bodyBytes, nil
-	}
-
-	var requestData map[string]any
-	if err := json.Unmarshal(bodyBytes, &requestData); err != nil {
-		return bodyBytes, nil
-	}
-
-	modelValue, exists := requestData["model"]
-	if !exists {
-		return bodyBytes, nil
-	}
-
-	model, ok := modelValue.(string)
-	if !ok {
-		return bodyBytes, nil
-	}
-
-	// 无需任何前缀处理的直接匹配
-	if actualModel, found := group.ModelRedirectMap[model]; found {
-		requestData["model"] = actualModel
-
-		// 记录重定向用于审计
-		logrus.WithFields(logrus.Fields{
-			"group":          group.Name,
-			"original_model": model,
-			"model":          actualModel,
-			"channel":        "json_body",
-		}).Debug("Model redirected")
-
-		return json.Marshal(requestData)
-	}
-
-	if group.ModelRedirectStrict {
-		return nil, fmt.Errorf("model '%s' is not configured in redirect rules", model)
-	}
-
+	// Base channel implementation: no additional processing needed
+	// Model redirect is already applied in server.go HandleProxy
 	return bodyBytes, nil
 }
 

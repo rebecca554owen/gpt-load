@@ -156,32 +156,56 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		}
 	}
 
-	// Modify model in request body if mapping changed it
-	finalBodyBytes := bodyBytes
+	// Collect all modifications to apply them in a single pass
+	// This avoids multiple JSON marshal/unmarshal cycles that could corrupt the request body
+	modifications := make(map[string]any)
+
+	// Collect model modification from model mapping
 	if selectedModel != "" {
-		finalBodyBytes = utils.ModifyJSONField(bodyBytes, "model", selectedModel)
+		modifications["model"] = selectedModel
 	}
 
-	// Merge ParamOverrides: aggregate first, then subgroup (subgroup takes precedence)
+	// Collect model modification from model redirect
+	// Note: Model redirect uses the FINAL model value (after model mapping)
+	finalModel := selectedModel
+	if finalModel == "" {
+		finalModel = model // Use original model if no mapping was applied
+	}
+
+	if len(group.ModelRedirectMap) > 0 {
+		if actualModel, found := group.ModelRedirectMap[finalModel]; found {
+			modifications["model"] = actualModel
+			logrus.WithFields(logrus.Fields{
+				"group":          group.Name,
+				"original_model": finalModel,
+				"redirected_to":  actualModel,
+			}).Debug("Model redirect applied")
+		} else if group.ModelRedirectStrict {
+			response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, fmt.Sprintf("model '%s' is not configured in redirect rules", finalModel)))
+			return
+		}
+	}
+
+	// Collect ParamOverrides: aggregate first, then subgroup (subgroup takes precedence)
 	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
 		// Apply aggregate group's ParamOverrides first (base configuration)
-		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, originalGroup)
-		if err != nil {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply aggregate parameter overrides: %v", err)))
-			return
+		for key, value := range originalGroup.ParamOverrides {
+			modifications[key] = value
 		}
 		// Then apply subgroup's ParamOverrides (takes precedence on conflicts)
-		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
-		if err != nil {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply subgroup parameter overrides: %v", err)))
-			return
+		for key, value := range group.ParamOverrides {
+			modifications[key] = value
 		}
 	} else {
-		finalBodyBytes, err = ps.applyParamOverrides(finalBodyBytes, group)
-		if err != nil {
-			response.Error(c, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("Failed to apply parameter overrides: %v", err)))
-			return
+		for key, value := range group.ParamOverrides {
+			modifications[key] = value
 		}
+	}
+
+	// Apply all modifications in a single pass
+	finalBodyBytes := bodyBytes
+	if len(modifications) > 0 {
+		finalBodyBytes = utils.ModifyJSONFields(bodyBytes, modifications)
 	}
 
 	isStream := channelHandler.IsStreamRequest(c, bodyBytes)
@@ -260,7 +284,8 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	req.Header.Del("X-Goog-Api-Key")
 	req.Header.Del("Api-Key")
 
-	// Apply model redirection
+	// Apply channel-specific model redirect (e.g., Gemini native format needs URL path modification)
+	// This will NOT modify the request body again if already processed
 	finalBodyBytes, err := channelHandler.ApplyModelRedirect(req, bodyBytes, group)
 	if err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, err.Error()))
@@ -268,7 +293,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		return
 	}
 
-	// Update request body if it was modified by redirection
+	// Update request body if it was modified by channel-specific redirect
 	if !bytes.Equal(finalBodyBytes, bodyBytes) {
 		req.Body = io.NopCloser(bytes.NewReader(finalBodyBytes))
 		req.ContentLength = int64(len(finalBodyBytes))
