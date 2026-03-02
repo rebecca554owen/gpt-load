@@ -209,6 +209,14 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	apiKey, err := ps.keyProvider.SelectKey(group.ID)
 	if err != nil {
 		logrus.Errorf("Failed to select a key for group %s on attempt %d: %v", group.Name, retryCount+1, err)
+
+		// For aggregate groups, try switching to another sub-group when no keys available
+		if originalGroup.GroupType == "aggregate" {
+			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, bodyBytes, isStream, startTime, excludedSubGroupIDs, http.StatusServiceUnavailable, err.Error()) {
+				return
+			}
+		}
+
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrNoKeysAvailable, err.Error()))
 		ps.logRequest(c, originalGroup, group, nil, startTime, http.StatusServiceUnavailable, err, isStream, "", channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
 		return
@@ -301,8 +309,14 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		defer resp.Body.Close()
 	}
 
-	// Unified error handling for retries. Exclude 404 from being a retryable error.
-	if err != nil || (resp != nil && resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound) {
+	// Unified error handling for retries.
+	// - 5xx server errors: retry within current group (up to MaxRetries), then switch for aggregate groups
+	// - 429 rate limit: retry, may succeed with different key
+	// - 4xx client errors (except 404): no retry within group, but aggregate groups can try next sub-group
+	// - 404: do not retry, resource not found
+	isRetryableHTTPError := resp != nil && (resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests)
+
+	if err != nil || isRetryableHTTPError {
 		if err != nil && app_errors.IsIgnorableError(err) {
 			logrus.Debugf("Client-side ignorable error for key %s, aborting retries: %v", utils.MaskAPIKey(apiKey.KeyValue), err)
 			ps.logRequest(c, originalGroup, group, apiKey, startTime, 499, err, isStream, upstreamURL, channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
@@ -336,7 +350,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		// Update key status using parsed error information
 		ps.keyProvider.UpdateStatus(apiKey, group, false, parsedError)
 
-		// Check if this is the last attempt
+		// Check if this is the last attempt within current group
 		isLastAttempt := retryCount >= cfg.MaxRetries
 		requestType := models.RequestTypeRetry
 		if isLastAttempt {
@@ -345,7 +359,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, bodyBytes, nil, requestType, modelAlias)
 
-		// If this is the last attempt, check if it's an aggregate group and try switching to another sub-group
+		// If this is the last attempt within current group, check if it's an aggregate group and try switching
 		if isLastAttempt && originalGroup.GroupType == "aggregate" {
 			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, finalBodyBytes, isStream, startTime, excludedSubGroupIDs, statusCode, errorMessage) {
 				return
@@ -362,6 +376,40 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		}
 
 		ps.executeRequestWithRetry(c, channelHandler, originalGroup, group, finalBodyBytes, isStream, startTime, retryCount+1, modelAlias, excludedSubGroupIDs)
+		return
+	}
+
+	// Handle 4xx client errors (except 404 which should pass through)
+	// 404: pass through to allow client handling
+	// Other 4xx: no retry within group, but aggregate groups can try next sub-group
+	if resp != nil && resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound {
+		statusCode := resp.StatusCode
+		errorBody, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			logrus.Errorf("Failed to read error body: %v", readErr)
+			errorBody = []byte("Failed to read error body")
+		}
+
+		errorBody = handleGzipCompression(resp, errorBody)
+		errorMessage := string(errorBody)
+		parsedError := app_errors.ParseUpstreamError(errorBody)
+
+		logrus.Debugf("Request failed with status %d for key %s. Parsed Error: %s", statusCode, utils.MaskAPIKey(apiKey.KeyValue), parsedError)
+
+		// Update key status
+		ps.keyProvider.UpdateStatus(apiKey, group, false, parsedError)
+
+		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, finalBodyBytes, nil, models.RequestTypeFinal, modelAlias)
+
+		// For aggregate groups, try switching to another sub-group on 4xx errors
+		// Different providers may have different API formats, so switching might help
+		if originalGroup.GroupType == "aggregate" {
+			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, finalBodyBytes, isStream, startTime, excludedSubGroupIDs, statusCode, errorMessage) {
+				return
+			}
+		}
+
+		ps.returnUpstreamError(c, statusCode, errorMessage)
 		return
 	}
 
