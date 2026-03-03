@@ -316,6 +316,38 @@ func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, sub
 	return nil
 }
 
+// CleanupModelMappingsForDeletedSubGroup 清理所有引用已删除子组的聚合组的模型映射
+func (s *AggregateGroupService) CleanupModelMappingsForDeletedSubGroup(ctx context.Context, tx *gorm.DB, subGroupID uint) error {
+	var parentGroupIDs []uint
+	if err := tx.WithContext(ctx).
+		Model(&models.GroupSubGroup{}).
+		Where("sub_group_id = ?", subGroupID).
+		Pluck("group_id", &parentGroupIDs).Error; err != nil {
+		return err
+	}
+
+	if len(parentGroupIDs) == 0 {
+		return nil
+	}
+
+	var parentGroups []models.Group
+	if err := tx.WithContext(ctx).Where("id IN ?", parentGroupIDs).Find(&parentGroups).Error; err != nil {
+		return err
+	}
+
+	for _, group := range parentGroups {
+		if err := s.cleanupModelMappingsForSubGroup(ctx, tx, &group, subGroupID); err != nil {
+			logrus.WithContext(ctx).WithFields(logrus.Fields{
+				"group_id":        group.ID,
+				"deleted_subgroup": subGroupID,
+				"error":           err,
+			}).Error("Failed to cleanup model mappings for deleted sub-group")
+		}
+	}
+
+	return nil
+}
+
 // cleanupModelMappingsForSubGroup 清理模型映射中引用已删除子组的条目
 func (s *AggregateGroupService) cleanupModelMappingsForSubGroup(ctx context.Context, tx *gorm.DB, group *models.Group, subGroupID uint) error {
 	if len(group.ModelMappings) == 0 {
@@ -346,16 +378,14 @@ func (s *AggregateGroupService) cleanupModelMappingsForSubGroup(ctx context.Cont
 		}
 	}
 
-	// No changes needed if mapping count unchanged
 	if len(updatedMappings) == len(mappings) {
 		return nil
 	}
 
-	// Log removed targets
 	removedCount := len(mappings) - len(updatedMappings)
 	if removedCount > 0 {
 		logrus.WithContext(ctx).WithFields(logrus.Fields{
-			"group_id":        group.ID,
+			"group_id":         group.ID,
 			"deleted_subgroup": subGroupID,
 			"removed_mappings": removedCount,
 		}).Info("Cleaned up model mappings after sub-group deletion")

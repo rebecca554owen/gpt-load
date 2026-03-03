@@ -510,6 +510,11 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) (err error) {
 		return app_errors.ParseDBError(err)
 	}
 
+	// 清理所有引用该组的聚合组的模型映射（必须在删除 GroupSubGroup 记录之前执行）
+	if err := s.aggregateGroupService.CleanupModelMappingsForDeletedSubGroup(ctx, tx, id); err != nil {
+		return fmt.Errorf("failed to cleanup model mappings: %w", err)
+	}
+
 	if err := tx.Where("group_id = ? OR sub_group_id = ?", id, id).Delete(&models.GroupSubGroup{}).Error; err != nil {
 		return app_errors.ParseDBError(err)
 	}
