@@ -58,7 +58,7 @@ export function formatDateTime(timestamp: string): string {
   }
   const date = new Date(timestamp);
   const locale = i18n.global.locale.value;
-  // Map locale to toLocaleString compatible format
+  // 将语言环境映射到 toLocaleString 兼容格式
   const localeStr = locale === "zh-CN" ? "zh-CN" : locale === "ja-JP" ? "ja-JP" : "en-US";
   return date.toLocaleString(localeStr, { hour12: false }).replace(/\//g, "-");
 }

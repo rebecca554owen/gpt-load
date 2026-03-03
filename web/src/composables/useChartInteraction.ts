@@ -78,7 +78,7 @@ export function useChartInteraction(
         index,
       }))
       .filter(item => !hiddenDatasetIndices().has(item.index) && item.value > 0)
-      .sort((a, b) => b.value - a.value); // Sort by value descending
+      .sort((a, b) => b.value - a.value); // 按值降序排序
 
     if (closestTimeIndex >= 0) {
       hoveredPoint.value = {
@@ -92,20 +92,20 @@ export function useChartInteraction(
         datasetsAtTime.reduce((sum, item) => sum + getYPosition(item.value), 0) /
         datasetsAtTime.length;
 
-      // Calculate tooltip position with viewport boundary detection
-      // Tooltip width: 280px for token_speed view (group - model labels), 180px for others
+      // 计算带有视口边界检测的 tooltip 位置
+      // token_speed 视图的 tooltip 宽度：280px（组 - 模型标签），其他视图：180px
       const isTokenSpeedView = currentData.datasets.some(d => d.label && d.label.includes(" - "));
       const tooltipWidth = isTokenSpeedView ? 280 : 180;
 
-      // Calculate position relative to the viewport
+      // 计算相对于视口的位置
       const svgRect = svg.getBoundingClientRect();
       const xInSvg = getXPosition(closestTimeIndex);
 
-      // CSS uses transform: translate(-50%, -100%), so we need to account for that offset
-      // The tooltip center (50%) should not exceed viewport boundaries
+      // CSS 使用 transform: translate(-50%, -100%)，所以我们需要考虑该偏移
+      // tooltip 中心（50%）不应超过视口边界
       const tooltipHalfWidth = (tooltipWidth / 2 / svgRect.width) * CHART_CONFIG.width;
 
-      // Check SVG boundaries (accounting for transform offset)
+      // 检查 SVG 边界（考虑 transform 偏移）
       const maxX = CHART_CONFIG.width - tooltipHalfWidth;
       const minX = tooltipHalfWidth;
 
@@ -116,18 +116,18 @@ export function useChartInteraction(
         adjustedXInSvg = minX;
       }
 
-      // Also check viewport boundaries for extra safety
+      // 还要检查视口边界以确保安全
       const xInViewport = svgRect.left + (xInSvg / CHART_CONFIG.width) * svgRect.width;
       const viewportWidth = window.innerWidth;
       const padding = 16;
 
-      // If tooltip would overflow on the right side of viewport, shift it left
+      // 如果 tooltip 在视口右侧溢出，向左移动
       if (xInViewport + tooltipWidth / 2 > viewportWidth - padding) {
         const maxViewportX = viewportWidth - padding - tooltipWidth / 2;
         const adjustedViewportX = Math.min(xInViewport, maxViewportX);
         adjustedXInSvg = ((adjustedViewportX - svgRect.left) / svgRect.width) * CHART_CONFIG.width;
       }
-      // If tooltip would overflow on the left side of viewport, shift it right
+      // 如果 tooltip 在视口左侧溢出，向右移动
       else if (xInViewport - tooltipWidth / 2 < padding) {
         const minViewportX = padding + tooltipWidth / 2;
         const adjustedViewportX = Math.max(xInViewport, minViewportX);

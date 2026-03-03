@@ -62,7 +62,7 @@ onMounted(() => {
 <template>
   <footer class="app-footer">
     <div class="footer-container">
-      <!-- Main info section -->
+      <!-- 主要信息区域 -->
       <div class="footer-main">
         <span class="project-info">
           <a href="https://github.com/tbphp/gpt-load" target="_blank" rel="noopener noreferrer">
@@ -72,7 +72,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- Version info -->
+        <!-- 版本信息 -->
         <div
           class="version-container"
           :class="{
@@ -103,7 +103,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- Links section -->
+        <!-- 链接区域 -->
         <div class="links-container">
           <n-tooltip trigger="hover" placement="top">
             <template #trigger>
@@ -183,7 +183,7 @@ onMounted(() => {
 
         <n-divider vertical />
 
-        <!-- Copyright info -->
+        <!-- 版权信息 -->
         <div class="copyright-container">
           <span class="copyright-text">
             © 2025 by
@@ -241,7 +241,7 @@ onMounted(() => {
   text-decoration: underline;
 }
 
-/* Version info area */
+/* 版本信息区域 */
 .version-container {
   display: flex;
   align-items: center;
@@ -277,7 +277,7 @@ onMounted(() => {
   opacity: 0.7;
 }
 
-/* Links area */
+/* 链接区域 */
 .links-container {
   display: flex;
   align-items: center;
@@ -308,7 +308,7 @@ onMounted(() => {
   align-items: center;
 }
 
-/* Copyright info area */
+/* 版权信息区域 */
 .copyright-container {
   display: flex;
   align-items: center;
@@ -335,7 +335,7 @@ onMounted(() => {
   text-decoration: underline !important;
 }
 
-/* Responsive design */
+/* 响应式设计 */
 @media (max-width: 768px) {
   .app-footer {
     padding: 10px 16px;

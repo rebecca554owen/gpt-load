@@ -80,7 +80,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 			return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_channel_mismatch", nil)
 		}
 
-		// Each sub-group uses its own endpoint configuration, no longer enforcing consistency
+		// 每个子组使用自己的端点配置，不再强制要求一致性
 		subGroupMap[sg.ID] = sg
 	}
 
@@ -96,7 +96,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 	}
 
 	return &AggregateValidationResult{
-		ValidationEndpoint: "", // No longer using unified validation endpoint
+		ValidationEndpoint: "", // 不再使用统一的验证端点
 		SubGroups:          resultSubGroups,
 	}, nil
 }
@@ -175,19 +175,19 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 		return NewI18nError(app_errors.ErrBadRequest, "group.not_aggregate", nil)
 	}
 
-	// Check for existing sub-groups (for deduplication)
+	// 检查现有子组（用于去重）
 	var existingSubGroups []models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("group_id = ?", groupID).Find(&existingSubGroups).Error; err != nil {
 		return err
 	}
 
-	// Validate sub-groups (no longer enforcing endpoint consistency)
+	// 验证子组（不再强制端点一致性）
 	result, err := s.ValidateSubGroups(ctx, group.ChannelType, inputs, "")
 	if err != nil {
 		return err
 	}
 
-	// Check for duplicates with existing sub groups
+	// 检查与现有子组的重复
 	existingSubGroupIDs := utils.NewUintSet()
 	for _, sg := range existingSubGroups {
 		existingSubGroupIDs.Add(sg.SubGroupID)
@@ -200,7 +200,7 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 		}
 	}
 
-	// Add new sub groups
+	// 添加新子组
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for _, newSg := range result.SubGroups {
 			newSg.GroupID = groupID
@@ -216,7 +216,7 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 		return err
 	}
 
-	// Trigger cache update
+	// 触发缓存更新
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after adding sub groups")
 	}
@@ -246,7 +246,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 		return NewI18nError(app_errors.ErrValidation, "validation.sub_group_weight_max_exceeded", nil)
 	}
 
-	// Check if sub-group association exists
+	// 检查子组关联是否存在
 	var existingRecord models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("group_id = ? AND sub_group_id = ?", groupID, subGroupID).First(&existingRecord).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
@@ -268,7 +268,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 		return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
 	}
 
-	// Trigger cache update
+	// 触发缓存更新
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache after updating sub group weight")
 	}
@@ -490,7 +490,7 @@ func (s *AggregateGroupService) fetchSubGroupsKeyStats(ctx context.Context, grou
 			var totalKeys, activeKeys int64
 			result := keyStatsResult{GroupID: gid}
 
-			// Query total keys
+			// 查询总密钥数
 			if err := s.db.WithContext(ctx).Model(&models.APIKey{}).
 				Where("group_id = ?", gid).
 				Count(&totalKeys).Error; err != nil {
@@ -501,7 +501,7 @@ func (s *AggregateGroupService) fetchSubGroupsKeyStats(ctx context.Context, grou
 				return
 			}
 
-			// Query active keys
+			// 查询活跃密钥数
 			if err := s.db.WithContext(ctx).Model(&models.APIKey{}).
 				Where("group_id = ? AND status = ?", gid, models.KeyStatusActive).
 				Count(&activeKeys).Error; err != nil {

@@ -32,8 +32,8 @@ interface VirtualListResult<T = unknown> {
 }
 
 /**
- * Virtual list composable for rendering only visible items
- * Optimized for grid layouts with dynamic item sizing
+ * 虚拟列表 composable，仅渲染可见项
+ * 为动态项目大小的网格布局优化
  */
 export function useVirtualList<T = unknown>(
   items: Ref<T[]>,
@@ -44,30 +44,30 @@ export function useVirtualList<T = unknown>(
   const containerRef = ref<HTMLElement | null>(null);
   const scrollTop = ref(0);
 
-  // Get window width for responsive column calculation
+  // 获取窗口宽度以进行响应式列计算
   const { width: _windowWidth } = useWindowSize();
 
-  // Calculate number of columns based on container width and item width (280px min)
+  // 根据容器宽度和项目宽度（最小 280px）计算列数
   const columnCount = computed(() => {
     if (!containerRef.value) {
       return 3;
     }
-    const containerWidth = containerRef.value.clientWidth - 32; // Subtract padding
-    const itemWidth = 296; // 280px min + 16px gap
+    const containerWidth = containerRef.value.clientWidth - 32; // 减去内边距
+    const itemWidth = 296; // 280px 最小值 + 16px 间隙
     return Math.max(1, Math.floor(containerWidth / itemWidth));
   });
 
-  // Total rows needed to display all items
+  // 显示所有项目所需的总行数
   const totalRows = computed(() => {
     return Math.ceil(items.value.length / columnCount.value);
   });
 
-  // Total height of the virtual container
+  // 虚拟容器的总高度
   const totalHeight = computed(() => {
     return totalRows.value * itemHeight;
   });
 
-  // Calculate visible range
+  // 计算可见范围
   const visibleRange = computed(() => {
     const startRow = Math.floor(scrollTop.value / itemHeight);
     const visibleRowCount = Math.ceil(containerHeight / itemHeight);
@@ -78,7 +78,7 @@ export function useVirtualList<T = unknown>(
     };
   });
 
-  // Get visible items
+  // 获取可见项目
   const list = computed(() => {
     const { start, end } = visibleRange.value;
     const result: VirtualListItem<T>[] = [];
@@ -98,13 +98,13 @@ export function useVirtualList<T = unknown>(
     return result;
   });
 
-  // Calculate wrapper transform
+  // 计算包装器变换
   const translateY = computed(() => {
     const { start } = visibleRange.value;
     return start * itemHeight;
   });
 
-  // Scroll to specific index
+  // 滚动到指定索引
   const scrollTo = (index: number) => {
     if (!containerRef.value) {
       return;
@@ -117,7 +117,7 @@ export function useVirtualList<T = unknown>(
     });
   };
 
-  // Handle scroll events
+  // 处理滚动事件
   const handleScroll = (event: Event) => {
     const target = event.target as HTMLElement;
     scrollTop.value = target.scrollTop;
@@ -144,15 +144,15 @@ export function useVirtualList<T = unknown>(
 }
 
 /**
- * Grid-based virtual list composable for KeyTable
- * Uses fixed row height for predictable layout
+ * 基于网格的虚拟列表 composable，用于 KeyTable
+ * 使用固定的行高度以获得可预测的布局
  */
 export function useVirtualGrid<T = unknown>(
   items: Ref<T[]>,
   containerHeight: number
 ): VirtualListResult<T> {
-  const itemHeight = 180; // Approximate height of a KeyCard
-  const overscan = 2; // Render 2 extra rows above/below viewport
+  const itemHeight = 180; // KeyCard 的近似高度
+  const overscan = 2; // 在视口上方/下方额外渲染 2 行
 
   return useVirtualList(items, {
     itemHeight,

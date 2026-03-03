@@ -48,7 +48,7 @@ const modalVisible = computed({
   set: (value: boolean) => emit("update:show", value),
 });
 
-// Watch for show prop changes to reset form
+// 监听 show 属性变化以重置表单
 watchEffect(() => {
   if (props.show) {
     resetForm();
@@ -85,14 +85,14 @@ async function handleCopy() {
     };
     const result = await keysApi.copyGroup(props.sourceGroup.id, copyData);
 
-    // Show appropriate success message based on copy strategy
+    // 根据复制策略显示相应的成功消息
     if (formData.value.copyKeys !== "none") {
       message.success(
         t("keys.copyGroupWithKeysSuccess", {
           groupName: result.group.display_name || result.group.name,
         })
       );
-      // Trigger task polling to show import progress
+      // 触发任务轮询以显示导入进度
       appState.triggerTaskPolling();
     } else {
       message.success(

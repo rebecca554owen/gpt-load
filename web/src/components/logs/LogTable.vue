@@ -46,7 +46,7 @@ interface LogRow extends RequestLog {
   is_key_visible: boolean;
 }
 
-// Column configuration
+// 列配置
 interface ColumnConfig {
   key: string;
   title: string;
@@ -58,7 +58,7 @@ interface ColumnConfig {
   render?: (row: LogRow) => VNodeChild;
 }
 
-// Data
+// 数据
 const loading = ref(false);
 const logs = ref<LogRow[]>([]);
 const currentPage = ref(1);
@@ -66,11 +66,11 @@ const pageSize = ref(PAGINATION.logPageSize);
 const total = ref(0);
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value));
 
-// Modal for viewing request/response details
+// 查看请求/响应详情的模态框
 const showDetailModal = ref(false);
 const selectedLog = ref<LogRow | null>(null);
 
-// Filters
+// 筛选器
 const filters = reactive({
   parent_group_name: "",
   group_name: "",
@@ -95,7 +95,7 @@ const requestTypeOptions = [
   { label: t("logs.finalRequest"), value: "final" },
 ];
 
-// Fetch data
+// 获取数据
 const loadLogs = async () => {
   loading.value = true;
   try {

@@ -1,15 +1,15 @@
 import { ref, type Ref } from "vue";
 
 /**
- * Loading state management composable
+ * 加载状态管理 composable
  */
 export function useLoading() {
   const loading = ref(false);
 
   /**
-   * Async function wrapper with loading state
-   * @param fn Async function
-   * @returns Wrapped function
+   * 带加载状态的异步函数包装器
+   * @param fn 异步函数
+   * @returns 包装后的函数
    */
   async function withLoading<T>(fn: () => Promise<T>): Promise<T> {
     loading.value = true;
@@ -21,30 +21,30 @@ export function useLoading() {
   }
 
   /**
-   * Set loading state
-   * @param state Loading state
+   * 设置加载状态
+   * @param state 加载状态
    */
   function setLoading(state: boolean): void {
     loading.value = state;
   }
 
   /**
-   * Start loading
+   * 开始加载
    */
   function startLoading(): void {
     loading.value = true;
   }
 
   /**
-   * Stop loading
+   * 停止加载
    */
   function stopLoading(): void {
     loading.value = false;
   }
 
   /**
-   * Create independent loading state
-   * @returns Loading state related functions
+   * 创建独立的加载状态
+   * @returns 加载状态相关函数
    */
   function createLoadingState(): {
     loading: Ref<boolean>;
@@ -96,6 +96,6 @@ export function useLoading() {
 }
 
 /**
- * Default export for convenience
+ * 便捷默认导出
  */
 export default useLoading;

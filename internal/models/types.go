@@ -7,7 +7,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Key status constants
+// 密钥状态常量
 const (
 	KeyStatusActive  = "active"
 	KeyStatusInvalid = "invalid"

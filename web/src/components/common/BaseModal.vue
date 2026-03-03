@@ -52,17 +52,17 @@ const emit = defineEmits<Emits>();
 
 const { t } = useI18n();
 
-// Calculate confirm button text
+// 计算确认按钮文本
 const confirmButtonText = computed(() => {
   return props.confirmText || t("common.confirm");
 });
 
-// Calculate cancel button text
+// 计算取消按钮文本
 const cancelButtonText = computed(() => {
   return props.cancelText || t("common.cancel");
 });
 
-// Calculate modal style
+// 计算模态框样式
 const modalStyle = computed(() => {
   const style: Record<string, string> = {};
 
@@ -89,12 +89,12 @@ const modalStyle = computed(() => {
   return style;
 });
 
-// Calculate whether modal can be closed
+// 计算模态框是否可关闭
 const canClose = computed(() => {
   return !props.loading || !props.preventCloseOnLoading;
 });
 
-// Handle modal close
+// 处理模态框关闭
 function handleClose() {
   if (!canClose.value) {
     return;
@@ -103,7 +103,7 @@ function handleClose() {
   emit("close");
 }
 
-// Handle cancel
+// 处理取消
 function handleCancel() {
   if (!canClose.value) {
     return;
@@ -112,7 +112,7 @@ function handleCancel() {
   handleClose();
 }
 
-// Handle confirm
+// 处理确认
 function handleConfirm() {
   if (props.loading) {
     return;
@@ -134,7 +134,7 @@ function handleConfirm() {
       aria-modal="true"
       :style="modalStyle"
     >
-      <!-- Header -->
+      <!-- 头部 -->
       <div class="modal-card-header" v-if="title || showCloseButton">
         <span class="modal-card-title" v-if="title">{{ title }}</span>
         <n-button
@@ -151,12 +151,12 @@ function handleConfirm() {
         </n-button>
       </div>
 
-      <!-- Content -->
+      <!-- 内容 -->
       <div class="modal-card-content">
         <slot />
       </div>
 
-      <!-- Footer -->
+      <!-- 底部 -->
       <div class="modal-card-footer" v-if="footer">
         <n-button @click="handleCancel" :disabled="!canClose" class="btn-cancel">
           {{ cancelButtonText }}
@@ -177,11 +177,11 @@ function handleConfirm() {
 
 <style scoped>
 .base-modal {
-  /* Basic modal style */
+  /* 基础模态框样式 */
 }
 
 .liquid-glass-modal-card {
-  /* Liquid glass style - unified standard */
+  /* 液态玻璃风格 - 统一标准 */
   background: rgba(250, 252, 255, 0.9);
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -196,7 +196,7 @@ function handleConfirm() {
   flex-direction: column;
 }
 
-/* Dark mode - unified standard */
+/* 暗黑模式 - 统一标准 */
 html.dark .liquid-glass-modal-card {
   background: rgba(35, 40, 55, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -265,7 +265,7 @@ html.dark .modal-card-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-/* Responsive adaptation */
+/* 响应式适配 */
 @media (max-width: 768px) {
   .base-modal-card {
     width: 95vw;
@@ -294,7 +294,7 @@ html.dark .modal-card-footer {
   }
 }
 
-/* Extra small screen adaptation */
+/* 超小屏幕适配 */
 @media (max-width: 480px) {
   .base-modal-card {
     width: 98vw;
@@ -315,9 +315,9 @@ html.dark .modal-card-footer {
   }
 }
 
-/* Dark mode adaptation - already handled in .liquid-glass-modal-card */
+/* 暗黑模式适配 - 已在 .liquid-glass-modal-card 中处理 */
 
-/* Disable close button scale animation to avoid click conflicts */
+/* 禁用关闭按钮缩放动画以避免点击冲突 */
 .modal-close-button:active {
   transform: none !important;
 }

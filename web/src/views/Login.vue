@@ -31,7 +31,7 @@ const handleLogin = async () => {
 
 <template>
   <div class="login-container">
-    <!-- Language switcher -->
+    <!-- 语言切换器 -->
     <div class="language-selector-wrapper" :aria-label="t('common.languageSelector')">
       <language-selector />
     </div>
@@ -254,7 +254,7 @@ const handleLogin = async () => {
   padding-top: 0;
 }
 
-/* Dark mode adaptation */
+/* 暗色模式适配 */
 :root.dark .login-decoration {
   opacity: 0.05;
 }

@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
-// Common weak password patterns for security validation
+// Common weak password patterns for security validation 用于安全验证的常见弱密码模式
 var WeakPasswordPatterns = []string{
 	"password", "sk-123456", "123456", "admin", "secret", "test", "demo",
 	"key", "token", "pass", "pwd", "qwerty", "abc", "default",

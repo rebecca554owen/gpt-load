@@ -3,7 +3,7 @@ import { useAuthService } from "@/composables/useAuth";
 import axios from "axios";
 import { useAppStateStore } from "@/stores/appState";
 
-// Define list of API URLs that don't need loading indicator
+// 定义不需要加载指示器的 API URL 列表
 const noLoadingUrls = ["/tasks/status"];
 
 declare module "axios" {
@@ -18,7 +18,7 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Request interceptor
+// 请求拦截器
 http.interceptors.request.use(config => {
   try {
     const appState = useAppStateStore();
@@ -26,7 +26,7 @@ http.interceptors.request.use(config => {
       appState.loading = true;
     }
   } catch {
-    // Pinia not initialized yet, skip loading state
+    // Pinia 尚未初始化，跳过加载状态
   }
   const authKey = localStorage.getItem("authKey");
   if (authKey) {
@@ -37,14 +37,14 @@ http.interceptors.request.use(config => {
   return config;
 });
 
-// Response interceptor
+// 响应拦截器
 http.interceptors.response.use(
   response => {
     try {
       const appState = useAppStateStore();
       appState.loading = false;
     } catch {
-      // Pinia not initialized yet, skip
+      // Pinia 尚未初始化，跳过
     }
     if (response.config.method !== "get" && !response.config.hideMessage) {
       window.$message.success(response.data.message ?? i18n.global.t("common.operationSuccess"));
@@ -56,7 +56,7 @@ http.interceptors.response.use(
       const appState = useAppStateStore();
       appState.loading = false;
     } catch {
-      // Pinia not initialized yet, skip
+      // Pinia 尚未初始化，跳过
     }
     if (error.response) {
       if (error.response.status === 401) {

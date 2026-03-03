@@ -11,15 +11,15 @@ import { onMounted, ref, watch } from "vue";
 
 const viewType = ref<ChartViewType>("token_speed");
 
-// Time range in hours: 1/5/168/720
+// 时间范围（小时）：1/5/168/720
 const timeRange = ref<TimeRangeHours>(5);
 
 const dashboardStats = ref<DashboardStatsResponse | null>(null);
 
-// Load statistics
+// 加载统计数据
 const loadStats = async () => {
   try {
-    // Use hours directly for stats API (1/5/24/168/720 hours)
+    // 使用小时数直接调用统计 API（1/5/24/168/720 小时）
     const response = await getDashboardStats(timeRange.value);
     dashboardStats.value = response.data;
   } catch (error) {
@@ -27,7 +27,7 @@ const loadStats = async () => {
   }
 };
 
-// Watch time range changes
+// 监听时间范围变化
 watch(timeRange, async () => {
   try {
     await loadStats();
@@ -44,10 +44,10 @@ onMounted(() => {
 <template>
   <div class="dashboard-container">
     <n-space vertical :size="16">
-      <!-- Encryption config error alert (highest priority) -->
+      <!-- 加密配置错误警告（最高优先级） -->
       <encryption-mismatch-alert />
 
-      <!-- Security warning banner -->
+      <!-- 安全警告横幅 -->
       <security-alert
         v-if="dashboardStats?.security_warnings"
         :warnings="dashboardStats.security_warnings"

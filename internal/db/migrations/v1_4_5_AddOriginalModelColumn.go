@@ -9,13 +9,13 @@ import (
 func V1_4_5_AddOriginalModelColumn(db *gorm.DB) error {
 	logrus.Info("Running v1.4.5 migration: Adding original_model column to request_logs table")
 
-	// Check if column already exists
+	// 检查列是否已存在
 	if db.Migrator().HasColumn(&requestLogTable{}, "original_model") {
 		logrus.Info("original_model column already exists, skipping v1.4.5 migration")
 		return nil
 	}
 
-	// Add column
+	// 添加列
 	if err := db.Migrator().AddColumn(&requestLogTable{}, "original_model"); err != nil {
 		logrus.WithError(err).Error("Failed to add original_model column")
 		return err

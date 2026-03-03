@@ -64,7 +64,7 @@ export function useChartRendering(
 
     return Array.from({ length: Y_AXIS.tickCount }, (_, i) => {
       const tickValue = min + i * step;
-      // Round to avoid floating point precision issues
+      // 四舍五入以避免浮点精度问题
       return Math.round(tickValue * PRECISION_MULTIPLIER) / PRECISION_MULTIPLIER;
     });
   });
@@ -72,22 +72,22 @@ export function useChartRendering(
   const formatTimeLabel = (_isoString: string, index: number, totalLabels: number) => {
     const range = timeRange();
 
-    // Calculate label positions dynamically based on total labels
-    // Show labels at: start, ~25%, ~50%, ~75%, end (with "realtime" at the last point)
+    // 根据总标签数动态计算标签位置
+    // 在以下位置显示标签：开始、约 25%、约 50%、约 75%、结束（最后一点为 "realtime"）
     const labelPositions = calculateLabelPositions(totalLabels, range);
 
-    // Check if current index should show a label
+    // 检查当前索引是否应显示标签
     const labelIndex = labelPositions.findIndex(pos => pos.index === index);
     if (labelIndex === -1) {
       return "";
     }
 
-    // Return the corresponding label text
+    // 返回相应的标签文本
     const labelText = labelPositions[labelIndex].text;
     return labelText === "realtime" ? t("dashboard.realtime") : labelText;
   };
 
-  // Helper function to calculate label positions dynamically
+  // 计算标签位置的辅助函数
   const calculateLabelPositions = (totalLabels: number, rangeHours: TimeRangeHours) => {
     const positions: Array<{ index: number; text: string }> = [];
 
@@ -95,14 +95,14 @@ export function useChartRendering(
       return [{ index: 0, text: t("dashboard.realtime") }];
     }
 
-    // Define how many labels to show based on range
+    // 根据范围定义要显示的标签数量
     const labelCount = getLabelCount(rangeHours);
 
-    // Calculate evenly distributed positions
+    // 计算均匀分布的位置
     for (let i = 0; i < labelCount; i++) {
       const index = Math.floor((i / (labelCount - 1)) * (totalLabels - 1));
 
-      // Generate label text based on position and range
+      // 根据位置和范围生成标签文本
       const text = generateLabelText(i, labelCount, rangeHours);
       positions.push({ index, text });
     }
@@ -110,11 +110,11 @@ export function useChartRendering(
     return positions;
   };
 
-  // Get the number of labels to show based on time range
+  // 根据时间范围获取要显示的标签数量
   const getLabelCount = (rangeHours: TimeRangeHours): number => LABEL_COUNTS[rangeHours] ?? 6;
 
-  // Generate label text based on position
-  // All ranges have 6 labels total, with 5 time intervals + realtime
+  // 根据位置生成标签文本
+  // 所有范围都有 6 个标签，5 个时间间隔 + realtime
   const generateLabelText = (
     positionIndex: number,
     totalLabels: number,
@@ -125,28 +125,28 @@ export function useChartRendering(
       return "realtime";
     }
 
-    // 5 intervals (index 0-4), calculate value based on range
-    const intervalIndex = totalLabels - 1 - positionIndex; // 5, 4, 3, 2, 1 for index 0-4
+    // 5 个间隔（索引 0-4），根据范围计算值
+    const intervalIndex = totalLabels - 1 - positionIndex; // 索引 0-4 对应 5, 4, 3, 2, 1
 
     if (rangeHours === 1) {
-      // 1 hour range: 6 data points, 6 labels (1:1 mapping)
-      // Labels at index 0,1,2,3,4,5
+      // 1 小时范围：6 个数据点，6 个标签（1:1 映射）
+      // 标签在索引 0,1,2,3,4,5
       const minutesFromEnd = (5 - positionIndex) * 10;
       return t("dashboard.minutesAgo", { value: minutesFromEnd });
     } else if (rangeHours === 5) {
-      // 5 hour range: 5, 4, 3, 2, 1 hours
+      // 5 小时范围：5, 4, 3, 2, 1 小时
       const hoursFromEnd = intervalIndex;
       return t("dashboard.hoursAgo", { value: hoursFromEnd });
     } else if (rangeHours === 24) {
-      // 24 hour range: 20, 16, 12, 8, 4 hours
+      // 24 小时范围：20, 16, 12, 8, 4 小时
       const hoursFromEnd = intervalIndex * 4;
       return t("dashboard.hoursAgo", { value: hoursFromEnd });
     } else if (rangeHours === 168) {
-      // 1 week range: 5, 4, 3, 2, 1 days
+      // 1 周范围：5, 4, 3, 2, 1 天
       const daysFromEnd = intervalIndex;
       return t("dashboard.daysAgo", { value: daysFromEnd });
     } else {
-      // 1 month range: 25, 20, 15, 10, 5 days
+      // 1 月范围：25, 20, 15, 10, 5 天
       const daysFromEnd = intervalIndex * 5;
       return t("dashboard.daysAgo", { value: daysFromEnd });
     }
@@ -200,40 +200,40 @@ export function useChartRendering(
       return `M ${x} ${y}`;
     }
 
-    // Use cubic bezier curves for smooth lines
+    // 使用三次贝塞尔曲线实现平滑线条
     const pathCommands: string[] = [];
     const points = data.map((value, index) => ({
       x: getXPosition(index),
       y: getYPosition(value),
     }));
 
-    // Start point
+    // 起点
     pathCommands.push(`M ${points[0].x} ${points[0].y}`);
 
-    // Generate smooth curve using cubic bezier
+    // 使用三次贝塞尔生成平滑曲线
     for (let i = 0; i < points.length - 1; i++) {
       const p0 = points[Math.max(0, i - 1)];
       const p1 = points[i];
       const p2 = points[i + 1];
       const p3 = points[Math.min(points.length - 1, i + 2)];
 
-      // Use straight line if values are both zero
+      // 如果两个值都为零，使用直线
       if (data[i] === 0 && data[i + 1] === 0) {
         pathCommands.push(`L ${p2.x} ${p2.y}`);
       } else {
-        // Calculate control points for smooth curve with reduced tension
-        const tension = 0.2; // Reduced tension for smoother curves
+        // 计算平滑曲线的控制点，减小张力
+        const tension = 0.2; // 减小张力以获得更平滑的曲线
         const cp1x = p1.x + (p2.x - p0.x) * tension;
         let cp1y = p1.y + (p2.y - p0.y) * tension;
         const cp2x = p2.x - (p3.x - p1.x) * tension;
         let cp2y = p2.y - (p3.y - p1.y) * tension;
 
-        // Clamp control points to stay between p1.y and p2.y range
-        // This prevents curves from going below either endpoint
-        const upperY = Math.min(p1.y, p2.y); // Higher on screen (smaller Y value)
-        const lowerY = Math.max(p1.y, p2.y); // Lower on screen (larger Y value)
+        // 将控制点限制在 p1.y 和 p2.y 范围之间
+        // 这样可以防止曲线低于任一端点
+        const upperY = Math.min(p1.y, p2.y); // 屏幕上方（Y 值较小）
+        const lowerY = Math.max(p1.y, p2.y); // 屏幕下方（Y 值较大）
 
-        // Control points should not extend beyond the range of the two endpoints
+        // 控制点不应超出两个端点的范围
         cp1y = Math.max(upperY, Math.min(lowerY, cp1y));
         cp2y = Math.max(upperY, Math.min(lowerY, cp2y));
 
@@ -265,11 +265,11 @@ export function useChartRendering(
       return "0";
     }
 
-    // Fix floating point precision issues
+    // 修复浮点精度问题
     const roundedValue = Math.round(value * PRECISION_MULTIPLIER) / PRECISION_MULTIPLIER;
 
     if (roundedValue < 1000) {
-      // For small values, show appropriate decimal places
+      // 对于小值，显示适当的小数位数
       if (roundedValue < 10) {
         return roundedValue.toFixed(2);
       }

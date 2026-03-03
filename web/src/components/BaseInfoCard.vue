@@ -7,38 +7,38 @@ import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
 
-// Props
+// 属性
 interface Props {
   stats: DashboardStatsResponse | null;
 }
 
 const props = defineProps<Props>();
 
-// Unit format state: false = pure number, true = auto format (K/M)
+// 单位格式化状态：false = 纯数字，true = 自动格式化 (K/M)
 const autoFormat = ref(true);
 
-// Toggle unit format
+// 切换单位格式
 const toggleFormat = () => {
   autoFormat.value = !autoFormat.value;
 };
 
-// Expose toggle function to parent component
+// 向父组件暴露切换函数
 defineExpose({
   toggleFormat,
 });
 
-// Format value display
+// 格式化值显示
 const formatValue = (value: number, type: "count" | "rate" = "count"): string => {
   if (type === "rate") {
     return `${value.toFixed(1)}%`;
   }
 
-  // Pure number mode
+  // 纯数字模式
   if (!autoFormat.value) {
     return value.toLocaleString();
   }
 
-  // Auto format mode
+  // 自动格式化模式
   if (value >= 1000000) {
     return `${(value / 1000000).toFixed(1)}M`;
   }
@@ -48,13 +48,13 @@ const formatValue = (value: number, type: "count" | "rate" = "count"): string =>
   return value.toString();
 };
 
-// Format trend display
+// 格式化趋势显示
 const formatTrend = (trend: number): string => {
   const sign = trend >= 0 ? "+" : "";
   return `${sign}${trend.toFixed(1)}%`;
 };
 
-// Card type definition
+// 卡片类型定义
 interface StatCard {
   key: string;
   title: string;
@@ -67,7 +67,7 @@ interface StatCard {
   isRate?: boolean;
 }
 
-// Row 1 card configuration
+// 第一行卡片配置
 const firstRowCards = computed<StatCard[]>(() => [
   {
     key: "key-count",
@@ -108,7 +108,7 @@ const firstRowCards = computed<StatCard[]>(() => [
   },
 ]);
 
-// Row 2 card configuration
+// 第二行卡片配置
 const secondRowCards = computed<StatCard[]>(() => [
   {
     key: "non-cached-prompt-tokens",
@@ -156,7 +156,7 @@ const secondRowCards = computed<StatCard[]>(() => [
 <template>
   <div class="stats-container">
     <n-space vertical :size="16">
-      <!-- Row 1 cards -->
+      <!-- 第一行卡片 -->
       <n-grid cols="2 s:4" :x-gap="16" :y-gap="16" responsive="screen">
         <n-grid-item v-for="card in firstRowCards" :key="card.key" span="1">
           <n-card :bordered="false" class="stat-card compact" @click="toggleFormat">
@@ -197,7 +197,7 @@ const secondRowCards = computed<StatCard[]>(() => [
         </n-grid-item>
       </n-grid>
 
-      <!-- Row 2 cards - Token details -->
+      <!-- 第二行卡片 - Token 详情 -->
       <n-grid cols="2 s:4" :x-gap="16" :y-gap="16" responsive="screen">
         <n-grid-item v-for="card in secondRowCards" :key="card.key" span="1">
           <n-card :bordered="false" class="stat-card compact" @click="toggleFormat">
@@ -385,7 +385,7 @@ const secondRowCards = computed<StatCard[]>(() => [
   }
 }
 
-/* Responsive grid */
+/* 响应式网格 */
 :deep(.n-grid-item) {
   min-width: 0;
 }

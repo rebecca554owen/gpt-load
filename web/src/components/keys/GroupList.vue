@@ -30,7 +30,7 @@ const emit = defineEmits<Emits>();
 
 const searchText = ref("");
 const showGroupModal = ref(false);
-// Store references to group item DOM elements
+// 存储分组项 DOM 元素的引用
 const groupItemRefs = ref(new Map());
 const showAggregateGroupModal = ref(false);
 
@@ -46,7 +46,7 @@ const filteredGroups = computed(() => {
   );
 });
 
-// Watch for changes in selected item ID and auto-scroll to that item
+// 监听选中项 ID 的变化并自动滚动到该项
 watch(
   () => props.selectedGroup?.id,
   id => {
@@ -57,14 +57,14 @@ watch(
     const element = groupItemRefs.value.get(id);
     if (element) {
       element.scrollIntoView({
-        behavior: "smooth", // Smooth scrolling
-        block: "nearest", // Scroll element to nearest edge
+        behavior: "smooth", // 平滑滚动
+        block: "nearest", // 滚动到最近的边缘
       });
     }
   },
   {
-    flush: "post", // Ensure callback is executed after DOM update
-    immediate: true, // Execute once immediately to handle initial load
+    flush: "post", // 确保在 DOM 更新后执行回调
+    immediate: true, // 立即执行一次以处理初始加载
   }
 );
 
@@ -72,7 +72,7 @@ function handleGroupClick(group: Group) {
   emit("group-select", group);
 }
 
-// Get tag color for channel type
+// 获取渠道类型的标签颜色
 function getChannelTagType(channelType: string) {
   switch (channelType) {
     case "openai":
@@ -278,7 +278,7 @@ function handleGroupCreated(group: Group) {
   position: relative;
 }
 
-/* Aggregate group style */
+/* 聚合分组样式 */
 .group-item.aggregate {
   border-style: dashed;
   background: linear-gradient(135deg, var(--primary-color-suppl) 0%, rgba(13, 148, 136, 0.08) 100%);

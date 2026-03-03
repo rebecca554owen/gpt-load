@@ -77,14 +77,14 @@ func NewDB(configManager types.ConfigManager) (*gorm.DB, error) {
 		return nil, fmt.Errorf("failed to get sql.DB: %w", err)
 	}
 
-	// Fix MySQL table charset to utf8mb4 if needed
+	// 如需要，修复 MySQL 表字符集为 utf8mb4
 	if strings.Contains(dsn, "@tcp") {
 		if err := fixMysqlCharset(DB); err != nil {
 			log.Printf("Warning: failed to fix MySQL charset: %v", err)
 		}
 	}
 
-	// Configure connection pool from environment variables
+	// 从环境变量配置连接池
 	maxIdleConns := getEnvInt("DB_MAX_IDLE_CONNS", 50)
 	maxOpenConns := getEnvInt("DB_MAX_OPEN_CONNS", 500)
 	connMaxLifetime := time.Duration(getEnvInt("DB_CONN_MAX_LIFETIME", 3600)) * time.Second

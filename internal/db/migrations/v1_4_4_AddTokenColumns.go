@@ -9,13 +9,13 @@ import (
 func V1_4_4_AddTokenColumns(db *gorm.DB) error {
 	logrus.Info("Running v1.4.4 migration: Adding token columns to request_logs table")
 
-	// Check if columns already exist
+	// 检查列是否已存在
 	if db.Migrator().HasColumn(&requestLogTable{}, "prompt_tokens") {
 		logrus.Info("Token columns already exist, skipping v1.4.4 migration")
 		return nil
 	}
 
-	// Add new columns
+	// 添加新列
 	if err := db.Migrator().AddColumn(&requestLogTable{}, "prompt_tokens"); err != nil {
 		return err
 	}

@@ -11,42 +11,42 @@ import type {
 import http from "@/utils/http";
 
 export const keysApi = {
-  // Get all groups
+  // 获取所有组
   async getGroups(): Promise<Group[]> {
     const res = await http.get("/groups");
     return res.data || [];
   },
 
-  // Create group
+  // 创建组
   async createGroup(group: Partial<Group>): Promise<Group> {
     const res = await http.post("/groups", group);
     return res.data;
   },
 
-  // Update group
+  // 更新组
   async updateGroup(groupId: number, group: Partial<Group>): Promise<Group> {
     const res = await http.put(`/groups/${groupId}`, group);
     return res.data;
   },
 
-  // Delete group
+  // 删除组
   deleteGroup(groupId: number): Promise<void> {
     return http.delete(`/groups/${groupId}`);
   },
 
-  // Get group statistics
+  // 获取组统计信息
   async getGroupStats(groupId: number): Promise<GroupStatsResponse> {
     const res = await http.get(`/groups/${groupId}/stats`);
     return res.data;
   },
 
-  // Get group configuration options
+  // 获取组配置选项
   async getGroupConfigOptions(): Promise<GroupConfigOption[]> {
     const res = await http.get("/groups/config-options");
     return res.data || [];
   },
 
-  // Copy group
+  // 复制组
   async copyGroup(
     groupId: number,
     copyData: {
@@ -61,13 +61,13 @@ export const keysApi = {
     return res.data;
   },
 
-  // Get group list
+  // 获取组列表
   async listGroups(): Promise<Pick<Group, "id" | "name" | "display_name">[]> {
     const res = await http.get("/groups/list");
     return res.data || [];
   },
 
-  // Get group keys list
+  // 获取组密钥列表
   async getGroupKeys(params: {
     group_id: number;
     page: number;
@@ -85,7 +85,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Batch add keys - deprecated
+  // 批量添加密钥 - 已弃用
   async addMultipleKeys(
     group_id: number,
     keys_text: string
@@ -101,7 +101,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Async batch add keys
+  // 异步批量添加密钥
   async addKeysAsync(group_id: number, keys_text?: string, file?: File): Promise<TaskInfo> {
     let requestData: FormData | { group_id: number; keys_text: string };
     const config: { hideMessage: boolean; headers?: { "Content-Type": string } } = {
@@ -109,14 +109,14 @@ export const keysApi = {
     };
 
     if (file) {
-      // File upload mode
+      // 文件上传模式
       const formData = new FormData();
       formData.append("group_id", group_id.toString());
       formData.append("file", file);
       requestData = formData;
       config.headers = { "Content-Type": "multipart/form-data" };
     } else {
-      // Text input mode
+      // 文本输入模式
       requestData = { group_id, keys_text: keys_text || "" };
     }
 
@@ -124,12 +124,12 @@ export const keysApi = {
     return res.data;
   },
 
-  // Update key notes
+  // 更新密钥备注
   async updateKeyNotes(keyId: number, notes: string): Promise<void> {
     await http.put(`/keys/${keyId}/notes`, { notes }, { hideMessage: true });
   },
 
-  // Test keys
+  // 测试密钥
   async testKeys(
     group_id: number,
     keys_text: string,
@@ -156,7 +156,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Test next key (using polling mechanism)
+  // 测试下一个密钥（使用轮询机制）
   async testNextKey(
     group_id: number,
     model?: string
@@ -181,7 +181,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Delete keys
+  // 删除密钥
   async deleteKeys(
     group_id: number,
     keys_text: string
@@ -193,7 +193,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Async batch delete keys
+  // 异步批量删除密钥
   async deleteKeysAsync(group_id: number, keys_text: string): Promise<TaskInfo> {
     const res = await http.post(
       "/keys/delete-async",
@@ -208,7 +208,7 @@ export const keysApi = {
     return res.data;
   },
 
-  // Restore keys
+  // 恢复密钥
   restoreKeys(group_id: number, keys_text: string): Promise<null> {
     return http.post("/keys/restore-multiple", {
       group_id,
@@ -216,12 +216,12 @@ export const keysApi = {
     });
   },
 
-  // Restore all invalid keys
+  // 恢复所有无效密钥
   restoreAllInvalidKeys(group_id: number): Promise<void> {
     return http.post("/keys/restore-all-invalid", { group_id });
   },
 
-  // Clear all invalid keys
+  // 清除所有无效密钥
   clearAllInvalidKeys(group_id: number): Promise<void> {
     return http.post(
       "/keys/clear-all-invalid",
@@ -232,7 +232,7 @@ export const keysApi = {
     );
   },
 
-  // Clear all keys
+  // 清除所有密钥
   clearAllKeys(group_id: number): Promise<void> {
     return http.post(
       "/keys/clear-all",
@@ -243,7 +243,7 @@ export const keysApi = {
     );
   },
 
-  // Export keys
+  // 导出密钥
   exportKeys(groupId: number, status: "all" | "active" | "invalid" = "all"): void {
     const authKey = localStorage.getItem("authKey");
     if (!authKey) {
@@ -270,7 +270,7 @@ export const keysApi = {
     document.body.removeChild(link);
   },
 
-  // Validate group keys
+  // 验证组密钥
   async validateGroupKeys(
     groupId: number,
     status?: "active" | "invalid"
@@ -289,19 +289,19 @@ export const keysApi = {
     return res.data;
   },
 
-  // Get task status
+  // 获取任务状态
   async getTaskStatus(): Promise<TaskInfo> {
     const res = await http.get("/tasks/status");
     return res.data;
   },
 
-  // Get subgroups of aggregate group
+  // 获取聚合组的子组
   async getSubGroups(aggregateGroupId: number): Promise<import("@/types/models").SubGroupInfo[]> {
     const res = await http.get(`/groups/${aggregateGroupId}/sub-groups`);
     return res.data || [];
   },
 
-  // Add subgroups to aggregate group
+  // 添加子组到聚合组
   async addSubGroups(
     aggregateGroupId: number,
     subGroups: { group_id: number; weight: number }[]
@@ -311,7 +311,7 @@ export const keysApi = {
     });
   },
 
-  // Update subgroup weight
+  // 更新子组权重
   async updateSubGroupWeight(
     aggregateGroupId: number,
     subGroupId: number,
@@ -322,12 +322,12 @@ export const keysApi = {
     });
   },
 
-  // Delete subgroup
+  // 删除子组
   async deleteSubGroup(aggregateGroupId: number, subGroupId: number): Promise<void> {
     await http.delete(`/groups/${aggregateGroupId}/sub-groups/${subGroupId}`);
   },
 
-  // Get parent aggregate groups list
+  // 获取父聚合组列表
   async getParentAggregateGroups(groupId: number): Promise<ParentAggregateGroup[]> {
     const res = await http.get(`/groups/${groupId}/parent-aggregate-groups`);
     return res.data || [];

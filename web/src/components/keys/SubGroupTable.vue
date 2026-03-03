@@ -31,7 +31,7 @@ import EditSubGroupWeightModal from "./EditSubGroupWeightModal.vue";
 
 const { t } = useI18n();
 
-// Get sub-group status
+// 获取子分组状态
 function getSubGroupStatus(subGroup: SubGroupInfo): {
   status: "active" | "disabled" | "unavailable";
   text: string;
@@ -71,14 +71,14 @@ const addModalShow = ref(false);
 const editModalShow = ref(false);
 const editingSubGroup = ref<SubGroupInfo | null>(null);
 
-// Search and filter state
+// 搜索和筛选状态
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "disabled" | "unavailable">("all");
 
-// Collapse state - default collapsed
+// 折叠状态 - 默认折叠
 const isCollapsed = ref(true);
 
-// Status filter options
+// 状态筛选选项
 const statusOptions = [
   { label: t("common.all"), value: "all" },
   { label: t("subGroups.statusActive"), value: "active" },
@@ -86,7 +86,7 @@ const statusOptions = [
   { label: t("subGroups.statusUnavailable"), value: "unavailable" },
 ];
 
-// Calculate sub-group data with percentage and sort by weight
+// 计算子分组数据（含百分比）并按权重排序
 const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
   if (!props.subGroups) {
     return [];
@@ -97,15 +97,15 @@ const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
     percentage: total > 0 ? Math.round((sg.weight / total) * 100) : 0,
   }));
 
-  // Sort by weight descending
+  // 按权重降序排序
   return withPercentage.sort((a, b) => b.weight - a.weight);
 });
 
-// Filtered sub-groups (apply search and status filtering)
+// 筛选后的子分组（应用搜索和状态筛选）
 const filteredSubGroups = computed<SubGroupRow[]>(() => {
   let filtered = sortedSubGroupsWithPercentage.value;
 
-  // Name search filter (case-insensitive)
+  // 名称搜索筛选（不区分大小写）
   if (searchText.value.trim()) {
     const searchLower = searchText.value.trim().toLowerCase();
     filtered = filtered.filter(sg => {
@@ -115,7 +115,7 @@ const filteredSubGroups = computed<SubGroupRow[]>(() => {
     });
   }
 
-  // Status filter
+  // 状态筛选
   if (statusFilter.value !== "all") {
     filtered = filtered.filter(sg => {
       const status = getSubGroupStatus(sg).status;

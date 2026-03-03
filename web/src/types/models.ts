@@ -1,4 +1,4 @@
-// Generic API response structure
+// 通用 API 响应结构
 export interface ApiResponse<T> {
   code: number;
   message: string;
@@ -24,16 +24,16 @@ interface GroupConfigChannelSpecific {
 
 export type GroupConfig = GroupConfigBase & GroupConfigChannelSpecific;
 
-// Key status
+// 密钥状态
 export type KeyStatus = "active" | "invalid";
 
-// Group type
+// 分组类型
 export type GroupType = "standard" | "aggregate";
 
-// Channel type
+// 渠道类型
 export type ChannelType = "openai" | "openai-response" | "gemini" | "anthropic";
 
-// Data model definition
+// 数据模型定义
 export interface APIKey {
   id: number;
   group_id: number;
@@ -62,13 +62,13 @@ export interface HeaderRule {
   action: "set" | "remove";
 }
 
-// Subgroup configuration (for create/update)
+// 子分组配置（用于创建/更新）
 export interface SubGroupConfig {
   group_id: number;
   weight: number;
 }
 
-// Subgroup information (for display)
+// 子分组信息（用于显示）
 export interface SubGroupInfo {
   group: Group;
   weight: number;
@@ -77,7 +77,7 @@ export interface SubGroupInfo {
   invalid_keys: number;
 }
 
-// Parent aggregate group information (for display)
+// 父聚合分组信息（用于显示）
 export interface ParentAggregateGroup {
   group_id: number;
   name: string;
@@ -85,7 +85,7 @@ export interface ParentAggregateGroup {
   weight: number;
 }
 
-// Model mapping target configuration
+// 模型映射目标配置
 export interface ModelMappingTarget {
   sub_group_id: number;
   weight: number;
@@ -94,7 +94,7 @@ export interface ModelMappingTarget {
   models?: string[];
 }
 
-// Model mapping configuration
+// 模型映射配置
 export interface ModelMapping {
   model: string;
   targets: ModelMappingTarget[];
@@ -166,7 +166,7 @@ export interface GroupFormData {
   group_type?: string;
 }
 
-// GroupStatsResponse defines the complete statistics for a group.
+// GroupStatsResponse 定义分组的完整统计数据
 export interface GroupStatsResponse {
   key_stats: KeyStats;
   stats_24_hour: RequestStats;
@@ -174,14 +174,14 @@ export interface GroupStatsResponse {
   stats_30_day: RequestStats;
 }
 
-// KeyStats defines the statistics for API keys in a group.
+// KeyStats 定义分组中 API 密钥的统计数据
 export interface KeyStats {
   total_keys: number;
   active_keys: number;
   invalid_keys: number;
 }
 
-// RequestStats defines the statistics for requests over a period.
+// RequestStats 定义一段时间内的请求统计数据
 export interface RequestStats {
   total_requests: number;
   failed_requests: number;
@@ -227,7 +227,7 @@ export interface TaskInfo {
   error?: string;
 }
 
-// Based on backend response
+// 基于后端响应
 export interface RequestLog {
   id: string;
   timestamp: string;
@@ -245,11 +245,11 @@ export interface RequestLog {
   parent_group_name?: string;
   key_value?: string;
   model: string;
-  original_model?: string; // Original requested model name
+  original_model?: string; // 原始请求的模型名称
   upstream_addr: string;
   is_stream: boolean;
   request_body?: string;
-  // Token statistics fields
+  // Token 统计字段
   prompt_tokens: number;
   completion_tokens: number;
   total_tokens: number;
@@ -296,7 +296,7 @@ export interface GroupRequestStat {
   request_count: number;
 }
 
-// Dashboard statistics card data
+// 仪表盘统计卡片数据
 export interface StatCard {
   value: number;
   sub_value?: number;
@@ -305,15 +305,15 @@ export interface StatCard {
   trend_is_growth: boolean;
 }
 
-// Security warning information
+// 安全警告信息
 export interface SecurityWarning {
-  type: string; // Warning type: auth_key, encryption_key, etc.
-  message: string; // Warning message
-  severity: string; // Severity: low, medium, high
-  suggestion: string; // Suggested solution
+  type: string; // 警告类型：auth_key、encryption_key 等
+  message: string; // 警告消息
+  severity: string; // 严重程度：low、medium、high
+  suggestion: string; // 建议的解决方案
 }
 
-// Dashboard basic statistics response
+// 仪表盘基础统计响应
 export interface DashboardStatsResponse {
   key_count: StatCard;
   token_consumption: StatCard;
@@ -328,18 +328,18 @@ export interface DashboardStatsResponse {
   security_warnings: SecurityWarning[];
 }
 
-// Chart dataset
+// 图表数据集
 export interface ChartDataset {
   label: string;
   label_key?: string;
   data: number[];
 }
 
-// Chart data
+// 图表数据
 export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];
 }
 
-// Chart view type for dashboard
+// 仪表盘图表视图类型
 export type ChartViewType = "request" | "token" | "token_speed";

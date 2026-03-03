@@ -4,10 +4,10 @@ import { computed } from "vue";
 import { SUPPORTED_LOCALES, setLocale, getCurrentLocaleLabel, type Locale } from "@/locales";
 import { Language } from "@vicons/ionicons5";
 
-// Current language label
+// 当前语言标签
 const currentLabel = computed(() => getCurrentLocaleLabel());
 
-// Dropdown options
+// 下拉选项
 const options = computed(() =>
   SUPPORTED_LOCALES.map(locale => ({
     label: locale.label,
@@ -15,10 +15,10 @@ const options = computed(() =>
   }))
 );
 
-// Switch language
+// 切换语言
 const handleSelect = (key: string) => {
   setLocale(key as Locale);
-  // Page will auto refresh, no need to prompt
+  // 页面会自动刷新，无需提示
 };
 </script>
 
@@ -38,7 +38,7 @@ const handleSelect = (key: string) => {
   min-width: 100px;
 }
 
-/* Ensure good contrast in dark mode */
+/* 确保暗黑模式下有良好的对比度 */
 :global(.dark) .language-selector-btn {
   color: var(--n-text-color);
 }

@@ -53,23 +53,23 @@ const notesDialogShow = ref(false);
 const editingKey = ref<KeyRow | null>(null);
 const editingNotes = ref("");
 
-// Virtual scrolling container
+// 虚拟滚动容器
 const gridContainerRef = ref<HTMLElement | null>(null);
 const containerHeight = computed(() => {
   if (!gridContainerRef.value) {
     return 600;
   }
-  // Use the actual container height minus toolbar and pagination
+  // 使用实际容器高度减去工具栏和分页
   const containerHeight = gridContainerRef.value.clientHeight;
-  return Math.max(400, containerHeight - 150); // Reserve space for toolbar and pagination
+  return Math.max(400, containerHeight - 150); // 为工具栏和分页预留空间
 });
 
-// Use virtual scrolling for large datasets
+// 对大数据集使用虚拟滚动
 const shouldUseVirtualScroll = computed(() => {
-  return keys.value.length > 24; // Only use virtual scroll for more than 24 items
+  return keys.value.length > 24; // 仅对超过 24 项的数据使用虚拟滚动
 });
 
-// Set up virtual list
+// 设置虚拟列表
 const {
   list: virtualList,
   containerProps,
@@ -102,8 +102,8 @@ watch(statusFilter, async () => {
   }
 });
 
-// Watch for task completion events (e.g., bulk validation, import, delete)
-// When a task completes for the current group, refresh the key list
+// 监听任务完成事件（如批量验证、导入、删除）
+// 当任务在当前分组完成时，刷新密钥列表
 watch(
   () => appState.groupDataRefreshTrigger,
   async () => {
@@ -125,8 +125,8 @@ watch(
   }
 );
 
-// Watch for sync operation events (e.g., single key test, restore, delete)
-// When a sync operation completes for the current group, refresh the key list
+// 监听同步操作事件（如单个密钥测试、恢复、删除）
+// 当同步操作在当前分组完成时，刷新密钥列表
 watch(
   () => appState.syncOperationTrigger,
   async () => {

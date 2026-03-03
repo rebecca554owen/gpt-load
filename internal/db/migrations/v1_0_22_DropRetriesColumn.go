@@ -9,9 +9,9 @@ type RequestLog struct {
 
 // V1_0_22_DropRetriesColumn 从 request_logs 表删除 retries 列
 func V1_0_22_DropRetriesColumn(db *gorm.DB) error {
-	// Check if retries column exists
+	// 检查 retries 列是否存在
 	if db.Migrator().HasColumn(&RequestLog{}, "retries") {
-		// Drop retries column
+		// 删除 retries 列
 		if err := db.Migrator().DropColumn(&RequestLog{}, "retries"); err != nil {
 			return err
 		}

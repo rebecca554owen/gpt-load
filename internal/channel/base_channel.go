@@ -173,11 +173,11 @@ func (b *BaseChannel) GetStreamClient() *http.Client {
 }
 
 // ApplyModelRedirect 根据组的重定向规则应用模型重定向
-// Note: For most channels, model redirect is already applied in HandleProxy (server.go)
-// This method is kept for channel-specific implementations (e.g., Gemini native format)
+// 注意：对于大多数通道，模型重定向已在 HandleProxy（server.go）中应用
+// 此方法保留用于通道特定的实现（例如，Gemini 原生格式）
 func (b *BaseChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error) {
-	// Base channel implementation: no additional processing needed
-	// Model redirect is already applied in server.go HandleProxy
+	// 基础通道实现：无需额外处理
+	// 模型重定向已在 server.go 的 HandleProxy 中应用
 	return bodyBytes, nil
 }
 

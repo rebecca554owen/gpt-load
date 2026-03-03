@@ -10,8 +10,8 @@ interface ApiError {
 export type ApiResult<T> = { data: T } | ApiError;
 
 /**
- * Get dashboard basic statistics
- * @param hours Time range in hours (1/5/24/168/720)
+ * 获取仪表板基本统计数据
+ * @param hours 时间范围（小时）(1/5/24/168/720)
  */
 export const getDashboardStats = (hours: number = 5) => {
   return http.get<DashboardStatsResponse>("/dashboard/stats", {
@@ -20,9 +20,9 @@ export const getDashboardStats = (hours: number = 5) => {
 };
 
 /**
- * Get dashboard chart data
- * @param view View type (request/token/token_speed)
- * @param hours Time range in hours (1/5/24/168/720)
+ * 获取仪表板图表数据
+ * @param view 视图类型 (request/token/token_speed)
+ * @param hours 时间范围（小时）(1/5/24/168/720)
  */
 export const getDashboardChart = (view: ChartViewType = "token", hours: number = 5) => {
   return http.get<ChartData>("/dashboard/chart", {
@@ -31,7 +31,7 @@ export const getDashboardChart = (view: ChartViewType = "token", hours: number =
 };
 
 /**
- * Get group list for filtering
+ * 获取用于过滤的组列表
  */
 export const getGroupList = () => {
   return http.get<Group[]>("/groups/list");

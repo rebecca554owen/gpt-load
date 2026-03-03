@@ -322,7 +322,7 @@ func (s *MemoryStore) LLen(key string) (int64, error) {
 
 // --- SET 操作 ---
 
-// SAdd adds members to a set.
+// SAdd 将成员添加到集合。
 func (s *MemoryStore) SAdd(key string, members ...any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -346,7 +346,7 @@ func (s *MemoryStore) SAdd(key string, members ...any) error {
 	return nil
 }
 
-// SPopN randomly removes and returns the given number of members from a set.
+// SPopN 从集合中随机移除并返回指定数量的成员。
 func (s *MemoryStore) SPopN(key string, count int64) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -377,7 +377,7 @@ func (s *MemoryStore) SPopN(key string, count int64) ([]string, error) {
 	return popped, nil
 }
 
-// SMembers returns all members of a set.
+// SMembers 返回集合的所有成员。
 func (s *MemoryStore) SMembers(key string) ([]string, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

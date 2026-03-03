@@ -106,7 +106,7 @@ func (m *Manager) ReloadConfig() error {
 	}
 	m.config = config
 
-	// Validate configuration
+	// 验证配置
 	if err := m.Validate(); err != nil {
 		return err
 	}
@@ -163,7 +163,7 @@ func (m *Manager) GetEffectiveServerConfig() types.ServerConfig {
 func (m *Manager) Validate() error {
 	var validationErrors []string
 
-	// Validate port
+	// 验证端口
 	if m.config.Server.Port < DefaultConstants.MinPort || m.config.Server.Port > DefaultConstants.MaxPort {
 		validationErrors = append(validationErrors, fmt.Sprintf("port must be between %d-%d", DefaultConstants.MinPort, DefaultConstants.MaxPort))
 	}
@@ -172,14 +172,14 @@ func (m *Manager) Validate() error {
 		validationErrors = append(validationErrors, "max concurrent requests cannot be less than 1")
 	}
 
-	// Validate auth key
+	// 验证认证密钥
 	if m.config.Auth.Key == "" {
 		validationErrors = append(validationErrors, "AUTH_KEY is required and cannot be empty")
 	} else {
 		utils.ValidatePasswordStrength(m.config.Auth.Key, "AUTH_KEY")
 	}
 
-	// Validate GracefulShutdownTimeout and reset if necessary
+	// 验证优雅关闭超时并在必要时重置
 	if m.config.Server.GracefulShutdownTimeout < 10 {
 		logrus.Warnf("SERVER_GRACEFUL_SHUTDOWN_TIMEOUT value %ds is too short, resetting to minimum 10s.", m.config.Server.GracefulShutdownTimeout)
 		m.config.Server.GracefulShutdownTimeout = 10

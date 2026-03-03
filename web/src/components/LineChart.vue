@@ -40,7 +40,7 @@ const isErrorDataset = (label: string): boolean => {
   return checkIsErrorDataset(label, t);
 };
 
-// Track token speed dataset index for color assignment
+// 跟踪 Token 速度数据集索引以进行颜色分配
 const isTokenSpeedView = computed(() => props.viewType === "token_speed");
 
 const {
@@ -97,9 +97,9 @@ const translateLabel = (label: string): string => {
   if (/[一-龥]/.test(label)) {
     return label;
   }
-  // For token speed labels in format "group_name - model_name", try to translate
+  // 对于格式为 "group_name - model_name" 的 token 速度标签，尝试翻译
   if (label.includes(" - ")) {
-    return label; // Return as-is since it's a dynamic combination
+    return label; // 由于是动态组合，直接返回
   }
   return t(label);
 };
@@ -119,7 +119,7 @@ const datasetsWithColor = computed(() => {
   <div class="chart-container">
     <div class="chart-header">
       <div class="chart-title-section">
-        <!-- Top-left: View type toggle -->
+        <!-- 左上角：视图类型切换 -->
         <n-radio-group
           :value="viewType"
           @update:value="
@@ -133,7 +133,7 @@ const datasetsWithColor = computed(() => {
           <n-radio value="request">{{ t("dashboard.requestView") }}</n-radio>
         </n-radio-group>
       </div>
-      <!-- Top-right: Time range selector -->
+      <!-- 右上角：时间范围选择器 -->
       <n-select
         :value="timeRange"
         @update:value="(value: number) => emit('update:timeRange', value as TimeRangeHours)"
@@ -173,7 +173,7 @@ const datasetsWithColor = computed(() => {
           @mousemove="handleMouseMove"
           @mouseleave="hideTooltip"
         >
-          <!-- Background grid -->
+          <!-- 背景网格 -->
           <defs>
             <pattern id="grid" width="40" height="30" patternUnits="userSpaceOnUse">
               <path
@@ -187,7 +187,7 @@ const datasetsWithColor = computed(() => {
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
 
-          <!-- Y-axis tick lines and labels -->
+          <!-- Y 轴刻度线和标签 -->
           <g class="y-axis">
             <line
               :x1="padding.left"
@@ -217,7 +217,7 @@ const datasetsWithColor = computed(() => {
             </g>
           </g>
 
-          <!-- X-axis tick lines and labels -->
+          <!-- X 轴刻度线和标签 -->
           <g class="x-axis">
             <line
               :x1="padding.left"
@@ -247,13 +247,13 @@ const datasetsWithColor = computed(() => {
             </g>
           </g>
 
-          <!-- Data lines -->
+          <!-- 数据线 -->
           <g
             v-for="(dataset, datasetIndex) in datasetsWithColor"
             :key="dataset.label"
             v-show="!hiddenDatasetIndices.has(datasetIndex)"
           >
-            <!-- Gradient definition -->
+            <!-- 渐变定义 -->
             <defs>
               <linearGradient :id="`gradient-${datasetIndex}`" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" :stop-color="dataset.color" stop-opacity="0.3" />
@@ -261,7 +261,7 @@ const datasetsWithColor = computed(() => {
               </linearGradient>
             </defs>
 
-            <!-- Fill area -->
+            <!-- 填充区域 -->
             <path
               :d="generateAreaPath(dataset.data)"
               :fill="`url(#gradient-${datasetIndex})`"
@@ -270,7 +270,7 @@ const datasetsWithColor = computed(() => {
               :style="{ opacity: isErrorDataset(dataset.label) ? 0.3 : 0.6 }"
             />
 
-            <!-- Main line -->
+            <!-- 主线 -->
             <path
               :d="generateLinePath(dataset.data)"
               :stroke="dataset.color"
@@ -283,9 +283,9 @@ const datasetsWithColor = computed(() => {
               }"
             />
 
-            <!-- Data points -->
+            <!-- 数据点 -->
             <g v-for="(value, pointIndex) in dataset.data" :key="pointIndex">
-              <!-- Non-zero value points -->
+              <!-- 非零值点 -->
               <circle
                 v-if="value > 0"
                 :cx="getXPosition(pointIndex)"
@@ -300,7 +300,7 @@ const datasetsWithColor = computed(() => {
                 }"
                 :style="{ opacity: isErrorDataset(dataset.label) ? 0.8 : 1 }"
               />
-              <!-- Zero value points - only shown for total_tokens to indicate no data in this period -->
+              <!-- 零值点 - 仅对 total_tokens 显示，以指示该时间段内无数据 -->
               <circle
                 v-else-if="dataset.label_key === 'dashboard.total_tokens'"
                 :cx="getXPosition(pointIndex)"
@@ -312,7 +312,7 @@ const datasetsWithColor = computed(() => {
             </g>
           </g>
 
-          <!-- Hover indicator line -->
+          <!-- 悬停指示线 -->
           <line
             v-if="hoveredPoint"
             :x1="getXPosition(hoveredPoint.pointIndex)"
@@ -326,7 +326,7 @@ const datasetsWithColor = computed(() => {
           />
         </svg>
 
-        <!-- Tooltip -->
+        <!-- 工具提示 -->
         <div
           v-if="tooltipData"
           class="chart-tooltip"
@@ -372,13 +372,13 @@ const datasetsWithColor = computed(() => {
   border: 1px solid var(--border-color-light);
 }
 
-/* Light theme - keep original purple gradient design */
+/* 浅色主题 - 保持原紫色渐变设计 */
 :root:not(.dark) .chart-container {
   background: var(--primary-gradient);
   color: white;
 }
 
-/* Dark theme - use dark blue-purple gradient outer background */
+/* 暗黑主题 - 使用深蓝紫渐变外层背景 */
 :root.dark .chart-container {
   background: var(--chart-bg-dark-gradient);
   box-shadow: var(--shadow-md);
@@ -400,7 +400,7 @@ const datasetsWithColor = computed(() => {
   align-items: center;
 }
 
-/* Light theme - View toggle button */
+/* 浅色主题 - 视图切换按钮 */
 :root:not(.dark) .view-toggle {
   background: rgba(255, 255, 255, 0.3);
   border-radius: 8px;
@@ -420,7 +420,7 @@ const datasetsWithColor = computed(() => {
   border-color: white;
 }
 
-/* Dark theme - View toggle button */
+/* 暗黑主题 - 视图切换按钮 */
 :root.dark .view-toggle {
   background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
@@ -442,19 +442,19 @@ const datasetsWithColor = computed(() => {
   flex-wrap: wrap;
 }
 
-/* Light theme */
+/* 浅色主题 */
 :root:not(.dark) .chart-legend {
   background: rgba(255, 255, 255, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
-/* Dark theme */
+/* 暗黑主题 */
 :root.dark .chart-legend {
   background: var(--overlay-bg);
   border: 1px solid var(--border-color);
 }
 
-/* Token speed legend style */
+/* Token 速度图例样式 */
 .legend-speed {
   gap: 12px;
   padding: 8px 16px;
@@ -476,14 +476,14 @@ const datasetsWithColor = computed(() => {
   user-select: none;
 }
 
-/* Light theme */
+/* 浅色主题 */
 :root:not(.dark) .legend-item {
   color: var(--chart-grid-light);
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.7);
 }
 
-/* Dark theme */
+/* 暗黑主题 */
 :root.dark .legend-item {
   color: var(--text-primary);
   background: var(--bg-tertiary);
@@ -496,7 +496,7 @@ const datasetsWithColor = computed(() => {
   text-decoration: line-through;
 }
 
-/* Light theme hover effect */
+/* 浅色主题悬停效果 */
 :root:not(.dark) .legend-item:hover {
   background: rgba(255, 255, 255, 0.9);
   transform: translateY(-1px);
@@ -620,7 +620,7 @@ const datasetsWithColor = computed(() => {
   max-width: 240px;
 }
 
-/* Light theme tooltip */
+/* 浅色主题工具提示 */
 :root:not(.dark) .chart-tooltip {
   background: rgba(255, 255, 255, 0.95);
   color: #1a1a2e;
@@ -786,7 +786,7 @@ const datasetsWithColor = computed(() => {
     height: auto;
   }
 
-  /* 移动端 tooltip 特殊处理 */
+  /* 移动端工具提示特殊处理 */
   .chart-tooltip {
     min-width: 160px;
     max-width: calc(100vw - 32px);

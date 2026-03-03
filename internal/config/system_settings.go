@@ -49,7 +49,7 @@ func (sm *SystemSettingsManager) Initialize(store store.Store, gm groupManager, 
 			settingsMap[setting.SettingKey] = setting.SettingValue
 		}
 
-		// Start with default settings, then override with values from the database.
+		// 从默认设置开始，然后用数据库中的值覆盖。
 		settings := utils.DefaultSystemSettings()
 		v := reflect.ValueOf(&settings).Elem()
 		t := v.Type()
@@ -180,12 +180,12 @@ func (sm *SystemSettingsManager) GetAppUrl() string {
 
 // UpdateSettings 更新系统配置
 func (sm *SystemSettingsManager) UpdateSettings(settingsMap map[string]any) error {
-	// Validate settings
+	// 验证设置
 	if err := sm.ValidateSettings(settingsMap); err != nil {
 		return err
 	}
 
-	// Update database
+	// 更新数据库
 	var settingsToUpdate []models.SystemSetting
 	for key, value := range settingsMap {
 		settingsToUpdate = append(settingsToUpdate, models.SystemSetting{
@@ -203,7 +203,7 @@ func (sm *SystemSettingsManager) UpdateSettings(settingsMap map[string]any) erro
 		}
 	}
 
-	// Trigger reload on all instances
+	// 触发所有实例重新加载
 	return sm.syncer.Invalidate()
 }
 

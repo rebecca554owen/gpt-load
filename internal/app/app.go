@@ -76,13 +76,13 @@ func NewApp(params AppParams) *App {
 
 // Start 启动应用，非阻塞调用
 func (a *App) Start() error {
-	// Initialize i18n
+	// 初始化 i18n
 	if err := i18n.Init(); err != nil {
 		return fmt.Errorf("failed to initialize i18n: %w", err)
 	}
 	logrus.Info("i18n initialized successfully.")
 
-	// Master node initialization
+	// 主节点初始化
 	if a.configManager.IsMaster() {
 		logrus.Info("Starting as Master Node.")
 
@@ -90,7 +90,7 @@ func (a *App) Start() error {
 			return fmt.Errorf("cache cleanup failed: %w", err)
 		}
 
-		// Database migration
+		// 数据库迁移
 		db.HandleLegacyIndexes(a.db)
 		if err := a.db.AutoMigrate(
 			&models.SystemSetting{},
@@ -108,7 +108,7 @@ func (a *App) Start() error {
 		}
 		logrus.Info("Database auto-migration completed.")
 
-		// Initialize system settings
+		// 初始化系统设置
 		if err := a.settingsManager.EnsureSettingsInitialized(a.configManager.GetAuthConfig()); err != nil {
 			return fmt.Errorf("failed to initialize system settings: %w", err)
 		}
@@ -116,13 +116,13 @@ func (a *App) Start() error {
 
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 
-		// Load keys from database to Redis
+		// 从数据库加载密钥到 Redis
 		if err := a.keyPoolProvider.InitializeFromDatabase(); err != nil {
 			return fmt.Errorf("failed to load keys into key pool: %w", err)
 		}
 		logrus.Debug("API keys loaded into Redis cache by master.")
 
-		// Services only started on Master node
+		// 仅在主节点启动的服务
 		a.requestLogService.Start()
 		a.logCleanupService.Start()
 		a.cronChecker.Start()
@@ -144,12 +144,12 @@ func (a *App) Start() error {
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 	}
 
-	// Display configuration and start all background services
+	// 显示配置并启动所有后台服务
 	a.configManager.DisplayServerConfig()
 
 	a.groupManager.Initialize()
 
-	// Create HTTP server
+	// 创建 HTTP 服务器
 	serverConfig := a.configManager.GetEffectiveServerConfig()
 	a.httpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", serverConfig.Host, serverConfig.Port),
@@ -160,7 +160,7 @@ func (a *App) Start() error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	// Start HTTP server in a new goroutine
+	// 在新协程中启动 HTTP 服务器
 	go func() {
 		logrus.Infof("GPT-Load proxy server started successfully on Version: %s", version.Version)
 		logrus.Infof("Server address: http://%s:%d", serverConfig.Host, serverConfig.Port)
@@ -180,7 +180,7 @@ func (a *App) Stop(ctx context.Context) {
 	serverConfig := a.configManager.GetEffectiveServerConfig()
 	totalTimeout := time.Duration(serverConfig.GracefulShutdownTimeout) * time.Second
 
-	// Dynamically calculate HTTP shutdown timeout, reserve 5 seconds for background services
+	// 动态计算 HTTP 关闭超时，为后台服务预留 5 秒
 	httpShutdownTimeout := totalTimeout - 5*time.Second
 	httpShutdownCtx, cancelHttpShutdown := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancelHttpShutdown()
@@ -194,7 +194,7 @@ func (a *App) Stop(ctx context.Context) {
 	}
 	logrus.Info("HTTP server has been shut down.")
 
-	// Use original total timeout context to continue shutting down other background services
+	// 使用原始总超时上下文继续关闭其他后台服务
 	stoppableServices := []func(context.Context){
 		a.groupManager.Stop,
 		a.settingsManager.Stop,

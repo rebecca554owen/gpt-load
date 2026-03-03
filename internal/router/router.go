@@ -88,10 +88,10 @@ func registerAPIRoutes(
 
 	authConfig := configManager.GetAuthConfig()
 
-	// Public
+	// 公共路由
 	registerPublicAPIRoutes(api, serverHandler)
 
-	// Authentication
+	// 认证路由
 	protectedAPI := api.Group("")
 	protectedAPI.Use(middleware.Auth(authConfig))
 	registerProtectedAPIRoutes(protectedAPI, serverHandler)
@@ -102,7 +102,7 @@ func registerPublicAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server
 	api.POST("/auth/login", serverHandler.Login)
 	api.GET("/integration/info", serverHandler.GetIntegrationInfo)
 
-	// Dashboard public endpoints
+	// Dashboard 公共端点
 	dashboard := api.Group("/dashboard")
 	{
 		dashboard.GET("/stats", serverHandler.Stats)
@@ -152,17 +152,17 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		keys.PUT("/:id/notes", serverHandler.UpdateKeyNotes)
 	}
 
-	// Tasks
+	// 任务
 	api.GET("/tasks/status", serverHandler.GetTaskStatus)
 
-	// Logs
+	// 日志
 	logs := api.Group("/logs")
 	{
 		logs.GET("", serverHandler.GetLogs)
 		logs.GET("/export", serverHandler.ExportLogs)
 	}
 
-	// Settings
+	// 设置
 	settings := api.Group("/settings")
 	{
 		settings.GET("", serverHandler.GetSettings)
@@ -192,7 +192,7 @@ func registerFrontendRoutes(router *gin.Engine, buildFS embed.FS, indexPage []by
 		c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
 	})
 
-	// Use static resource cache middleware
+	// 使用静态资源缓存中间件
 	router.Use(middleware.StaticCache())
 
 	router.Use(static.Serve("/", EmbedFolder(buildFS, "web/dist")))

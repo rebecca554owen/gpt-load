@@ -18,7 +18,7 @@ type APIError struct {
 	Message    string
 }
 
-// Error implements the error interface.
+// Error 实现 error 接口。
 func (e *APIError) Error() string {
 	return e.Message
 }
@@ -30,7 +30,7 @@ type ServiceError struct {
 	Message string
 }
 
-// Error implements the error interface.
+// Error 实现 error 接口。
 func (e *ServiceError) Error() string {
 	if e.Message != "" {
 		return e.Message

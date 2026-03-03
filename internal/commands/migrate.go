@@ -20,25 +20,25 @@ import (
 func RunMigrateKeys(args []string) {
 	// 解析 migrate-keys 子命令参数
 	migrateCmd := flag.NewFlagSet("migrate-keys", flag.ExitOnError)
-	fromKey := migrateCmd.String("from", "", "Source encryption key (for decrypting existing data)")
-	toKey := migrateCmd.String("to", "", "Target encryption key (for encrypting new data)")
+	fromKey := migrateCmd.String("from", "", "源加密密钥（用于解密现有数据）")
+	toKey := migrateCmd.String("to", "", "目标加密密钥（用于加密新数据）")
 
 	// 设置自定义使用消息
 	migrateCmd.Usage = func() {
-		fmt.Println("GPT-Load Key Migration Tool")
+		fmt.Println("GPT-Load 密钥迁移工具")
 		fmt.Println()
-		fmt.Println("Usage:")
-		fmt.Println("  Enable encryption: gpt-load migrate-keys --to new-key")
-		fmt.Println("  Disable encryption: gpt-load migrate-keys --from old-key")
-		fmt.Println("  Change key: gpt-load migrate-keys --from old-key --to new-key")
+		fmt.Println("用法:")
+		fmt.Println("  启用加密：gpt-load migrate-keys --to new-key")
+		fmt.Println("  禁用加密：gpt-load migrate-keys --from old-key")
+		fmt.Println("  更改密钥：gpt-load migrate-keys --from old-key --to new-key")
 		fmt.Println()
-		fmt.Println("Arguments:")
+		fmt.Println("参数:")
 		migrateCmd.PrintDefaults()
 		fmt.Println()
-		fmt.Println("⚠️  Important Notes:")
-		fmt.Println("  1. Always backup database before migration")
-		fmt.Println("  2. Stop service during migration")
-		fmt.Println("  3. Restart service after migration completes")
+		fmt.Println("⚠️ 重要提示:")
+		fmt.Println("  1. 迁移前务必备份数据库")
+		fmt.Println("  2. 迁移期间停止服务")
+		fmt.Println("  3. 迁移完成后重启服务")
 	}
 
 	// 解析参数

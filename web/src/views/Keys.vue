@@ -26,7 +26,7 @@ async function loadGroups() {
   try {
     loading.value = true;
     groups.value = await keysApi.getGroups();
-    // Select default group
+    // 选择默认组
     if (groups.value.length > 0 && !selectedGroup.value) {
       const groupId = route.query.groupId;
       const found = groups.value.find(g => String(g.id) === String(groupId));
@@ -62,7 +62,7 @@ async function loadSubGroups() {
   }
 }
 
-// Watch selected group changes, load subgroup data
+// 监听选中组变化，加载子组数据
 watch(selectedGroup, async newGroup => {
   if (newGroup?.group_type === "aggregate") {
     await loadSubGroups();
@@ -105,7 +105,7 @@ async function refreshGroupsAndSelect(targetGroupId?: number, selectFirst = true
   }
 }
 
-// Handle subgroup selection, navigate to corresponding group
+// 处理子组选择，导航到对应组
 function handleSubGroupSelect(groupId: number) {
   const targetGroup = groups.value.find(g => g.id === groupId);
   if (targetGroup) {
@@ -113,7 +113,7 @@ function handleSubGroupSelect(groupId: number) {
   }
 }
 
-// Handle aggregate group navigation, navigate to corresponding aggregate group
+// 处理聚合组导航，导航到对应的聚合组
 function handleNavigateToGroup(groupId: number) {
   const targetGroup = groups.value.find(g => g.id === groupId);
   if (targetGroup) {
@@ -121,15 +121,15 @@ function handleNavigateToGroup(groupId: number) {
   }
 }
 
-// Use API response data directly to update selectedGroup
+// 使用 API 响应数据直接更新 selectedGroup
 function updateSelectedGroupFromResponse(updatedGroup: Group) {
   if (selectedGroup.value?.id === updatedGroup.id) {
-    // Replace the entire object to ensure reactive update
-    // Note: Backend returns model_mappings (array), need to map it to model_mappings_list
+    // 替换整个对象以确保响应式更新
+    // 注意：后端返回 model_mappings（数组），需要将其映射为 model_mappings_list
     const groupWithMappingsList = {
       ...selectedGroup.value,
       ...updatedGroup,
-      // If backend returns model_mappings array, set it as model_mappings_list
+      // 如果后端返回 model_mappings 数组，将其设置为 model_mappings_list
       model_mappings_list:
         (updatedGroup.model_mappings as ModelMapping[] | undefined) ||
         updatedGroup.model_mappings_list,
@@ -141,7 +141,7 @@ function updateSelectedGroupFromResponse(updatedGroup: Group) {
 
 <template>
   <div>
-    <!-- Encryption config error alert -->
+    <!-- 加密配置错误警告 -->
     <encryption-mismatch-alert style="margin-bottom: 16px" />
 
     <div class="keys-container">
@@ -156,9 +156,9 @@ function updateSelectedGroupFromResponse(updatedGroup: Group) {
         />
       </div>
 
-      <!-- Main content area on the right, 80% width -->
+      <!-- 右侧主内容区域，80% 宽度 -->
       <div class="main-content">
-        <!-- Group info card, more compact -->
+        <!-- 组信息卡片，更紧凑 -->
         <div class="group-info">
           <group-info-card
             :group="selectedGroup"
@@ -171,17 +171,17 @@ function updateSelectedGroupFromResponse(updatedGroup: Group) {
           />
         </div>
 
-        <!-- Key table area / Subgroup list area / Model mapping area -->
+        <!-- 密钥表格区域 / 子组列表区域 / 模型映射区域 -->
         <div class="key-table-section">
-          <!-- Standard group shows key list -->
+          <!-- 标准组显示密钥列表 -->
           <key-table
             v-if="!selectedGroup || selectedGroup.group_type !== 'aggregate'"
             :selected-group="selectedGroup"
           />
 
-          <!-- Aggregate group shows both subgroup list and model mapping list -->
+          <!-- 聚合组显示子组列表和模型映射列表 -->
           <template v-else>
-            <!-- Subgroup table -->
+            <!-- 子组表格 -->
             <sub-group-table
               :selected-group="selectedGroup"
               :sub-groups="subGroups"
@@ -191,7 +191,7 @@ function updateSelectedGroupFromResponse(updatedGroup: Group) {
               @group-select="handleSubGroupSelect"
             />
 
-            <!-- Model mapping list -->
+            <!-- 模型映射列表 -->
             <div class="model-mapping-section">
               <model-mapping-table
                 :selected-group="selectedGroup"

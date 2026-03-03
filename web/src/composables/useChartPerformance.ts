@@ -2,23 +2,23 @@ import { ref } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 
 /**
- * Chart performance optimization composable
- * Handles debounced interactions and rendering optimizations
+ * 图表性能优化 composable
+ * 处理防抖交互和渲染优化
  */
 export function useChartPerformance() {
-  // Track rendering state
+  // 跟踪渲染状态
   const isRendering = ref(false);
   const renderRequested = ref(false);
 
   /**
-   * Debounced tooltip update to reduce re-renders during rapid mouse movements
+   * 防抖的 tooltip 更新，减少快速鼠标移动时的重新渲染
    */
   const debouncedTooltipUpdate = useDebounceFn((callback: () => void) => {
     callback();
   }, 16); // 60fps = ~16ms per frame
 
   /**
-   * Throttle render requests to avoid unnecessary re-renders
+   * 节流渲染请求，避免不必要的重新渲染
    */
   const requestRender = (callback: () => void) => {
     if (renderRequested.value) {
@@ -40,7 +40,7 @@ export function useChartPerformance() {
   };
 
   /**
-   * Memoized path generation with cache key
+   * 带缓存键的记忆化路径生成
    */
   const pathCache = new Map<string, string>();
 
@@ -69,15 +69,15 @@ export function useChartPerformance() {
 }
 
 /**
- * Optimized data sampling for large datasets
- * Reduces number of points while preserving curve shape
+ * 大数据集的优化数据采样
+ * 在保持曲线形状的同时减少数据点数量
  */
 export function useDataSampling() {
   /**
-   * Sample data points to reduce rendering load
-   * @param data - Original data array
-   * @param maxPoints - Maximum number of points to return
-   * @returns Sampled data array
+   * 采样数据点以减少渲染负载
+   * @param data - 原始数据数组
+   * @param maxPoints - 要返回的最大点数
+   * @returns 采样后的数据数组
    */
   const sampleData = (data: number[], maxPoints: number): number[] => {
     if (data.length <= maxPoints) {
@@ -100,12 +100,12 @@ export function useDataSampling() {
   };
 
   /**
-   * Calculate optimal max points based on chart width
-   * @param chartWidth - Width of the chart in pixels
-   * @returns Optimal number of data points
+   * 根据图表宽度计算最佳最大点数
+   * @param chartWidth - 图表宽度（像素）
+   * @returns 最佳数据点数量
    */
   const getOptimalMaxPoints = (chartWidth: number): number => {
-    // One point per 2 pixels is enough for smooth curves
+    // 每两个像素一个点足以获得平滑的曲线
     return Math.ceil(chartWidth / 2);
   };
 

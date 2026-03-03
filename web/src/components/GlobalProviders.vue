@@ -178,12 +178,12 @@ const themeOverrides = computed<GlobalThemeOverrides>(() => {
   return baseOverrides;
 });
 
-// Dynamically return theme object based on current theme
+// 根据当前主题动态返回主题对象
 const theme = computed<GlobalTheme | undefined>(() => {
   return actualTheme.value === "dark" ? darkTheme : undefined;
 });
 
-// Return corresponding locale configuration based on current language
+// 根据当前语言返回对应的语言配置
 const locale = computed(() => {
   const currentLocale = getLocale();
   switch (currentLocale) {
@@ -198,7 +198,7 @@ const locale = computed(() => {
   }
 });
 
-// Return corresponding date locale configuration based on current language
+// 根据当前语言返回对应的日期语言配置
 const dateLocale = computed(() => {
   const currentLocale = getLocale();
   switch (currentLocale) {

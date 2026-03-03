@@ -8,7 +8,7 @@ import { useI18n } from "vue-i18n";
 const { t } = useI18n();
 const { mode: themeMode, toggleTheme } = useTheme();
 
-// Calculate icon and tooltip based on current theme mode
+// 根据当前主题模式计算图标和提示文本
 const themeConfig = computed(() => {
   switch (themeMode.value) {
     case "auto":

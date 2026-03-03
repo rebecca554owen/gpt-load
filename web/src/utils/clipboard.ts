@@ -1,5 +1,5 @@
 /**
- * Copy text
+ * 复制文本
  */
 const FALLBACK_TEXTAREA_STYLES: Partial<CSSStyleDeclaration> = {
   position: "fixed",

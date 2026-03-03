@@ -68,7 +68,7 @@ export function useChartColors() {
           return true;
         }
       } catch {
-        // Ignore translation errors
+        // 忽略翻译错误
       }
     }
 

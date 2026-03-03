@@ -4,7 +4,7 @@ import enUS from "./en-US";
 import jaJP from "./ja-JP";
 import zhCN from "./zh-CN";
 
-// Supported languages list
+// 支持的语言列表
 export const SUPPORTED_LOCALES = [
   { key: "zh-CN", label: "中文" },
   { key: "en-US", label: "English" },
@@ -13,34 +13,34 @@ export const SUPPORTED_LOCALES = [
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number]["key"];
 
-// Get default locale
+// 获取默认语言环境
 function getDefaultLocale(): Locale {
-  // 1. Prefer saved locale from localStorage
+  // 1. 优先使用 localStorage 中保存的语言设置
   const savedLocale = localStorage.getItem("locale");
   if (savedLocale && SUPPORTED_LOCALES.some(l => l.key === savedLocale)) {
     return savedLocale as Locale;
   }
 
-  // 2. Auto-detect browser language
+  // 2. 自动检测浏览器语言
   const browserLang = navigator.language;
 
-  // Exact match
+  // 精确匹配
   if (SUPPORTED_LOCALES.some(l => l.key === browserLang)) {
     return browserLang as Locale;
   }
 
-  // Fuzzy match (e.g., zh matches zh-CN)
+  // 模糊匹配（例如，zh 匹配 zh-CN）
   const shortLang = browserLang.split("-")[0];
   const matched = SUPPORTED_LOCALES.find(l => l.key.startsWith(shortLang));
   if (matched) {
     return matched.key;
   }
 
-  // 3. Default to Chinese
+  // 3. 默认使用中文
   return "zh-CN";
 }
 
-// Create i18n instance
+// 创建 i18n 实例
 const defaultLocale = getDefaultLocale();
 const i18n = createI18n({
   legacy: false,
@@ -53,31 +53,31 @@ const i18n = createI18n({
   },
 });
 
-// Set axios default language on initialization
+// 初始化时设置 axios 默认语言
 if (axios.defaults.headers) {
   axios.defaults.headers.common["Accept-Language"] = defaultLocale;
 }
 
-// Helper function to switch language
+// 切换语言的辅助函数
 export function setLocale(locale: Locale) {
-  // Save to localStorage
+  // 保存到 localStorage
   localStorage.setItem("locale", locale);
 
-  // Update axios default headers
+  // 更新 axios 默认请求头
   if (axios.defaults.headers) {
     axios.defaults.headers.common["Accept-Language"] = locale;
   }
 
-  // Reload page to ensure all content (including backend data) uses new language
+  // 重新加载页面以确保所有内容（包括后端数据）使用新语言
   window.location.reload();
 }
 
-// Get current locale
+// 获取当前语言环境
 export function getLocale(): Locale {
   return i18n.global.locale.value as string as Locale;
 }
 
-// Get current locale label
+// 获取当前语言环境的显示标签
 export function getCurrentLocaleLabel(): string {
   const current = getLocale();
   return SUPPORTED_LOCALES.find(l => l.key === current)?.label || "中文";

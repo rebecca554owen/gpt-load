@@ -122,7 +122,7 @@ func (s *RedisStore) Rotate(key string) (string, error) {
 	return val, nil
 }
 
-// LLen returns the length of a list.
+// LLen 返回列表的长度。
 func (s *RedisStore) LLen(key string) (int64, error) {
 	return s.client.LLen(context.Background(), s.prefixKey(key)).Result()
 }

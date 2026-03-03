@@ -183,21 +183,21 @@ function handleDelete() {
 </template>
 
 <style scoped>
-/* Component-specific styles only - all card styles are in components.css */
+/* 仅组件特定样式 - 所有卡片样式在 components.css 中 */
 .key-card {
-  /* Use .item-card base styles from components.css */
+  /* 使用 components.css 中的 .item-card 基础样式 */
 }
 
 .key-card.status-valid {
-  /* Use .item-card.status-valid from components.css */
+  /* 使用 components.css 中的 .item-card.status-valid */
 }
 
 .key-card.status-invalid {
-  /* Use .item-card.status-invalid from components.css */
+  /* 使用 components.css 中的 .item-card.status-invalid */
 }
 
 .key-card.status-error {
-  /* Use .item-card.status-error from components.css */
+  /* 使用 components.css 中的 .item-card.status-error */
 }
 
 .key-text {

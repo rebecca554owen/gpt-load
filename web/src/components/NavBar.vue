@@ -22,7 +22,7 @@ const emit = defineEmits(["close"]);
 const menuOptions = computed<MenuOption[]>(() => {
   const options: MenuOption[] = [renderMenuItem("dashboard", t("nav.dashboard"), "dashboard")];
 
-  // Admin menu items only shown when logged in
+  // 仅登录后显示的管理员菜单项
   if (isLoggedIn.value) {
     options.push(
       renderMenuItem("keys", t("nav.keys"), "keys"),

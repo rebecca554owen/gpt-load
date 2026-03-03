@@ -78,7 +78,7 @@ export default {
     last1Week: "1 Week",
     last1Month: "1 Month",
     realtime: "Realtime",
-    // Token stats labels (camelCase)
+    // Token 统计标签（camelCase）
     nonCachedPromptTokens: "Input",
     promptTokens: "Input",
     completionTokens: "Output",
@@ -86,7 +86,7 @@ export default {
     totalTokens: "Total",
     successRequests: "Success Requests",
     failedRequests: "Failed Requests",
-    // Chart time axis labels
+    // 图表时间轴标签
     minutesAgo: "{value}m ago",
     hoursAgo: "{value}h ago",
     daysAgo: "{value}d ago",

@@ -27,7 +27,7 @@ interface Props {
   show: boolean;
   mode: "add" | "edit";
   aggregateGroup: Group | null;
-  modelMapping?: ModelMapping | null; // Passed in edit mode
+  modelMapping?: ModelMapping | null; // 编辑模式传入
   existingModelMappings: ModelMapping[];
   subGroups: SubGroupInfo[];
   groups: Group[];
@@ -41,7 +41,7 @@ interface Emits {
 
 interface TargetItem extends ModelMappingTarget {
   id: string;
-  editingModel?: string | null; // Model name being edited
+  editingModel?: string | null; // 正在编辑的模型名称
 }
 
 const props = defineProps<Props>();

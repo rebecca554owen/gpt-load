@@ -23,9 +23,9 @@ type SubGroupManager struct {
 }
 
 type groupSelectors struct {
-	// Each model alias has its own selector
+	// 每个模型别名有独立的选择器
 	aliasSelectors map[string]*modelLevelSelector
-	// Default selector for unmatched aliases
+	// 未匹配别名使用的默认选择器
 	defaultSelector *modelLevelSelector
 }
 
@@ -78,7 +78,7 @@ func (m *SubGroupManager) SelectSubGroup(group *models.Group, modelAlias string)
 
 	alias := strings.TrimSpace(modelAlias)
 
-	// Try to match model alias first
+	// 尝试匹配模型别名
 	if alias != "" && len(selectors.aliasSelectors) > 0 {
 		if sel, ok := selectors.aliasSelectors[strings.ToLower(alias)]; ok {
 			if selectedItem := sel.selectNextModel(); selectedItem != nil {
@@ -102,7 +102,7 @@ func (m *SubGroupManager) SelectSubGroup(group *models.Group, modelAlias string)
 		}
 	}
 
-	// Try wildcard matching (for patterns with * or ?)
+	// 尝试通配符匹配（支持 * 或 ? 模式）
 	if alias != "" && len(selectors.aliasSelectors) > 0 {
 		for pattern, sel := range selectors.aliasSelectors {
 			if utils.HasWildcard(pattern) && utils.MatchWildcard(pattern, alias) {

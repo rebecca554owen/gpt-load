@@ -1,4 +1,4 @@
-// Package proxy provides high-performance OpenAI multi-key proxy server
+// Package proxy 提供高性能 OpenAI 多密钥代理服务器
 package proxy
 
 import (
@@ -35,7 +35,7 @@ const (
 	modelFetchTimeout = 5 * time.Second
 )
 
-// ProxyServer represents the proxy server
+// ProxyServer 表示代理服务器
 type ProxyServer struct {
 	keyProvider       *keypool.KeyProvider
 	groupManager      *services.GroupManager
@@ -46,7 +46,7 @@ type ProxyServer struct {
 	encryptionSvc     encryption.Service
 }
 
-// NewProxyServer creates a new proxy server
+// NewProxyServer 创建新的代理服务器
 func NewProxyServer(
 	keyProvider *keypool.KeyProvider,
 	groupManager *services.GroupManager,
@@ -67,7 +67,7 @@ func NewProxyServer(
 	}, nil
 }
 
-// HandleProxy is the main entry point for proxy requests, refactored based on the stable .bak logic.
+// HandleProxy 是代理请求的主入口点，基于稳定的 .bak 逻辑重构
 func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 	startTime := time.Now()
 	groupName := c.Param("group_name")
@@ -93,7 +93,7 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 
 	var channelHandler channel.ChannelProxy
 	if originalGroup.GroupType == "aggregate" {
-		// For aggregate groups, use first subgroup to extract model name
+		// 对于聚合组，使用第一个子组提取模型名称
 		if len(originalGroup.SubGroups) > 0 {
 			tempGroup, err := ps.groupManager.GetGroupByName(originalGroup.SubGroups[0].SubGroupName)
 			if err == nil {
@@ -121,7 +121,7 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		logrus.WithField("group", originalGroup.Name).Warn("Empty model name extracted from request")
 	}
 
-	// Now select subgroup based on model name (for aggregate groups)
+	// 现在根据模型名称选择子组（用于聚合组）
 	group := originalGroup
 	var selectedModel string
 	if originalGroup.GroupType == "aggregate" && model != "" {
@@ -152,7 +152,7 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		}
 	}
 
-	// Create modification context
+	// 创建修改上下文
 	modCtx := &modifier.ModificationContext{
 		Context:       c.Request.Context(),
 		OriginalGroup: originalGroup,
@@ -163,14 +163,14 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 		RequestPath:   c.Request.URL.Path,
 	}
 
-	// Create modifier chain
+	// 创建修改器链
 	chain := modifier.NewModifierChain(
 		modifier.NewModelMappingModifier(),
 		modifier.NewModelRedirectModifier(),
 		modifier.NewParamOverrideModifier(),
 	)
 
-	// Apply modifications
+	// 应用修改
 	finalBodyBytes, err := chain.Apply(modCtx, bodyBytes)
 	if err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, err.Error()))
@@ -183,8 +183,8 @@ func (ps *ProxyServer) HandleProxy(c *gin.Context) {
 	ps.executeRequestWithRetry(c, channelHandler, originalGroup, group, finalBodyBytes, isStream, startTime, 0, model, excludedSubGroupIDs)
 }
 
-// executeRequestWithRetry is the core recursive function for handling requests and retries.
-// For aggregate groups, it supports cross-sub-group retry when all retries within a sub-group are exhausted.
+// executeRequestWithRetry 是处理请求和重试的核心递归函数
+// 对于聚合组，当子组内的所有重试耗尽时支持跨子组重试
 func (ps *ProxyServer) executeRequestWithRetry(
 	c *gin.Context,
 	channelHandler channel.ChannelProxy,
@@ -203,7 +203,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	if err != nil {
 		logrus.Errorf("Failed to select a key for group %s on attempt %d: %v", group.Name, retryCount+1, err)
 
-		// For aggregate groups, try switching to another sub-group when no keys available
+		// 对于聚合组，当没有可用密钥时尝试切换到另一个子组
 		if originalGroup.GroupType == "aggregate" {
 			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, bodyBytes, isStream, startTime, excludedSubGroupIDs, http.StatusServiceUnavailable, err.Error()) {
 				return
@@ -247,14 +247,14 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 	req.Header = c.Request.Header.Clone()
 
-	// Clean up client auth key
+	// 清理客户端认证密钥
 	req.Header.Del("Authorization")
 	req.Header.Del("X-Api-Key")
 	req.Header.Del("X-Goog-Api-Key")
 	req.Header.Del("Api-Key")
 
-	// Apply channel-specific model redirect (e.g., Gemini native format needs URL path modification)
-	// This will NOT modify the request body again if already processed
+	// 应用通道特定的模型重定向（例如，Gemini 原生格式需要修改 URL 路径）
+	// 如果已经处理过，此操作不会再次修改请求体
 	finalBodyBytes, err := channelHandler.ApplyModelRedirect(req, bodyBytes, group)
 	if err != nil {
 		response.Error(c, app_errors.NewAPIError(app_errors.ErrBadRequest, err.Error()))
@@ -262,7 +262,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		return
 	}
 
-	// Update request body if it was modified by channel-specific redirect
+	// 如果请求体被通道特定的重定向修改，则更新请求体
 	if !bytes.Equal(finalBodyBytes, bodyBytes) {
 		req.Body = io.NopCloser(bytes.NewReader(finalBodyBytes))
 		req.ContentLength = int64(len(finalBodyBytes))
@@ -270,20 +270,20 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 	channelHandler.ModifyRequest(req, apiKey, group)
 
-	// Merge HeaderRules: aggregate first, then subgroup (subgroup takes precedence)
+	// 合并 HeaderRules：先应用聚合组，再应用子组（子组优先）
 	if originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
-		// Apply aggregate group's HeaderRules first (base configuration)
+		// 先应用聚合组的 HeaderRules（基础配置）
 		if len(originalGroup.HeaderRuleList) > 0 {
 			headerCtx := utils.NewHeaderVariableContextFromGin(c, originalGroup, apiKey)
 			utils.ApplyHeaderRules(req, originalGroup.HeaderRuleList, headerCtx)
 		}
-		// Then apply subgroup's HeaderRules (takes precedence on conflicts)
+		// 然后应用子组的 HeaderRules（冲突时优先）
 		if len(group.HeaderRuleList) > 0 {
 			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
 			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
 		}
 	} else {
-		// Standard group or aggregate group acting as subgroup
+		// 标准组或聚合组作为子组
 		if len(group.HeaderRuleList) > 0 {
 			headerCtx := utils.NewHeaderVariableContextFromGin(c, group, apiKey)
 			utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
@@ -303,11 +303,11 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		defer resp.Body.Close()
 	}
 
-	// Unified error handling for retries.
-	// - 5xx server errors: retry within current group (up to MaxRetries), then switch for aggregate groups
-	// - 429 rate limit: retry, may succeed with different key
-	// - 4xx client errors (except 404): no retry within group, but aggregate groups can try next sub-group
-	// - 404: do not retry, resource not found
+	// 统一的重试错误处理
+	// - 5xx 服务器错误：在当前组内重试（最多 MaxRetries 次），然后为聚合组切换
+	// - 429 限流：重试，使用不同的密钥可能成功
+	// - 4xx 客户端错误（除了 404）：组内不重试，但聚合组可以尝试下一个子组
+	// - 404：不重试，资源未找到
 	isRetryableHTTPError := resp != nil && (resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests)
 
 	if err != nil || isRetryableHTTPError {
@@ -327,7 +327,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 			parsedError = errorMessage
 			logrus.Debugf("Request failed (attempt %d/%d) for key %s: %v", retryCount+1, cfg.MaxRetries, utils.MaskAPIKey(apiKey.KeyValue), err)
 		} else {
-			// HTTP-level error (status >= 400)
+			// HTTP 级别错误（状态 >= 400）
 			statusCode = resp.StatusCode
 			errorBody, readErr := io.ReadAll(resp.Body)
 			if readErr != nil {
@@ -341,10 +341,10 @@ func (ps *ProxyServer) executeRequestWithRetry(
 			logrus.Debugf("Request failed with status %d (attempt %d/%d) for key %s. Parsed Error: %s", statusCode, retryCount+1, cfg.MaxRetries, utils.MaskAPIKey(apiKey.KeyValue), parsedError)
 		}
 
-		// Update key status using parsed error information
+		// 使用解析的错误信息更新密钥状态
 		ps.keyProvider.UpdateStatus(apiKey, group, false, parsedError)
 
-		// Check if this is the last attempt within current group
+		// 检查是否是当前组内的最后一次尝试
 		isLastAttempt := retryCount >= cfg.MaxRetries
 		requestType := models.RequestTypeRetry
 		if isLastAttempt {
@@ -353,17 +353,17 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, bodyBytes, nil, requestType, modelAlias)
 
-		// If this is the last attempt within current group, check if it's an aggregate group and try switching
+		// 如果这是当前组内的最后一次尝试，检查是否为聚合组并尝试切换
 		if isLastAttempt && originalGroup.GroupType == "aggregate" {
 			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, finalBodyBytes, isStream, startTime, excludedSubGroupIDs, statusCode, errorMessage) {
 				return
 			}
-			// All sub-groups have been tried, return error
+			// 所有子组都已尝试，返回错误
 			ps.returnUpstreamError(c, statusCode, errorMessage)
 			return
 		}
 
-		// If this is the last attempt, return error directly without recursion
+		// 如果这是最后一次尝试，直接返回错误而不递归
 		if isLastAttempt {
 			ps.returnUpstreamError(c, statusCode, errorMessage)
 			return
@@ -373,9 +373,9 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		return
 	}
 
-	// Handle 4xx client errors (except 404 which should pass through)
-	// 404: pass through to allow client handling
-	// Other 4xx: no retry within group, but aggregate groups can try next sub-group
+	// 处理 4xx 客户端错误（除了 404，它应该透传）
+	// 404：透传以允许客户端处理
+	// 其他 4xx：组内不重试，但聚合组可以尝试下一个子组
 	if resp != nil && resp.StatusCode >= 400 && resp.StatusCode != http.StatusNotFound {
 		statusCode := resp.StatusCode
 		errorBody, readErr := io.ReadAll(resp.Body)
@@ -390,13 +390,13 @@ func (ps *ProxyServer) executeRequestWithRetry(
 
 		logrus.Debugf("Request failed with status %d for key %s. Parsed Error: %s", statusCode, utils.MaskAPIKey(apiKey.KeyValue), parsedError)
 
-		// Update key status
+		// 更新密钥状态
 		ps.keyProvider.UpdateStatus(apiKey, group, false, parsedError)
 
 		ps.logRequest(c, originalGroup, group, apiKey, startTime, statusCode, errors.New(parsedError), isStream, upstreamURL, channelHandler, finalBodyBytes, nil, models.RequestTypeFinal, modelAlias)
 
-		// For aggregate groups, try switching to another sub-group on 4xx errors
-		// Different providers may have different API formats, so switching might help
+		// 对于聚合组，在 4xx 错误时尝试切换到另一个子组
+		// 不同的提供商可能有不同的 API 格式，切换可能有所帮助
 		if originalGroup.GroupType == "aggregate" {
 			if ps.trySwitchToAnotherSubGroup(c, originalGroup, group, modelAlias, finalBodyBytes, isStream, startTime, excludedSubGroupIDs, statusCode, errorMessage) {
 				return
@@ -407,10 +407,10 @@ func (ps *ProxyServer) executeRequestWithRetry(
 		return
 	}
 
-	// ps.keyProvider.UpdateStatus(apiKey, group, true) // No longer reset success count on successful request to reduce I/O overhead
+	// ps.keyProvider.UpdateStatus(apiKey, group, true) // 不再在成功请求时重置成功计数以减少 I/O 开销
 	logrus.Debugf("Request for group %s succeeded on attempt %d with key %s", group.Name, retryCount+1, utils.MaskAPIKey(apiKey.KeyValue))
 
-	// Check if this is a model list request (needs special handling)
+	// 检查是否为模型列表请求（需要特殊处理）
 	if shouldInterceptModelList(c.Request.URL.Path, c.Request.Method) {
 		ps.handleModelListResponse(c, resp, group, channelHandler)
 		ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, nil, models.RequestTypeFinal, modelAlias)
@@ -434,7 +434,7 @@ func (ps *ProxyServer) executeRequestWithRetry(
 	ps.logRequest(c, originalGroup, group, apiKey, startTime, resp.StatusCode, nil, isStream, upstreamURL, channelHandler, bodyBytes, tokenUsage, models.RequestTypeFinal, modelAlias)
 }
 
-// returnUpstreamError is a helper function to return upstream error response
+// returnUpstreamError 返回上游错误响应的辅助函数
 func (ps *ProxyServer) returnUpstreamError(c *gin.Context, statusCode int, errorMessage string) {
 	var errorJSON map[string]any
 	if err := json.Unmarshal([]byte(errorMessage), &errorJSON); err == nil {
@@ -444,8 +444,8 @@ func (ps *ProxyServer) returnUpstreamError(c *gin.Context, statusCode int, error
 	}
 }
 
-// trySwitchToAnotherSubGroup attempts to switch to another sub-group for aggregate groups.
-// Returns true if successfully switched and retry initiated, false otherwise.
+// trySwitchToAnotherSubGroup 尝试为聚合组切换到另一个子组
+// 如果成功切换并启动重试则返回 true，否则返回 false
 func (ps *ProxyServer) trySwitchToAnotherSubGroup(
 	c *gin.Context,
 	originalGroup *models.Group,
@@ -482,7 +482,7 @@ func (ps *ProxyServer) trySwitchToAnotherSubGroup(
 		return false
 	}
 
-	// Get the current model from the request body (bodyBytes may have been modified)
+	// 从请求体获取当前模型（bodyBytes 可能已被修改）
 	var currentModel struct {
 		Model string `json:"model"`
 	}
@@ -490,7 +490,7 @@ func (ps *ProxyServer) trySwitchToAnotherSubGroup(
 		return false
 	}
 
-	// Apply model mapping for the new subgroup
+	// 为新子组应用模型映射
 	updatedBodyBytes := bodyBytes
 	updatedSelectedModel := newSelection.SelectedModel
 	if updatedSelectedModel != "" && updatedSelectedModel != currentModel.Model {
@@ -506,7 +506,7 @@ func (ps *ProxyServer) trySwitchToAnotherSubGroup(
 	return true
 }
 
-// logRequest is a helper function to create and record a request log.
+// logRequest 创建并记录请求日志的辅助函数
 func (ps *ProxyServer) logRequest(
 	c *gin.Context,
 	originalGroup *models.Group,
@@ -552,7 +552,7 @@ func (ps *ProxyServer) logRequest(
 		OriginalModel: originalModel,
 	}
 
-	// Set parent group
+	// 设置父组
 	if originalGroup != nil && originalGroup.GroupType == "aggregate" && originalGroup.ID != group.ID {
 		logEntry.ParentGroupID = originalGroup.ID
 		logEntry.ParentGroupName = originalGroup.Name
@@ -562,7 +562,7 @@ func (ps *ProxyServer) logRequest(
 		logEntry.Model = channelHandler.ExtractModel(c, bodyBytes)
 	}
 
-	// Set token usage if available
+	// 设置 token 使用情况（如果可用）
 	if tokenUsage != nil {
 		logEntry.PromptTokens = tokenUsage.PromptTokens
 		logEntry.CompletionTokens = tokenUsage.CompletionTokens
@@ -571,7 +571,7 @@ func (ps *ProxyServer) logRequest(
 	}
 
 	if apiKey != nil {
-		// Encrypt key value for log storage
+		// 加密密钥值用于日志存储
 		encryptedKeyValue, err := ps.encryptionSvc.Encrypt(apiKey.KeyValue)
 		if err != nil {
 			logrus.WithError(err).Error("Failed to encrypt key value for logging")
@@ -579,7 +579,7 @@ func (ps *ProxyServer) logRequest(
 		} else {
 			logEntry.KeyValue = encryptedKeyValue
 		}
-		// Add KeyHash for reverse lookup
+		// 添加 KeyHash 用于反向查找
 		logEntry.KeyHash = ps.encryptionSvc.Hash(apiKey.KeyValue)
 	}
 
@@ -592,12 +592,12 @@ func (ps *ProxyServer) logRequest(
 	}
 }
 
-// isModelsRequest checks if the request is for /v1/models or /models endpoint
+// isModelsRequest 检查请求是否为 /v1/models 或 /models 端点
 func (ps *ProxyServer) isModelsRequest(path string) bool {
 	return strings.HasSuffix(path, "/v1/models") || strings.HasSuffix(path, "/models")
 }
 
-// handleAggregateModelsRequest handles /v1/models requests for aggregate groups
+// handleAggregateModelsRequest 处理聚合组的 /v1/models 请求
 func (ps *ProxyServer) handleAggregateModelsRequest(c *gin.Context, aggregateGroup *models.Group) {
 	allModels := make(map[string]bool)
 	modelList := []string{}
@@ -650,7 +650,7 @@ func (ps *ProxyServer) handleAggregateModelsRequest(c *gin.Context, aggregateGro
 	c.JSON(http.StatusOK, response)
 }
 
-// fetchModelsFromAllSubGroups fetches models from all sub-groups of an aggregate group
+// fetchModelsFromAllSubGroups 从聚合组的所有子组获取模型列表
 func (ps *ProxyServer) fetchModelsFromAllSubGroups(ctx context.Context, aggregateGroup *models.Group, userAgent string) []string {
 	if len(aggregateGroup.SubGroups) == 0 {
 		return []string{}
@@ -721,7 +721,7 @@ func (ps *ProxyServer) fetchModelsFromAllSubGroups(ctx context.Context, aggregat
 	return modelList
 }
 
-// fetchUpstreamModelsWithKey fetches models from upstream using sub-group's key
+// fetchUpstreamModelsWithKey 使用子组密钥从上游获取模型列表
 func (ps *ProxyServer) fetchUpstreamModelsWithKey(ctx context.Context, group *models.Group, userAgent string) ([]string, error) {
 	channelHandler, err := ps.channelFactory.GetChannel(group)
 	if err != nil {
@@ -783,7 +783,7 @@ func (ps *ProxyServer) fetchUpstreamModelsWithKey(ctx context.Context, group *mo
 	return models, nil
 }
 
-// buildModelsURLForGroup builds the upstream URL for models endpoint for a specific group
+// buildModelsURLForGroup 为指定组构建模型端点的上游 URL
 func (ps *ProxyServer) buildModelsURLForGroup(group *models.Group) (string, error) {
 	channelHandler, err := ps.channelFactory.GetChannel(group)
 	if err != nil {
@@ -801,7 +801,7 @@ func (ps *ProxyServer) buildModelsURLForGroup(group *models.Group) (string, erro
 	return upstreamURL, nil
 }
 
-// getModelProviderForAggregate determines the provider for a model in aggregate groups
+// getModelProviderForAggregate 确定聚合组中模型的提供商
 func (ps *ProxyServer) getModelProviderForAggregate(model string, group *models.Group) string {
 	return "gpt-load-aggregate"
 }

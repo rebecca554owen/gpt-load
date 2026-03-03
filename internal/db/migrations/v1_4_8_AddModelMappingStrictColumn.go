@@ -9,13 +9,13 @@ import (
 func V1_4_8_AddModelMappingStrictColumn(db *gorm.DB) error {
 	logrus.Info("Running v1.4.8 migration: Adding model_mapping_strict column to groups table")
 
-	// Check if column already exists
+	// 检查列是否已存在
 	if db.Migrator().HasColumn(&groupTableStrict{}, "model_mapping_strict") {
 		logrus.Info("model_mapping_strict column already exists, skipping v1.4.8 migration")
 		return nil
 	}
 
-	// Add the column
+	// 添加列
 	if err := db.Migrator().AddColumn(&groupTableStrict{}, "model_mapping_strict"); err != nil {
 		logrus.WithError(err).Error("Failed to add model_mapping_strict column")
 		return err

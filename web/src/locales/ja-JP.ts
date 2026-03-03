@@ -77,7 +77,7 @@ export default {
     last1Week: "1週間",
     last1Month: "1ヶ月",
     realtime: "リアルタイム",
-    // Token stats labels (camelCase)
+    // Token 统计标签（camelCase）
     nonCachedPromptTokens: "入力",
     cachedTokens: "キャッシュ",
     completionTokens: "出力",

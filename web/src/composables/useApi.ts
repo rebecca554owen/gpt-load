@@ -14,16 +14,16 @@ interface AxiosError {
 }
 
 /**
- * Common composable for API error handling and success notifications
+ * 用于 API 错误处理和成功通知的通用 composable
  */
 export function useApi() {
   const message = useMessage();
   const { t } = useI18n();
 
   /**
-   * Parse response data error
-   * @param data Response data
-   * @returns Parsed error message string or null
+   * 解析响应数据错误
+   * @param data 响应数据
+   * @returns 解析后的错误消息字符串或 null
    */
   function parseResponseDataError(
     data: ErrorResponseData | Record<string, unknown>
@@ -44,17 +44,17 @@ export function useApi() {
   }
 
   /**
-   * Parse error object
-   * @param errorObj Error object
-   * @returns Parsed error message string or null
+   * 解析错误对象
+   * @param errorObj 错误对象
+   * @returns 解析后的错误消息字符串或 null
    */
   function parseErrorObject(errorObj: Partial<AxiosError>): string | null {
-    // Check message property of object
+    // 检查对象的 message 属性
     if (errorObj.message) {
       return errorObj.message;
     }
 
-    // Check status code related errors
+    // 检查状态码相关错误
     if (errorObj.response?.status) {
       const status = errorObj.response.status;
       return t("common.requestFailed", { status });
@@ -64,9 +64,9 @@ export function useApi() {
   }
 
   /**
-   * Parse API error message
-   * @param error Error object
-   * @returns Parsed error message string
+   * 解析 API 错误消息
+   * @param error 错误对象
+   * @returns 解析后的错误消息字符串
    */
   function parseApiError(error: unknown): string {
     if (!error) {
@@ -80,7 +80,7 @@ export function useApi() {
     if (typeof error === "object" && error !== null) {
       const errorObj = error as Partial<AxiosError>;
 
-      // Check message in response data
+      // 检查响应数据中的消息
       if (errorObj.response?.data) {
         const responseError = parseResponseDataError(errorObj.response.data);
         if (responseError) {
@@ -88,7 +88,7 @@ export function useApi() {
         }
       }
 
-      // Check error object properties
+      // 检查错误对象属性
       const objectError = parseErrorObject(errorObj);
       if (objectError) {
         return objectError;
@@ -99,9 +99,9 @@ export function useApi() {
   }
 
   /**
-   * Handle API error
-   * @param error Error object
-   * @param options Configuration options
+   * 处理 API 错误
+   * @param error 错误对象
+   * @param options 配置选项
    */
   function handleApiError(
     error: unknown,
@@ -121,34 +121,34 @@ export function useApi() {
   }
 
   /**
-   * Handle API success
-   * @param msg Success message
+   * 处理 API 成功
+   * @param msg 成功消息
    */
   function handleApiSuccess(msg?: string) {
     message.success(msg || t("common.operationSuccess"));
   }
 
   /**
-   * Handle API warning
-   * @param msg Warning message
+   * 处理 API 警告
+   * @param msg 警告消息
    */
   function handleApiWarning(msg?: string) {
     message.warning(msg || t("common.operationWarning"));
   }
 
   /**
-   * Handle API info
-   * @param msg Info message
+   * 处理 API 信息
+   * @param msg 信息消息
    */
   function handleApiInfo(msg?: string) {
     message.info(msg || t("common.operationInfo"));
   }
 
   /**
-   * Generic API request wrapper
-   * @param apiCall API call function
-   * @param options Configuration options
-   * @returns API call result
+   * 通用 API 请求包装器
+   * @param apiCall API 调用函数
+   * @param options 配置选项
+   * @returns API 调用结果
    */
   async function withApiCall<T>(
     apiCall: () => Promise<T>,
@@ -187,10 +187,10 @@ export function useApi() {
   }
 
   /**
-   * Batch API request handler
-   * @param apiCalls Array of API calls
-   * @param options Configuration options
-   * @returns Processing results
+   * 批量 API 请求处理器
+   * @param apiCalls API 调用数组
+   * @param options 配置选项
+   * @returns 处理结果
    */
   async function withBatchApiCall<T>(
     apiCalls: Array<() => Promise<T>>,
@@ -252,22 +252,22 @@ export function useApi() {
   }
 
   return {
-    // Error handling
+    // 错误处理
     parseApiError,
     handleApiError,
 
-    // Success handling
+    // 成功处理
     handleApiSuccess,
     handleApiWarning,
     handleApiInfo,
 
-    // Wrappers
+    // 包装器
     withApiCall,
     withBatchApiCall,
   };
 }
 
 /**
- * Default export for convenience
+ * 便捷默认导出
  */
 export default useApi;

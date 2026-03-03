@@ -59,7 +59,7 @@ const channelTypeOptions: SelectOption[] = [
   { label: "Anthropic", value: "anthropic" },
 ];
 
-// Param Overrides placeholder text
+// 参数覆盖占位符文本
 const placeholderText = '{\n  "key": "value"\n}';
 
 // 默认表单数据

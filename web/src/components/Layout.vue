@@ -79,7 +79,7 @@ const toggleMenu = () => {
     <app-footer />
   </n-layout>
 
-  <!-- Global task progress bar (only show when logged in) -->
+  <!-- 全局任务进度条（仅登录后显示） -->
   <global-task-progress-bar v-if="isLoggedIn" />
 </template>
 
@@ -190,7 +190,7 @@ const toggleMenu = () => {
   padding: 0;
 }
 
-/* Mobile specific styles */
+/* 移动端特定样式 */
 @media (max-width: 768px) {
   .header-nav {
     position: static;

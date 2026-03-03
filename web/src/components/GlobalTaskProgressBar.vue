@@ -14,7 +14,7 @@ const appState = useAppStateStore();
 const taskInfo = ref<TaskInfo>({ is_running: false, task_type: "KEY_VALIDATION" });
 const visible = ref(false);
 let pollTimer: number | null = null;
-let isPolling = false; // Add flag
+let isPolling = false; // 添加标志位
 const message = useMessage();
 
 onMounted(() => {

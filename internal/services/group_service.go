@@ -232,12 +232,12 @@ func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams
 		headerRulesJSON = datatypes.JSON("[]")
 	}
 
-	// Validate model redirect rules for aggregate groups
+	// 验证聚合组的模型重定向规则
 	if groupType == "aggregate" && len(params.ModelRedirectRules) > 0 {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
 	}
 
-	// Validate model redirect rules format
+	// 验证模型重定向规则格式
 	if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
 	}
@@ -294,7 +294,7 @@ func (s *GroupService) ListGroups(ctx context.Context) ([]models.Group, error) {
 		return nil, app_errors.ParseDBError(err)
 	}
 
-	// Parse model mappings JSON for each group
+	// 解析每个组的模型映射 JSON
 	for i := range groups {
 		if len(groups[i].ModelMappings) > 0 {
 			if err := json.Unmarshal(groups[i].ModelMappings, &groups[i].ModelMappingList); err != nil {
@@ -642,7 +642,7 @@ func (s *GroupService) GetGroupStats(ctx context.Context, groupID uint) (*GroupS
 		return nil, app_errors.ParseDBError(err)
 	}
 
-	// Select different statistics logic based on group type
+	// 根据分组类型选择不同的统计逻辑
 	if group.GroupType == "aggregate" {
 		return s.getAggregateGroupStats(ctx, groupID)
 	}
@@ -659,7 +659,7 @@ func (s *GroupService) queryGroupHourlyStats(ctx context.Context, groupID uint, 
 
 	now := time.Now()
 	currentHour := now.Truncate(time.Hour)
-	endTime := currentHour.Add(time.Hour) // Include current hour
+	endTime := currentHour.Add(time.Hour) // 包含当前小时
 	startTime := endTime.Add(-time.Duration(hours) * time.Hour)
 
 	if err := s.db.WithContext(ctx).Model(&models.GroupHourlyStat{}).
@@ -701,7 +701,7 @@ func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stat
 	var mu sync.Mutex
 	var errs []error
 
-	// Define time periods and their corresponding setters
+	// 定义时间段及其对应的设置函数
 	timePeriods := []struct {
 		hours  int
 		name   string
@@ -712,7 +712,7 @@ func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stat
 		{30 * 24, "30-day", func(r RequestStats) { stats.Stats30Day = r }},
 	}
 
-	// Fetch statistics for each time period concurrently
+	// 并发获取各时间段的统计信息
 	for _, period := range timePeriods {
 		wg.Add(1)
 		go func(hours int, name string, setter func(RequestStats)) {
@@ -740,11 +740,11 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 	stats := new(GroupStats)
 	var allErrors []error
 
-	// Fetch key statistics (only for standard groups)
+	// 获取密钥统计信息（仅标准组需要）
 	keyStats, err := s.fetchKeyStats(ctx, groupID)
 	if err != nil {
 		allErrors = append(allErrors, err)
-		// Log error but continue to fetch request stats
+		// 记录错误但继续获取请求统计
 		logrus.WithContext(ctx).WithError(err).Warn("failed to fetch key stats, continuing with request stats")
 	} else {
 		stats.KeyStats = keyStats
@@ -755,10 +755,10 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 		allErrors = append(allErrors, errs...)
 	}
 
-	// Handle errors
+	// 处理错误
 	if len(allErrors) > 0 {
 		logrus.WithContext(ctx).WithError(allErrors[0]).Error("errors occurred while fetching group stats")
-		// Return partial stats if we have some data
+		// 如果有部分数据，返回部分统计
 		if stats.Stats24Hour.TotalRequests > 0 || stats.Stats7Day.TotalRequests > 0 || stats.Stats30Day.TotalRequests > 0 {
 			return stats, nil
 		}
@@ -771,10 +771,10 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 func (s *GroupService) getAggregateGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
 	stats := new(GroupStats)
 
-	// Aggregate groups only need request statistics, not key statistics
+	// 聚合组只需要请求统计，不需要密钥统计
 	if errs := s.fetchRequestStats(ctx, groupID, stats); len(errs) > 0 {
 		logrus.WithContext(ctx).WithError(errs[0]).Error("errors occurred while fetching aggregate group stats")
-		// Return partial stats if we have some data
+		// 如果有部分数据，返回部分统计
 		if stats.Stats24Hour.TotalRequests > 0 || stats.Stats7Day.TotalRequests > 0 || stats.Stats30Day.TotalRequests > 0 {
 			return stats, nil
 		}
