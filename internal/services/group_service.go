@@ -1102,6 +1102,10 @@ func (s *GroupService) validateAndNormalizeTargets(
 
 	for _, target := range targets {
 		if _, ok := subGroupMap[target.SubGroupID]; !ok {
+			if groupID == 0 {
+				return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_invalid_sub_group",
+					map[string]any{"model": alias, "sub_group_id": target.SubGroupID})
+			}
 			logrus.WithContext(ctx).WithFields(logrus.Fields{
 				"group_id":             groupID,
 				"model_alias":          alias,

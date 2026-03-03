@@ -337,11 +337,7 @@ func (s *AggregateGroupService) CleanupModelMappingsForDeletedSubGroup(ctx conte
 
 	for _, group := range parentGroups {
 		if err := s.cleanupModelMappingsForSubGroup(ctx, tx, &group, subGroupID); err != nil {
-			logrus.WithContext(ctx).WithFields(logrus.Fields{
-				"group_id":        group.ID,
-				"deleted_subgroup": subGroupID,
-				"error":           err,
-			}).Error("Failed to cleanup model mappings for deleted sub-group")
+			return fmt.Errorf("cleanup model mappings for group %d failed: %w", group.ID, err)
 		}
 	}
 
@@ -356,19 +352,18 @@ func (s *AggregateGroupService) cleanupModelMappingsForSubGroup(ctx context.Cont
 
 	var mappings []models.ModelMapping
 	if err := json.Unmarshal(group.ModelMappings, &mappings); err != nil {
-		logrus.WithContext(ctx).WithFields(logrus.Fields{
-			"group_id": group.ID,
-			"error":    err,
-		}).Warn("Failed to parse model mappings during sub-group deletion")
-		return nil
+		return fmt.Errorf("parse model mappings for group %d failed: %w", group.ID, err)
 	}
 
 	updatedMappings := make([]models.ModelMapping, 0, len(mappings))
+	hasChanges := false
 	for _, mapping := range mappings {
 		var filteredTargets []models.ModelMappingTarget
 		for _, target := range mapping.Targets {
 			if target.SubGroupID != subGroupID {
 				filteredTargets = append(filteredTargets, target)
+			} else {
+				hasChanges = true
 			}
 		}
 
@@ -378,7 +373,7 @@ func (s *AggregateGroupService) cleanupModelMappingsForSubGroup(ctx context.Cont
 		}
 	}
 
-	if len(updatedMappings) == len(mappings) {
+	if !hasChanges {
 		return nil
 	}
 
