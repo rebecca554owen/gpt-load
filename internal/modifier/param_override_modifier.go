@@ -28,9 +28,10 @@ func (m *ParamOverrideModifier) ShouldApply(ctx *ModificationContext) bool {
 }
 
 func (m *ParamOverrideModifier) Modify(ctx *ModificationContext, bodyBytes []byte) ([]byte, bool, error) {
-	overrides := make(map[string]any)
+	var overrides map[string]any
 
 	if ctx.IsAggregate && ctx.OriginalGroup.ID != ctx.SelectedGroup.ID {
+		overrides = make(map[string]any)
 		for key, value := range ctx.OriginalGroup.ParamOverrides {
 			overrides[key] = value
 		}
@@ -38,9 +39,7 @@ func (m *ParamOverrideModifier) Modify(ctx *ModificationContext, bodyBytes []byt
 			overrides[key] = value
 		}
 	} else {
-		for key, value := range ctx.SelectedGroup.ParamOverrides {
-			overrides[key] = value
-		}
+		overrides = ctx.SelectedGroup.ParamOverrides
 	}
 
 	if len(overrides) == 0 {

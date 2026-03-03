@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/config"
 	"gpt-load/internal/models"
@@ -10,6 +9,7 @@ import (
 	"gpt-load/internal/syncer"
 	"gpt-load/internal/utils"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
 	"gpt-load/internal/utils"
+
+	"github.com/goccy/go-json"
 
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"

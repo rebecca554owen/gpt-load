@@ -1,16 +1,13 @@
 package jsonutil
 
-import "github.com/goccy/go-json"
+import (
+	"fmt"
+
+	"github.com/goccy/go-json"
+)
 
 func SetField(bodyBytes []byte, field string, value any) ([]byte, error) {
-	var data map[string]any
-	if err := json.Unmarshal(bodyBytes, &data); err != nil {
-		return nil, err
-	}
-
-	data[field] = value
-
-	return json.Marshal(data)
+	return SetFields(bodyBytes, map[string]any{field: value})
 }
 
 func SetFields(bodyBytes []byte, fields map[string]any) ([]byte, error) {
@@ -32,11 +29,15 @@ func GetStringField(bodyBytes []byte, field string) (string, error) {
 		return "", err
 	}
 
-	if val, ok := data[field]; ok {
-		if str, ok := val.(string); ok {
-			return str, nil
-		}
+	val, ok := data[field]
+	if !ok {
+		return "", nil
 	}
 
-	return "", nil
+	str, ok := val.(string)
+	if !ok {
+		return "", fmt.Errorf("field '%s' is not a string", field)
+	}
+
+	return str, nil
 }

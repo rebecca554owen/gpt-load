@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/db"
 	"gpt-load/internal/models"
@@ -15,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm/clause"

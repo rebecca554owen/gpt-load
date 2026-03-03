@@ -1,7 +1,6 @@
 package channel
 
 import (
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/config"
 	"gpt-load/internal/httpclient"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 )
 

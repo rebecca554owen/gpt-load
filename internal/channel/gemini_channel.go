@@ -2,7 +2,6 @@ package channel
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/models"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 )
 

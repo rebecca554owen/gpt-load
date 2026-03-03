@@ -1,12 +1,12 @@
 package i18n
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"gpt-load/internal/i18n/locales"
 
+	"github.com/goccy/go-json"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 )

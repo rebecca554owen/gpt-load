@@ -1,8 +1,9 @@
 package errors
 
 import (
-	"encoding/json"
 	"strings"
+
+	"github.com/goccy/go-json"
 )
 
 const (

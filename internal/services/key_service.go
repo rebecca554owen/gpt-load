@@ -1,7 +1,6 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -12,6 +11,7 @@ import (
 	"gpt-load/internal/keypool"
 	"gpt-load/internal/models"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )

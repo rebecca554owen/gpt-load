@@ -3,12 +3,12 @@ package proxy
 import (
 	"bytes"
 	"compress/gzip"
-	"encoding/json"
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
 	"io"
 	"net/http"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 )
 

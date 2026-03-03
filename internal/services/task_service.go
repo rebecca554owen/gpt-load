@@ -1,11 +1,12 @@
 package services
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"gpt-load/internal/store"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 const (

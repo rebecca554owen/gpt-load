@@ -1,12 +1,12 @@
 package proxy
 
 import (
-	"encoding/json"
 	"math"
 	"strings"
 	"sync"
 	"unicode"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 )
 

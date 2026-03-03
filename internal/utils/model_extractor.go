@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"encoding/json"
+	"github.com/goccy/go-json"
 )
 
 // ExtractModelFromBody 从请求体中提取模型名称

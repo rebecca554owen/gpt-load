@@ -2,7 +2,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"gpt-load/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )

@@ -3,7 +3,6 @@ package channel
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
@@ -17,6 +16,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )
