@@ -1,12 +1,15 @@
 <script setup lang="ts">
+import { Close } from "@vicons/ionicons5";
 import { keysApi } from "@/api/keys";
 import type { TaskInfo } from "@/types/models";
-import { appState } from "@/utils/app-state";
-import { NButton, NCard, NProgress, NText, useMessage } from "naive-ui";
+import { useAppStateStore } from "@/stores/appState";
+import { NButton, NCard, NIcon, NProgress, NText, useMessage } from "naive-ui";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
+
+const appState = useAppStateStore();
 
 const taskInfo = ref<TaskInfo>({ is_running: false, task_type: "KEY_VALIDATION" });
 const visible = ref(false);
@@ -73,7 +76,7 @@ async function pollOnce() {
 
           message.info(msg, {
             closable: true,
-            duration: 0,
+            duration: 5000,
             onClose: () => {
               localStorage.setItem("last_closed_task", task.finished_at || "");
             },
@@ -81,12 +84,12 @@ async function pollOnce() {
 
           // 触发分组数据刷新
           if (task.group_name && task.finished_at) {
-            appState.lastCompletedTask = {
+            appState.setLastCompletedTask({
               groupName: task.group_name,
               taskType: task.task_type,
               finishedAt: task.finished_at,
-            };
-            appState.groupDataRefreshTrigger++;
+            });
+            appState.triggerGroupDataRefresh();
           }
         }
       }
@@ -166,11 +169,7 @@ function getTaskTitle(): string {
           :title="t('task.hideProgress')"
         >
           <template #icon>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-              />
-            </svg>
+            <n-icon :component="Close" />
           </template>
         </n-button>
       </div>
@@ -224,8 +223,8 @@ function getTaskTitle(): string {
 
 /* 暗黑模式特殊样式 */
 :root.dark .global-task-progress {
-  background: #323841; /* 浅灰色背景，比内容区域浅 */
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
 }
 
 :root.dark .progress-title {
@@ -237,7 +236,7 @@ function getTaskTitle(): string {
 }
 
 :root.dark .progress-message {
-  background: rgba(102, 126, 234, 0.15);
+  background: var(--primary-color-suppl);
   color: var(--text-primary);
 }
 

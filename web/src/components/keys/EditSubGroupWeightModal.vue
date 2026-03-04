@@ -141,9 +141,15 @@ function adjustWeight(delta: number) {
 </script>
 
 <template>
-  <n-modal :show="show" @update:show="handleClose" class="edit-weight-modal">
+  <n-modal
+    :show="show"
+    @update:show="handleClose"
+    class="edit-weight-modal modal-mask"
+    :mask-closable="true"
+    :closable="false"
+  >
     <n-card
-      class="edit-weight-card"
+      class="edit-weight-card modal-card modal-narrow"
       :title="t('keys.editWeight')"
       :bordered="false"
       size="huge"
@@ -151,7 +157,7 @@ function adjustWeight(delta: number) {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleClose">
+        <n-button quaternary circle @click="handleClose" class="modal-close">
           <template #icon>
             <n-icon :component="Close" />
           </template>
@@ -229,9 +235,9 @@ function adjustWeight(delta: number) {
       </n-form>
 
       <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 12px">
-          <n-button @click="handleClose">{{ t("common.cancel") }}</n-button>
-          <n-button type="primary" @click="handleSubmit" :loading="loading">
+        <div class="modal-footer">
+          <n-button @click="handleClose" class="btn-cancel">{{ t("common.cancel") }}</n-button>
+          <n-button @click="handleSubmit" :loading="loading" class="btn-confirm">
             {{ t("common.confirm") }}
           </n-button>
         </div>
@@ -242,26 +248,32 @@ function adjustWeight(delta: number) {
 
 <style scoped>
 .edit-weight-modal {
-  width: 500px;
+  /* 继承 modal-mask 样式 */
+}
+
+.edit-weight-card {
+  /* 继承 modal-card 和 modal-narrow 样式 */
 }
 
 .form-section {
-  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .sub-group-info {
   margin-bottom: 24px;
   padding: 16px;
-  background: var(--bg-secondary);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
+  background: var(--n-color-modal);
+  border-radius: 8px;
+  border: 1px solid var(--n-border-color);
 }
 
 .section-title {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--n-text-color);
   margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .group-name {

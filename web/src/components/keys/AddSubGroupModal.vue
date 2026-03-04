@@ -213,9 +213,15 @@ const canAddMore = computed(() => {
 </script>
 
 <template>
-  <n-modal :show="show" @update:show="handleClose" class="add-sub-group-modal">
+  <n-modal
+    :show="show"
+    @update:show="handleClose"
+    class="add-sub-group-modal modal-mask"
+    :mask-closable="true"
+    :closable="false"
+  >
     <n-card
-      class="add-sub-group-card"
+      class="add-sub-group-card modal-card modal-standard"
       :title="t('keys.addSubGroup')"
       :bordered="false"
       size="huge"
@@ -223,7 +229,7 @@ const canAddMore = computed(() => {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleClose">
+        <n-button quaternary circle @click="handleClose" class="modal-close">
           <template #icon>
             <n-icon :component="Close" />
           </template>
@@ -307,9 +313,9 @@ const canAddMore = computed(() => {
       </n-form>
 
       <template #footer>
-        <div style="display: flex; justify-content: flex-end; gap: 12px">
-          <n-button @click="handleClose">{{ t("common.cancel") }}</n-button>
-          <n-button type="primary" @click="handleSubmit" :loading="loading">
+        <div class="modal-footer">
+          <n-button @click="handleClose" class="btn-cancel">{{ t("common.cancel") }}</n-button>
+          <n-button @click="handleSubmit" :loading="loading" class="btn-confirm">
             {{ t("common.confirm") }}
           </n-button>
         </div>
@@ -320,20 +326,26 @@ const canAddMore = computed(() => {
 
 <style scoped>
 .add-sub-group-modal {
-  width: 700px;
+  /* 继承 modal-mask 样式 */
+}
+
+.add-sub-group-card {
+  /* 继承 modal-card 和 modal-standard 样式 */
 }
 
 .form-section {
-  margin-top: 0;
+  margin-bottom: 24px;
 }
 
 .section-title {
-  font-size: 1rem;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--n-text-color);
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--n-border-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .section-subtitle {

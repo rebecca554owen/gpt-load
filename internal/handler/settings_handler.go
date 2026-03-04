@@ -12,29 +12,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetSettings handles the GET /api/settings request.
-// It retrieves all system settings, groups them by category, and returns them.
+// GetSettings 处理 GET /api/settings 请求
+// 它检索所有系统设置，按类别分组，并返回它们
 func (s *Server) GetSettings(c *gin.Context) {
 	currentSettings := s.SettingsManager.GetSettings()
 	settingsInfo := utils.GenerateSettingsMetadata(&currentSettings)
 
-	// Translate settings info
+	// 翻译设置信息
 	for i := range settingsInfo {
-		// Translate name if it's an i18n key
+		// 如果是 i18n 键则翻译名称
 		if strings.HasPrefix(settingsInfo[i].Name, "config.") {
 			settingsInfo[i].Name = i18n.Message(c, settingsInfo[i].Name)
 		}
-		// Translate description if it's an i18n key
+		// 如果是 i18n 键则翻译描述
 		if strings.HasPrefix(settingsInfo[i].Description, "config.") {
 			settingsInfo[i].Description = i18n.Message(c, settingsInfo[i].Description)
 		}
-		// Translate category if it's an i18n key
+		// 如果是 i18n 键则翻译类别
 		if strings.HasPrefix(settingsInfo[i].Category, "config.") {
 			settingsInfo[i].Category = i18n.Message(c, settingsInfo[i].Category)
 		}
 	}
 
-	// Group settings by category while preserving order
+	// 按类别分组设置，同时保持顺序
 	categorized := make(map[string][]models.SystemSettingInfo)
 	var categoryOrder []string
 	for _, s := range settingsInfo {
@@ -44,7 +44,7 @@ func (s *Server) GetSettings(c *gin.Context) {
 		categorized[s.Category] = append(categorized[s.Category], s)
 	}
 
-	// Create the response structure in the correct order
+	// 按正确顺序创建响应结构
 	var responseData []models.CategorizedSettings
 	for _, categoryName := range categoryOrder {
 		responseData = append(responseData, models.CategorizedSettings{
@@ -56,7 +56,7 @@ func (s *Server) GetSettings(c *gin.Context) {
 	response.Success(c, responseData)
 }
 
-// UpdateSettings handles the PUT /api/settings request.
+// UpdateSettings 处理 PUT /api/settings 请求
 func (s *Server) UpdateSettings(c *gin.Context) {
 	var settingsMap map[string]any
 	if err := c.ShouldBindJSON(&settingsMap); err != nil {
@@ -69,7 +69,7 @@ func (s *Server) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	// Sanitize proxy_keys input
+	// 清理 proxy_keys 输入
 	if proxyKeys, ok := settingsMap["proxy_keys"]; ok {
 		if proxyKeysStr, ok := proxyKeys.(string); ok {
 			cleanedKeys := utils.SplitAndTrim(proxyKeysStr, ",")
@@ -83,7 +83,7 @@ func (s *Server) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	time.Sleep(100 * time.Millisecond) // 等待异步更新配置
+	time.Sleep(100 * time.Millisecond) // 等待异步配置更新
 
 	response.SuccessI18n(c, "settings.update_success", nil)
 }

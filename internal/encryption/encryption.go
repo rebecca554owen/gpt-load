@@ -12,24 +12,24 @@ import (
 	"io"
 )
 
-// Service defines the encryption interface
+// Service 定义加密接口
 type Service interface {
 	Encrypt(plaintext string) (string, error)
 	Decrypt(ciphertext string) (string, error)
 	Hash(plaintext string) string
 }
 
-// NewService creates encryption service
+// NewService 创建加密服务
 func NewService(encryptionKey string) (Service, error) {
 	if encryptionKey == "" {
-		return &noopService{}, nil
+		return new(noopService), nil
 	}
 
-	// Derive AES-256 key from user input and validate strength
+	// 从用户输入派生 AES-256 密钥并验证强度
 	aesKey := utils.DeriveAESKey(encryptionKey)
 	utils.ValidatePasswordStrength(encryptionKey, "ENCRYPTION_KEY")
 
-	// Initialize cipher and GCM once for reuse
+	// 初始化密码和 GCM 一次以供重用
 	block, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
@@ -43,7 +43,7 @@ func NewService(encryptionKey string) (Service, error) {
 	return &aesService{key: aesKey, gcm: gcm}, nil
 }
 
-// aesService implements AES-256-GCM encryption
+// aesService 实现 AES-256-GCM 加密
 type aesService struct {
 	key []byte
 	gcm cipher.AEAD
@@ -79,7 +79,7 @@ func (s *aesService) Decrypt(ciphertext string) (string, error) {
 	return string(plaintext), nil
 }
 
-// Hash generates a hash of the plaintext using HMAC-SHA256
+// Hash 使用 HMAC-SHA256 生成明文的哈希
 func (s *aesService) Hash(plaintext string) string {
 	if plaintext == "" {
 		return ""
@@ -89,7 +89,7 @@ func (s *aesService) Hash(plaintext string) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-// noopService disables encryption
+// noopService 禁用加密
 type noopService struct{}
 
 func (s *noopService) Encrypt(plaintext string) (string, error) {
@@ -100,7 +100,7 @@ func (s *noopService) Decrypt(ciphertext string) (string, error) {
 	return ciphertext, nil
 }
 
-// Hash generates a hash of the plaintext using SHA256 (no key)
+// Hash 使用 SHA256 生成明文的哈希（无密钥）
 func (s *noopService) Hash(plaintext string) string {
 	if plaintext == "" {
 		return ""

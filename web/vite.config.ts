@@ -30,6 +30,16 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       assetsDir: "assets",
+      chunkSizeWarningLimit: 1400,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "vue-vendor": ["vue", "vue-router", "vue-i18n"],
+            "naive-ui": ["naive-ui"],
+            axios: ["axios"],
+          },
+        },
+      },
     },
   };
 });

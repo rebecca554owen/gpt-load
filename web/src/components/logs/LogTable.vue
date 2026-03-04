@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { logApi } from "@/api/logs";
 import type { LogFilter, RequestLog } from "@/types/models";
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { maskKey } from "@/utils/display";
+import { formatDateTime } from "@/utils/format";
+import { PAGINATION } from "@/constants/chart";
 import {
   CheckmarkDoneOutline,
   CloseCircleOutline,
@@ -33,45 +35,42 @@ import {
   NSpin,
   NTag,
   NTooltip,
-  useMessage,
 } from "naive-ui";
 import { computed, h, onMounted, reactive, ref, watch, type VNodeChild } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
-
-// Message instance
-const message = useMessage();
+const { copyWithFeedback } = useCopy();
 
 interface LogRow extends RequestLog {
   is_key_visible: boolean;
 }
 
-// Column configuration
+// 列配置
 interface ColumnConfig {
   key: string;
   title: string;
   width: number;
   defaultVisible: boolean;
-  alwaysVisible?: boolean; // 某些列不能隐藏
-  required?: boolean; // 必选字段，不能取消选中
-  fixed?: "left" | "right"; // 固定列位置
+  alwaysVisible?: boolean; // Some columns cannot be hidden
+  required?: boolean; // Required field, cannot be deselected
+  fixed?: "left" | "right"; // Fixed column position
   render?: (row: LogRow) => VNodeChild;
 }
 
-// Data
+// 数据
 const loading = ref(false);
 const logs = ref<LogRow[]>([]);
 const currentPage = ref(1);
-const pageSize = ref(15);
+const pageSize = ref(PAGINATION.logPageSize);
 const total = ref(0);
 const totalPages = computed(() => Math.ceil(total.value / pageSize.value));
 
-// Modal for viewing request/response details
+// 查看请求/响应详情的模态框
 const showDetailModal = ref(false);
 const selectedLog = ref<LogRow | null>(null);
 
-// Filters
+// 筛选器
 const filters = reactive({
   parent_group_name: "",
   group_name: "",
@@ -96,7 +95,7 @@ const requestTypeOptions = [
   { label: t("logs.finalRequest"), value: "final" },
 ];
 
-// Fetch data
+// 获取数据
 const loadLogs = async () => {
   loading.value = true;
   try {
@@ -139,14 +138,6 @@ const loadLogs = async () => {
   }
 };
 
-const formatDateTime = (timestamp: string) => {
-  if (!timestamp) {
-    return "-";
-  }
-  const date = new Date(timestamp);
-  return date.toLocaleString("zh-CN", { hour12: false }).replace(/\//g, "-");
-};
-
 const toggleKeyVisibility = (row: LogRow) => {
   row.is_key_visible = !row.is_key_visible;
 };
@@ -172,15 +163,9 @@ const formatJsonString = (jsonStr: string) => {
   }
 };
 
-// 复制功能
-const copyContent = async (content: string, type: string) => {
-  const success = await copy(content);
-  if (success) {
-    message.success(t("logs.copiedToClipboard", { type }));
-  } else {
-    message.error(t("logs.copyFailed", { type }));
-  }
-};
+async function copyContent(content: string, _type: string) {
+  await copyWithFeedback(content);
+}
 
 // Column visibility management
 const visibleColumns = ref<string[]>([]);
@@ -221,15 +206,15 @@ const allColumnConfigs: ColumnConfig[] = [
     title: t("logs.time"),
     width: 160,
     defaultVisible: true,
-    required: true, // 必选字段
+    required: true, // Required field
     render: (row: LogRow) => formatDateTime(row.timestamp),
   },
   {
     key: "is_success",
     title: t("common.status"),
-    width: 90,
+    width: 70,
     defaultVisible: true,
-    required: true, // 必选字段
+    required: true, // Required field
     render: (row: LogRow) =>
       h(
         NTag,
@@ -240,7 +225,7 @@ const allColumnConfigs: ColumnConfig[] = [
   {
     key: "request_type",
     title: t("logs.requestType"),
-    width: 90,
+    width: 70,
     defaultVisible: true,
     render: (row: LogRow) => {
       return h(
@@ -256,7 +241,7 @@ const allColumnConfigs: ColumnConfig[] = [
   {
     key: "is_stream",
     title: t("logs.responseType"),
-    width: 140,
+    width: 80,
     defaultVisible: true,
     render: (row: LogRow) =>
       h(
@@ -268,14 +253,26 @@ const allColumnConfigs: ColumnConfig[] = [
   {
     key: "status_code",
     title: t("logs.statusCode"),
-    width: 130,
+    width: 80,
     defaultVisible: true,
   },
   {
     key: "duration_ms",
     title: t("logs.duration"),
-    width: 110,
+    width: 80,
     defaultVisible: true,
+  },
+  {
+    key: "total_tokens",
+    title: t("logs.tokens"),
+    width: 100,
+    defaultVisible: true,
+    render: (row: LogRow) => {
+      if (row.total_tokens > 0) {
+        return row.total_tokens.toLocaleString();
+      }
+      return "-";
+    },
   },
   {
     key: "parent_group_name",
@@ -293,9 +290,17 @@ const allColumnConfigs: ColumnConfig[] = [
   {
     key: "model",
     title: t("logs.model"),
-    width: 240,
+    width: 300,
     defaultVisible: true,
-    required: true, // 必选字段
+    required: true, // Required field
+    render: (row: LogRow) => {
+      const original = row.original_model || "-";
+      const actual = row.model || "-";
+      if (original === actual || original === "-") {
+        return actual;
+      }
+      return `${original} → ${actual}`;
+    },
   },
   {
     key: "key_value",
@@ -456,7 +461,7 @@ function changePage(page: number) {
   currentPage.value = page;
 }
 
-function changePageSize(size: number) {
+function changePageSize(size: 15) {
   pageSize.value = size;
   currentPage.value = 1;
 }
@@ -475,7 +480,7 @@ const deselectAllColumns = () => {
 <template>
   <div class="log-table-container">
     <n-space vertical>
-      <!-- 工具栏 -->
+      <!-- Toolbar -->
       <div class="toolbar">
         <div class="filter-section">
           <div class="filter-row">
@@ -662,7 +667,7 @@ const deselectAllColumns = () => {
         </div>
       </div>
       <div class="table-main">
-        <!-- 表格 -->
+        <!-- Table -->
         <div class="table-container">
           <n-spin :show="loading">
             <n-data-table
@@ -676,7 +681,7 @@ const deselectAllColumns = () => {
           </n-spin>
         </div>
 
-        <!-- 分页 -->
+        <!-- Pagination -->
         <div class="pagination-container">
           <div class="pagination-info">
             <span>{{ t("logs.totalRecords", { total }) }}</span>
@@ -716,7 +721,7 @@ const deselectAllColumns = () => {
       </div>
     </n-space>
 
-    <!-- 详情模态框 -->
+    <!-- Detail Modal -->
     <n-modal
       v-model:show="showDetailModal"
       preset="card"
@@ -725,7 +730,7 @@ const deselectAllColumns = () => {
     >
       <div v-if="selectedLog" style="max-height: 65vh; overflow-y: auto">
         <n-space vertical size="small">
-          <!-- 基本信息 -->
+          <!-- Basic Info -->
           <n-card
             :title="t('logs.basicInfo')"
             size="small"
@@ -758,8 +763,12 @@ const deselectAllColumns = () => {
                 <span class="detail-value-compact">{{ selectedLog.group_name }}</span>
               </div>
               <div class="detail-item-compact">
-                <span class="detail-label-compact">{{ t("logs.model") }}:</span>
-                <span class="detail-value-compact">{{ selectedLog.model }}</span>
+                <span class="detail-label-compact">{{ t("logs.originalModel") }}:</span>
+                <span class="detail-value-compact">{{ selectedLog.original_model || "-" }}</span>
+              </div>
+              <div class="detail-item-compact">
+                <span class="detail-label-compact">{{ t("logs.actualModel") }}:</span>
+                <span class="detail-value-compact">{{ selectedLog.model || "-" }}</span>
               </div>
               <div class="detail-item-compact">
                 <span class="detail-label-compact">{{ t("logs.requestType") }}:</span>
@@ -800,7 +809,7 @@ const deselectAllColumns = () => {
                       v-if="selectedLog.key_value"
                       size="tiny"
                       text
-                      @click="copyContent(selectedLog.key_value, 'API Key')"
+                      @click="copyContent(selectedLog.key_value, t('logs.key'))"
                     >
                       <template #icon>
                         <n-icon :component="CopyOutline" />
@@ -812,7 +821,44 @@ const deselectAllColumns = () => {
             </div>
           </n-card>
 
-          <!-- 请求信息 (紧凑布局) -->
+          <!-- Token Statistics -->
+          <n-card
+            v-if="selectedLog.total_tokens > 0"
+            :title="t('logs.tokenStats')"
+            size="small"
+            :header-style="{ padding: '8px 12px', fontSize: '13px' }"
+          >
+            <div class="detail-grid-compact">
+              <div class="detail-item-compact">
+                <span class="detail-label-compact">{{ t("logs.promptTokens") }}:</span>
+                <span class="detail-value-compact">
+                  {{ selectedLog.prompt_tokens.toLocaleString() }}
+                </span>
+              </div>
+              <div class="detail-item-compact">
+                <span class="detail-label-compact">{{ t("logs.completionTokens") }}:</span>
+                <span class="detail-value-compact">
+                  {{ selectedLog.completion_tokens.toLocaleString() }}
+                </span>
+              </div>
+              <div class="detail-item-compact" v-if="selectedLog.cached_tokens > 0">
+                <span class="detail-label-compact">{{ t("logs.cachedTokens") }}:</span>
+                <span class="detail-value-compact">
+                  {{ selectedLog.cached_tokens.toLocaleString() }}
+                </span>
+              </div>
+              <div class="detail-item-compact">
+                <span class="detail-label-compact" style="font-weight: 600">
+                  {{ t("logs.totalTokens") }}:
+                </span>
+                <span class="detail-value-compact" style="font-weight: 600">
+                  {{ selectedLog.total_tokens.toLocaleString() }}
+                </span>
+              </div>
+            </div>
+          </n-card>
+
+          <!-- Request Info (compact layout) -->
           <n-card
             :title="t('logs.requestInfo')"
             size="small"
@@ -857,11 +903,11 @@ const deselectAllColumns = () => {
 
               <div class="compact-field" v-if="selectedLog.user_agent">
                 <div class="compact-field-header">
-                  <span class="compact-field-title">User Agent</span>
+                  <span class="compact-field-title">{{ t("logs.userAgent") }}</span>
                   <n-button
                     size="tiny"
                     text
-                    @click="copyContent(selectedLog.user_agent, 'User Agent')"
+                    @click="copyContent(selectedLog.user_agent, t('logs.userAgent'))"
                   >
                     <template #icon>
                       <n-icon :component="CopyOutline" />
@@ -898,7 +944,7 @@ const deselectAllColumns = () => {
             </div>
           </n-card>
 
-          <!-- 错误信息 -->
+          <!-- Error Info -->
           <n-card
             v-if="selectedLog.error_message"
             :title="t('logs.errorInfo')"
@@ -1081,7 +1127,7 @@ const deselectAllColumns = () => {
   flex-shrink: 0;
 }
 
-/* 紧凑布局样式 */
+/* Compact layout styles */
 .detail-grid-compact {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1168,7 +1214,7 @@ const deselectAllColumns = () => {
   color: var(--error-text-color, #721c24);
 }
 
-/* 暗黑模式下的错误信息样式 */
+/* Error info styles in dark mode */
 :global(.dark) .compact-field-error {
   --error-border-color: rgba(248, 113, 113, 0.3);
   --error-bg-color: rgba(239, 68, 68, 0.1);
@@ -1230,7 +1276,7 @@ const deselectAllColumns = () => {
   font-size: 13px;
   line-height: 1.5;
   word-break: break-all;
-  color: #495057;
+  color: var(--text-secondary);
 }
 
 .key-display {
@@ -1242,9 +1288,9 @@ const deselectAllColumns = () => {
 .key-value {
   font-family: monospace;
   font-size: 12px;
-  color: #856404;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
+  color: var(--log-key-text);
+  background: var(--log-key-bg);
+  border: 1px solid var(--log-key-border);
   border-radius: 4px;
   padding: 4px 8px;
 }
@@ -1256,9 +1302,9 @@ const deselectAllColumns = () => {
 
 .empty-content {
   text-align: center;
-  color: #6c757d;
+  color: var(--log-empty-text);
   padding: 24px;
-  background: #f8f9fa;
+  background: var(--log-empty-bg);
   border-radius: 6px;
   font-style: italic;
 }

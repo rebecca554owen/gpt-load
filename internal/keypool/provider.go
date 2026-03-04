@@ -17,6 +17,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	// 数据库加载批量大小（与 config.DBLoadBatchSize 同步）
+	dbLoadBatchSize = 10000
+)
+
 type KeyProvider struct {
 	db              *gorm.DB
 	store           store.Store
@@ -34,11 +39,11 @@ func NewProvider(db *gorm.DB, store store.Store, settingsManager *config.SystemS
 	}
 }
 
-// SelectKey 为指定的分组原子性地选择并轮换一个可用的 APIKey。
+// SelectKey 原子性地为指定组选择并轮换一个可用的 APIKey。
 func (p *KeyProvider) SelectKey(groupID uint) (*models.APIKey, error) {
 	activeKeysListKey := fmt.Sprintf("group:%d:active_keys", groupID)
 
-	// 1. Atomically rotate the key ID from the list
+	// 1. 从列表中原子性地轮换密钥 ID
 	keyIDStr, err := p.store.Rotate(activeKeysListKey)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -52,26 +57,24 @@ func (p *KeyProvider) SelectKey(groupID uint) (*models.APIKey, error) {
 		return nil, fmt.Errorf("failed to parse key ID '%s': %w", keyIDStr, err)
 	}
 
-	// 2. Get key details from HASH
+	// 2. 从 HASH 获取密钥详情
 	keyHashKey := fmt.Sprintf("key:%d", keyID)
 	keyDetails, err := p.store.HGetAll(keyHashKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get key details for key ID %d: %w", keyID, err)
 	}
 
-	// 3. Manually unmarshal the map into an APIKey struct
+	// 3. 手动将 map 解码为 APIKey 结构体
 	failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
 	createdAt, _ := strconv.ParseInt(keyDetails["created_at"], 10, 64)
 
-	// Decrypt the key value for use by channels
 	encryptedKeyValue := keyDetails["key_string"]
 	decryptedKeyValue, err := p.encryptionSvc.Decrypt(encryptedKeyValue)
 	if err != nil {
-		// If decryption fails, try to use the value as-is (backward compatibility for unencrypted keys)
 		logrus.WithFields(logrus.Fields{
 			"keyID": keyID,
 			"error": err,
-		}).Debug("Failed to decrypt key value, using as-is for backward compatibility")
+		}).Warn("Failed to decrypt API key, falling back to plaintext")
 		decryptedKeyValue = encryptedKeyValue
 	}
 
@@ -87,32 +90,35 @@ func (p *KeyProvider) SelectKey(groupID uint) (*models.APIKey, error) {
 	return apiKey, nil
 }
 
-// UpdateStatus 异步地提交一个 Key 状态更新任务。
+// UpdateStatus 同步更新密钥状态。
 func (p *KeyProvider) UpdateStatus(apiKey *models.APIKey, group *models.Group, isSuccess bool, errorMessage string) {
-	go func() {
-		keyHashKey := fmt.Sprintf("key:%d", apiKey.ID)
-		activeKeysListKey := fmt.Sprintf("group:%d:active_keys", group.ID)
+	keyHashKey := fmt.Sprintf("key:%d", apiKey.ID)
+	activeKeysListKey := fmt.Sprintf("group:%d:active_keys", group.ID)
 
-		if isSuccess {
-			if err := p.handleSuccess(apiKey.ID, keyHashKey, activeKeysListKey); err != nil {
-				logrus.WithFields(logrus.Fields{"keyID": apiKey.ID, "error": err}).Error("Failed to handle key success")
-			}
+	if isSuccess {
+		if err := p.handleSuccess(apiKey.ID, keyHashKey, activeKeysListKey); err != nil {
+			logrus.WithFields(logrus.Fields{"keyID": apiKey.ID, "error": err}).Error("Failed to handle key success")
+		}
+	} else {
+		if app_errors.IsUnCounted(errorMessage) {
+			logrus.WithFields(logrus.Fields{
+				"keyID": apiKey.ID,
+				"error": errorMessage,
+			}).Debug("Uncounted error, skipping failure handling")
 		} else {
-			if app_errors.IsUnCounted(errorMessage) {
-				logrus.WithFields(logrus.Fields{
-					"keyID": apiKey.ID,
-					"error": errorMessage,
-				}).Debug("Uncounted error, skipping failure handling")
-			} else {
-				if err := p.handleFailure(apiKey, group, keyHashKey, activeKeysListKey); err != nil {
-					logrus.WithFields(logrus.Fields{"keyID": apiKey.ID, "error": err}).Error("Failed to handle key failure")
-				}
+			if err := p.handleFailure(apiKey, group, keyHashKey, activeKeysListKey); err != nil {
+				logrus.WithFields(logrus.Fields{"keyID": apiKey.ID, "error": err}).Error("Failed to handle key failure")
 			}
 		}
-	}()
+	}
 }
 
-// executeTransactionWithRetry wraps a database transaction with a retry mechanism.
+// isDatabaseLockedError 检查错误是否是 SQLite 数据库锁定错误
+func isDatabaseLockedError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "database is locked")
+}
+
+// executeTransactionWithRetry 使用重试机制包装数据库事务。
 func (p *KeyProvider) executeTransactionWithRetry(operation func(tx *gorm.DB) error) error {
 	const maxRetries = 3
 	const baseDelay = 50 * time.Millisecond
@@ -125,7 +131,7 @@ func (p *KeyProvider) executeTransactionWithRetry(operation func(tx *gorm.DB) er
 			return nil
 		}
 
-		if strings.Contains(err.Error(), "database is locked") {
+		if isDatabaseLockedError(err) {
 			jitter := time.Duration(rand.Intn(int(maxJitter)))
 			totalDelay := baseDelay + jitter
 			logrus.Debugf("Database is locked, retrying in %v... (attempt %d/%d)", totalDelay, i+1, maxRetries)
@@ -140,25 +146,32 @@ func (p *KeyProvider) executeTransactionWithRetry(operation func(tx *gorm.DB) er
 }
 
 func (p *KeyProvider) handleSuccess(keyID uint, keyHashKey, activeKeysListKey string) error {
-	keyDetails, err := p.store.HGetAll(keyHashKey)
-	if err != nil {
-		return fmt.Errorf("failed to get key details from store: %w", err)
-	}
-
-	failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
-	isActive := keyDetails["status"] == models.KeyStatusActive
-
-	if failureCount == 0 && isActive {
-		return nil
-	}
-
 	return p.executeTransactionWithRetry(func(tx *gorm.DB) error {
 		var key models.APIKey
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&key, keyID).Error; err != nil {
 			return fmt.Errorf("failed to lock key %d for update: %w", keyID, err)
 		}
 
-		updates := map[string]any{"failure_count": 0}
+		// 在事务内检查缓存状态
+		keyDetails, err := p.store.HGetAll(keyHashKey)
+		if err != nil {
+			return fmt.Errorf("failed to get key details from store: %w", err)
+		}
+
+		failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
+		isActive := keyDetails["status"] == models.KeyStatusActive
+		keyExistsInStore := len(keyDetails) > 0
+
+		now := time.Now()
+		updates := map[string]any{
+			"request_count": gorm.Expr("request_count + ?", 1),
+			"last_used_at":  now,
+		}
+
+		if failureCount > 0 {
+			updates["failure_count"] = 0
+		}
+
 		if !isActive {
 			updates["status"] = models.KeyStatusActive
 		}
@@ -167,7 +180,37 @@ func (p *KeyProvider) handleSuccess(keyID uint, keyHashKey, activeKeysListKey st
 			return fmt.Errorf("failed to update key in DB: %w", err)
 		}
 
-		if err := p.store.HSet(keyHashKey, updates); err != nil {
+		// 如果密钥不在缓存中或缓存不完整，重新初始化缓存
+		if !keyExistsInStore {
+			logrus.WithField("keyID", keyID).Debug("Key not found in store, reinitializing cache.")
+			if failureCount > 0 {
+				key.FailureCount = 0
+			}
+			if !isActive {
+				key.Status = models.KeyStatusActive
+			}
+			if err := p.addKeyToStore(&key); err != nil {
+				return fmt.Errorf("failed to reinitialize key in store: %w", err)
+			}
+			if !isActive {
+				logrus.WithField("keyID", keyID).Info("Key has recovered and been restored to active pool.")
+			}
+			return nil
+		}
+
+		// 更新存储中的数据
+		storeUpdates := map[string]any{
+			"request_count": key.RequestCount + 1,
+			"last_used_at":  fmt.Sprint(now.Unix()),
+		}
+		if failureCount > 0 {
+			storeUpdates["failure_count"] = 0
+		}
+		if !isActive {
+			storeUpdates["status"] = models.KeyStatusActive
+		}
+
+		if err := p.store.HSet(keyHashKey, storeUpdates); err != nil {
 			return fmt.Errorf("failed to update key details in store: %w", err)
 		}
 
@@ -197,7 +240,7 @@ func (p *KeyProvider) handleFailure(apiKey *models.APIKey, group *models.Group, 
 
 	failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
 
-	// 获取该分组的有效配置
+	// 获取组的有效配置
 	blacklistThreshold := group.EffectiveConfig.BlacklistThreshold
 
 	return p.executeTransactionWithRetry(func(tx *gorm.DB) error {
@@ -206,9 +249,14 @@ func (p *KeyProvider) handleFailure(apiKey *models.APIKey, group *models.Group, 
 			return fmt.Errorf("failed to lock key %d for update: %w", apiKey.ID, err)
 		}
 
+		now := time.Now()
 		newFailureCount := failureCount + 1
 
-		updates := map[string]any{"failure_count": newFailureCount}
+		updates := map[string]any{
+			"failure_count":  newFailureCount,
+			"request_count": gorm.Expr("request_count + ?", 1),
+			"last_used_at":  now,
+		}
 		shouldBlacklist := blacklistThreshold > 0 && newFailureCount >= int64(blacklistThreshold)
 		if shouldBlacklist {
 			updates["status"] = models.KeyStatusInvalid
@@ -220,6 +268,12 @@ func (p *KeyProvider) handleFailure(apiKey *models.APIKey, group *models.Group, 
 
 		if _, err := p.store.HIncrBy(keyHashKey, "failure_count", 1); err != nil {
 			return fmt.Errorf("failed to increment failure count in store: %w", err)
+		}
+		if _, err := p.store.HIncrBy(keyHashKey, "request_count", 1); err != nil {
+			return fmt.Errorf("failed to increment request count in store: %w", err)
+		}
+		if err := p.store.HSet(keyHashKey, map[string]any{"last_used_at": fmt.Sprint(now.Unix())}); err != nil {
+			return fmt.Errorf("failed to update last used at in store: %w", err)
 		}
 
 		if shouldBlacklist {
@@ -236,13 +290,13 @@ func (p *KeyProvider) handleFailure(apiKey *models.APIKey, group *models.Group, 
 	})
 }
 
-// LoadKeysFromDB 从数据库加载所有分组和密钥，并填充到 Store 中。
-func (p *KeyProvider) LoadKeysFromDB() error {
+// InitializeFromDatabase 从数据库加载所有组和密钥并填充存储。
+func (p *KeyProvider) InitializeFromDatabase() error {
 	logrus.Debug("First time startup, loading keys from DB...")
 
-	// 1. 分批从数据库加载并使用 Pipeline 写入 Redis
+	// 批量从数据库加载并使用 Pipeline 写入 Redis
 	allActiveKeyIDs := make(map[uint][]any)
-	batchSize := 10000
+	batchSize := dbLoadBatchSize
 	var batchKeys []*models.APIKey
 
 	err := p.db.Model(&models.APIKey{}).FindInBatches(&batchKeys, batchSize, func(tx *gorm.DB, batch int) error {
@@ -282,7 +336,7 @@ func (p *KeyProvider) LoadKeysFromDB() error {
 		return fmt.Errorf("failed during batch processing of keys: %w", err)
 	}
 
-	// 2. 更新所有分组的 active_keys 列表
+	// 2. 更新所有组的 active_keys 列表
 	logrus.Info("Updating active key lists for all groups...")
 	for groupID, activeIDs := range allActiveKeyIDs {
 		if len(activeIDs) > 0 {
@@ -297,7 +351,7 @@ func (p *KeyProvider) LoadKeysFromDB() error {
 	return nil
 }
 
-// AddKeys 批量添加新的 Key 到池和数据库中。
+// AddKeys 批量向密钥池和数据库添加新密钥。
 func (p *KeyProvider) AddKeys(groupID uint, keys []models.APIKey) error {
 	if len(keys) == 0 {
 		return nil
@@ -315,7 +369,7 @@ func (p *KeyProvider) AddKeys(groupID uint, keys []models.APIKey) error {
 	return err
 }
 
-// RemoveKeys 批量从池和数据库中移除 Key。
+// RemoveKeys 批量从密钥池和数据库删除密钥。
 func (p *KeyProvider) RemoveKeys(groupID uint, keyValues []string) (int64, error) {
 	if len(keyValues) == 0 {
 		return 0, nil
@@ -366,7 +420,7 @@ func (p *KeyProvider) RemoveKeys(groupID uint, keyValues []string) (int64, error
 	return deletedCount, err
 }
 
-// RestoreKeys 恢复组内所有无效的 Key。
+// RestoreKeys 恢复组中所有无效密钥。
 func (p *KeyProvider) RestoreKeys(groupID uint) (int64, error) {
 	var invalidKeys []models.APIKey
 	var restoredCount int64
@@ -404,7 +458,7 @@ func (p *KeyProvider) RestoreKeys(groupID uint) (int64, error) {
 	return restoredCount, err
 }
 
-// RestoreMultipleKeys 恢复指定的 Key。
+// RestoreMultipleKeys 恢复指定的密钥。
 func (p *KeyProvider) RestoreMultipleKeys(groupID uint, keyValues []string) (int64, error) {
 	if len(keyValues) == 0 {
 		return 0, nil
@@ -461,18 +515,18 @@ func (p *KeyProvider) RestoreMultipleKeys(groupID uint, keyValues []string) (int
 	return restoredCount, err
 }
 
-// RemoveInvalidKeys 移除组内所有无效的 Key。
+// RemoveInvalidKeys 删除组中所有无效密钥。
 func (p *KeyProvider) RemoveInvalidKeys(groupID uint) (int64, error) {
 	return p.removeKeysByStatus(groupID, models.KeyStatusInvalid)
 }
 
-// RemoveAllKeys 移除组内所有的 Key。
+// RemoveAllKeys 删除组中所有密钥。
 func (p *KeyProvider) RemoveAllKeys(groupID uint) (int64, error) {
 	return p.removeKeysByStatus(groupID)
 }
 
-// removeKeysByStatus is a generic function to remove keys by status.
-// If no status is provided, it removes all keys in the group.
+// removeKeysByStatus 是一个通用函数，根据状态删除密钥。
+// 如果没有提供状态，则删除组中的所有密钥。
 func (p *KeyProvider) removeKeysByStatus(groupID uint, status ...string) (int64, error) {
 	var keysToRemove []models.APIKey
 	var removedCount int64
@@ -513,8 +567,8 @@ func (p *KeyProvider) removeKeysByStatus(groupID uint, status ...string) (int64,
 	return removedCount, err
 }
 
-// RemoveKeysFromStore 直接从内存存储中移除指定的键，不涉及数据库操作
-// 这个方法适用于数据库已经删除但需要清理内存存储的场景
+// RemoveKeysFromStore 直接从内存存储中删除指定的密钥，无需数据库操作。
+// 此方法适用于数据库已删除但需要清理内存存储的场景。
 func (p *KeyProvider) RemoveKeysFromStore(groupID uint, keyIDs []uint) error {
 	if len(keyIDs) == 0 {
 		return nil
@@ -522,7 +576,7 @@ func (p *KeyProvider) RemoveKeysFromStore(groupID uint, keyIDs []uint) error {
 
 	activeKeysListKey := fmt.Sprintf("group:%d:active_keys", groupID)
 
-	// 第一步：直接删除整个 active_keys 列表
+	// 第 1 步：删除整个 active_keys 列表
 	if err := p.store.Delete(activeKeysListKey); err != nil {
 		logrus.WithFields(logrus.Fields{
 			"groupID": groupID,
@@ -531,7 +585,7 @@ func (p *KeyProvider) RemoveKeysFromStore(groupID uint, keyIDs []uint) error {
 		return err
 	}
 
-	// 第二步：批量删除所有相关的key hash
+	// 第 2 步：批量删除所有相关的密钥哈希
 	for _, keyID := range keyIDs {
 		keyHashKey := fmt.Sprintf("key:%d", keyID)
 		if err := p.store.Delete(keyHashKey); err != nil {
@@ -550,16 +604,16 @@ func (p *KeyProvider) RemoveKeysFromStore(groupID uint, keyIDs []uint) error {
 	return nil
 }
 
-// addKeyToStore is a helper to add a single key to the cache.
+// addKeyToStore 是向缓存添加单个密钥的辅助函数。
 func (p *KeyProvider) addKeyToStore(key *models.APIKey) error {
-	// 1. Store key details in HASH
+	// 1. 在 HASH 中存储密钥详情
 	keyHashKey := fmt.Sprintf("key:%d", key.ID)
 	keyDetails := p.apiKeyToMap(key)
 	if err := p.store.HSet(keyHashKey, keyDetails); err != nil {
 		return fmt.Errorf("failed to HSet key details for key %d: %w", key.ID, err)
 	}
 
-	// 2. If active, add to the active LIST
+	// 2. 如果是活跃的，添加到活跃 LIST
 	if key.Status == models.KeyStatusActive {
 		activeKeysListKey := fmt.Sprintf("group:%d:active_keys", key.GroupID)
 		if err := p.store.LRem(activeKeysListKey, 0, key.ID); err != nil {
@@ -572,7 +626,7 @@ func (p *KeyProvider) addKeyToStore(key *models.APIKey) error {
 	return nil
 }
 
-// addKeysToCacheBatch 批量添加密钥到缓存（用于批量导入场景）
+// addKeysToCacheBatch 批量向缓存添加密钥（用于批量导入场景）
 func (p *KeyProvider) addKeysToCacheBatch(groupID uint, keys []models.APIKey) error {
 	if len(keys) == 0 {
 		return nil
@@ -580,7 +634,7 @@ func (p *KeyProvider) addKeysToCacheBatch(groupID uint, keys []models.APIKey) er
 
 	// 1. 批量 HSet 密钥详情
 	if pipeliner, ok := p.store.(store.RedisPipeliner); ok {
-		// Redis: 使用 Pipeline 批量操作
+		// Redis：使用 Pipeline 进行批量操作
 		pipe := pipeliner.Pipeline()
 		for i := range keys {
 			keyHashKey := fmt.Sprintf("key:%d", keys[i].ID)
@@ -590,7 +644,7 @@ func (p *KeyProvider) addKeysToCacheBatch(groupID uint, keys []models.APIKey) er
 			return fmt.Errorf("failed to batch HSet keys: %w", err)
 		}
 	} else {
-		// MemoryStore: 降级为逐个 HSet
+		// MemoryStore：回退到单个 HSet
 		for i := range keys {
 			keyHashKey := fmt.Sprintf("key:%d", keys[i].ID)
 			if err := p.store.HSet(keyHashKey, p.apiKeyToMap(&keys[i])); err != nil {
@@ -614,7 +668,7 @@ func (p *KeyProvider) addKeysToCacheBatch(groupID uint, keys []models.APIKey) er
 	return nil
 }
 
-// removeKeyFromStore is a helper to remove a single key from the cache.
+// removeKeyFromStore 是从缓存删除单个密钥的辅助函数。
 func (p *KeyProvider) removeKeyFromStore(keyID, groupID uint) error {
 	activeKeysListKey := fmt.Sprintf("group:%d:active_keys", groupID)
 	if err := p.store.LRem(activeKeysListKey, 0, keyID); err != nil {
@@ -628,19 +682,20 @@ func (p *KeyProvider) removeKeyFromStore(keyID, groupID uint) error {
 	return nil
 }
 
-// apiKeyToMap converts an APIKey model to a map for HSET.
+// apiKeyToMap 将 APIKey 模型转换为用于 HSET 的 map。
 func (p *KeyProvider) apiKeyToMap(key *models.APIKey) map[string]any {
 	return map[string]any{
 		"id":            fmt.Sprint(key.ID),
 		"key_string":    key.KeyValue,
 		"status":        key.Status,
 		"failure_count": key.FailureCount,
+		"request_count": key.RequestCount,
 		"group_id":      key.GroupID,
-		"created_at":    key.CreatedAt.Unix(),
+		"created_at":    fmt.Sprint(key.CreatedAt.Unix()),
 	}
 }
 
-// pluckIDs extracts IDs from a slice of APIKey.
+// pluckIDs 从 APIKey 切片中提取 ID。
 func pluckIDs(keys []models.APIKey) []uint {
 	ids := make([]uint, len(keys))
 	for i, key := range keys {

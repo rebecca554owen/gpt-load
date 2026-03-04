@@ -1,11 +1,11 @@
 import type { Group, SubGroupInfo } from "@/types/models";
 
 /**
- * Formats a string from camelCase, snake_case, or kebab-case
- * into a more readable format with spaces and capitalized words.
+ * 将 camelCase、snake_case 或 kebab-case 格式的字符串
+ * 转换为更易读的格式，使用空格分隔单词并首字母大写。
  *
- * @param name The input string.
- * @returns The formatted string.
+ * @param name 输入字符串
+ * @returns 格式化后的字符串
  *
  * @example
  * formatDisplayName("myGroupName")      // "My Group Name"
@@ -18,10 +18,10 @@ export function formatDisplayName(name: string): string {
     return "";
   }
 
-  // Replace snake_case and kebab-case with spaces, and add a space before uppercase letters in camelCase.
+  // 将 snake_case 和 kebab-case 替换为空格，并在 camelCase 的大写字母前添加空格
   const result = name.replace(/[_-]/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
 
-  // Capitalize the first letter of each word.
+  // 将每个单词的首字母大写
   return result
     .split(" ")
     .filter(word => word.length > 0)
@@ -30,9 +30,9 @@ export function formatDisplayName(name: string): string {
 }
 
 /**
- * Gets the display name for a group or subgroup, falling back to a formatted version of its name.
- * @param item The group or subgroup object.
- * @returns The display name for the group.
+ * 获取分组或子分组的显示名称，如果没有则使用格式化后的名称。
+ * @param item 分组或子分组对象
+ * @returns 分组的显示名称
  */
 export function getGroupDisplayName(item: Group | SubGroupInfo): string {
   if ("group" in item && item.group) {
@@ -44,9 +44,9 @@ export function getGroupDisplayName(item: Group | SubGroupInfo): string {
 }
 
 /**
- * Masks a long key string for display.
- * @param key The key string.
- * @returns The masked key.
+ * 对长密钥字符串进行掩码处理以便显示。
+ * @param key 密钥字符串
+ * @returns 掩码后的密钥
  */
 export function maskKey(key: string): string {
   if (!key || key.length <= 8) {
@@ -56,9 +56,9 @@ export function maskKey(key: string): string {
 }
 
 /**
- * Masks a comma-separated string of keys.
- * @param keys The comma-separated keys string.
- * @returns The masked keys string.
+ * 对逗号分隔的密钥字符串进行掩码处理。
+ * @param keys 逗号分隔的密钥字符串
+ * @returns 掩码后的密钥字符串
  */
 export function maskProxyKeys(keys: string): string {
   if (!keys) {

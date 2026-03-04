@@ -2,25 +2,26 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"gpt-load/internal/types"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
 
-// NewStore creates a new store based on the application configuration.
+// NewStore 根据应用配置创建新的存储。
 func NewStore(cfg types.ConfigManager) (Store, error) {
 	redisDSN := cfg.GetRedisDSN()
 	if redisDSN != "" {
 		opts, err := redis.ParseURL(redisDSN)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse redis DSN: %w", err)
+			logrus.Warnf("Failed to parse redis DSN: %v, falling back to in-memory store.", err)
+			return NewMemoryStore(), nil
 		}
 
 		client := redis.NewClient(opts)
 		if err := client.Ping(context.Background()).Err(); err != nil {
-			return nil, fmt.Errorf("failed to connect to redis: %w", err)
+			logrus.Warnf("Failed to connect to redis: %v, falling back to in-memory store.", err)
+			return NewMemoryStore(), nil
 		}
 
 		logrus.Debug("Successfully connected to Redis.")

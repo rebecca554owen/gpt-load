@@ -1,4 +1,4 @@
-// Package container provides a dependency injection container for the application.
+// Package container 提供应用的依赖注入容器
 package container
 
 import (
@@ -19,11 +19,11 @@ import (
 	"go.uber.org/dig"
 )
 
-// BuildContainer creates a new dependency injection container and provides all the application's services.
+// BuildContainer 创建新的依赖注入容器并提供应用的所有服务
 func BuildContainer() (*dig.Container, error) {
 	container := dig.New()
 
-	// Infrastructure Services
+	// 基础设施服务
 	if err := container.Provide(config.NewManager); err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func BuildContainer() (*dig.Container, error) {
 		return nil, err
 	}
 
-	// Business Services
+	// 业务服务
 	if err := container.Provide(services.NewTaskService); err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func BuildContainer() (*dig.Container, error) {
 		return nil, err
 	}
 
-	// Handlers
+	// 处理器
 	if err := container.Provide(handler.NewServer); err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func BuildContainer() (*dig.Container, error) {
 		return nil, err
 	}
 
-	// Proxy & Router
+	// 代理和路由
 	if err := container.Provide(proxy.NewProxyServer); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func BuildContainer() (*dig.Container, error) {
 		return nil, err
 	}
 
-	// Application Layer
+	// 应用层
 	if err := container.Provide(app.NewApp); err != nil {
 		return nil, err
 	}

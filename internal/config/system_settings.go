@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/db"
 	"gpt-load/internal/models"
@@ -15,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm/clause"
@@ -27,16 +27,16 @@ type SystemSettingsManager struct {
 	syncer *syncer.CacheSyncer[types.SystemSettings]
 }
 
-// NewSystemSettingsManager creates a new, uninitialized SystemSettingsManager.
+// NewSystemSettingsManager 创建一个新的、未初始化的 SystemSettingsManager
 func NewSystemSettingsManager() *SystemSettingsManager {
-	return &SystemSettingsManager{}
+	return new(SystemSettingsManager)
 }
 
 type groupManager interface {
 	Invalidate() error
 }
 
-// Initialize initializes the SystemSettingsManager with database and store dependencies.
+// Initialize 使用数据库和存储依赖初始化 SystemSettingsManager
 func (sm *SystemSettingsManager) Initialize(store store.Store, gm groupManager, isMaster bool) error {
 	settingsLoader := func() (types.SystemSettings, error) {
 		var dbSettings []models.SystemSetting
@@ -49,7 +49,7 @@ func (sm *SystemSettingsManager) Initialize(store store.Store, gm groupManager, 
 			settingsMap[setting.SettingKey] = setting.SettingValue
 		}
 
-		// Start with default settings, then override with values from the database.
+		// 从默认设置开始，然后用数据库中的值覆盖。
 		settings := utils.DefaultSystemSettings()
 		v := reflect.ValueOf(&settings).Elem()
 		t := v.Type()
@@ -102,14 +102,14 @@ func (sm *SystemSettingsManager) Initialize(store store.Store, gm groupManager, 
 	return nil
 }
 
-// Stop gracefully stops the SystemSettingsManager's background syncer.
+// Stop 优雅停止 SystemSettingsManager 的后台同步器
 func (sm *SystemSettingsManager) Stop(ctx context.Context) {
 	if sm.syncer != nil {
 		sm.syncer.Stop()
 	}
 }
 
-// EnsureSettingsInitialized 确保数据库中存在所有系统设置的记录。
+// EnsureSettingsInitialized 确保所有系统设置记录存在于数据库中
 func (sm *SystemSettingsManager) EnsureSettingsInitialized(authConfig types.AuthConfig) error {
 	defaultSettings := utils.DefaultSystemSettings()
 	metadata := utils.GenerateSettingsMetadata(&defaultSettings)
@@ -160,7 +160,7 @@ func (sm *SystemSettingsManager) GetSettings() types.SystemSettings {
 	return sm.syncer.Get()
 }
 
-// GetAppUrl returns the effective App URL.
+// GetAppUrl 返回有效的 App URL
 func (sm *SystemSettingsManager) GetAppUrl() string {
 	settings := sm.GetSettings()
 	if settings.AppUrl != "" {
@@ -180,7 +180,7 @@ func (sm *SystemSettingsManager) GetAppUrl() string {
 
 // UpdateSettings 更新系统配置
 func (sm *SystemSettingsManager) UpdateSettings(settingsMap map[string]any) error {
-	// 验证配置项
+	// 验证设置
 	if err := sm.ValidateSettings(settingsMap); err != nil {
 		return err
 	}
@@ -207,7 +207,7 @@ func (sm *SystemSettingsManager) UpdateSettings(settingsMap map[string]any) erro
 	return sm.syncer.Invalidate()
 }
 
-// GetEffectiveConfig 获取有效配置 (系统配置 + 分组覆盖)
+// GetEffectiveConfig 获取有效配置（系统设置 + 组覆盖）
 func (sm *SystemSettingsManager) GetEffectiveConfig(groupConfigJSON datatypes.JSONMap) types.SystemSettings {
 	effectiveConfig := sm.GetSettings()
 
@@ -245,91 +245,43 @@ func (sm *SystemSettingsManager) GetEffectiveConfig(groupConfigJSON datatypes.JS
 	return effectiveConfig
 }
 
-// ValidateSettings 验证系统配置的有效性
+// ValidateSettings 验证系统设置
 func (sm *SystemSettingsManager) ValidateSettings(settingsMap map[string]any) error {
 	tempSettings := utils.DefaultSystemSettings()
-	v := reflect.ValueOf(&tempSettings).Elem()
-	t := v.Type()
-	jsonToField := make(map[string]reflect.StructField)
-	for i := range t.NumField() {
-		field := t.Field(i)
-		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
-		if jsonTag != "" {
-			jsonToField[jsonTag] = field
-		}
-	}
-
-	for key, value := range settingsMap {
-		field, ok := jsonToField[key]
-		if !ok {
-			return fmt.Errorf("invalid setting key: %s", key)
-		}
-
-		validateTag := field.Tag.Get("validate")
-		rules := strings.Split(validateTag, ",")
-
-		switch field.Type.Kind() {
-		case reflect.Int:
-			floatVal, ok := value.(float64)
-			if !ok {
-				return fmt.Errorf("invalid type for %s: expected a number, got %T", key, value)
-			}
-			intVal := int(floatVal)
-			if floatVal != float64(intVal) {
-				return fmt.Errorf("invalid value for %s: must be an integer", key)
-			}
-
-			// The 'required' check is implicitly handled by the type assertion above.
-			for _, rule := range rules {
-				trimmedRule := strings.TrimSpace(rule)
-				if strings.HasPrefix(trimmedRule, "min=") {
-					minValStr := strings.TrimPrefix(trimmedRule, "min=")
-					minVal, _ := strconv.Atoi(minValStr)
-					if intVal < minVal {
-						return fmt.Errorf("value for %s (%d) is below minimum value (%d)", key, intVal, minVal)
-					}
-				}
-			}
-		case reflect.Bool:
-			if _, ok := value.(bool); !ok {
-				return fmt.Errorf("invalid type for %s: expected a boolean, got %T", key, value)
-			}
-		case reflect.String:
-			strVal, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("invalid type for %s: expected a string, got %T", key, value)
-			}
-			for _, rule := range rules {
-				trimmedRule := strings.TrimSpace(rule)
-				if trimmedRule == "required" {
-					if strVal == "" {
-						return fmt.Errorf("value for %s is required", key)
-					}
-				}
-			}
-		default:
-			return fmt.Errorf("unsupported type for setting key validation: %s", key)
-		}
-	}
-
-	return nil
+	jsonToField := buildJSONFieldMap(tempSettings)
+	return sm.validateFields(settingsMap, jsonToField, false)
 }
 
-// ValidateGroupConfigOverrides validates a map of group-level configuration overrides.
+// ValidateGroupConfigOverrides 验证组级别配置覆盖映射
 func (sm *SystemSettingsManager) ValidateGroupConfigOverrides(configMap map[string]any) error {
 	tempSettings := types.SystemSettings{}
-	v := reflect.ValueOf(&tempSettings).Elem()
-	t := v.Type()
+	jsonToField := buildJSONFieldMap(tempSettings)
+	return sm.validateFields(configMap, jsonToField, true)
+}
+
+type validationField struct {
+	field reflect.StructField
+}
+
+func buildJSONFieldMap(v any) map[string]reflect.StructField {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
+	}
+	rt := rv.Type()
 	jsonToField := make(map[string]reflect.StructField)
-	for i := range t.NumField() {
-		field := t.Field(i)
+	for i := range rt.NumField() {
+		field := rt.Field(i)
 		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
 		if jsonTag != "" {
 			jsonToField[jsonTag] = field
 		}
 	}
+	return jsonToField
+}
 
-	for key, value := range configMap {
+func (sm *SystemSettingsManager) validateFields(settingsMap map[string]any, jsonToField map[string]reflect.StructField, allowSkip bool) error {
+	for key, value := range settingsMap {
 		if value == nil {
 			continue
 		}
@@ -346,14 +298,16 @@ func (sm *SystemSettingsManager) ValidateGroupConfigOverrides(configMap map[stri
 		case reflect.Int:
 			floatVal, ok := value.(float64)
 			if !ok {
-				continue
+				if allowSkip {
+					continue
+				}
+				return fmt.Errorf("invalid type for %s: expected a number, got %T", key, value)
 			}
 			intVal := int(floatVal)
 			if floatVal != float64(intVal) {
 				return fmt.Errorf("invalid value for %s: must be an integer", key)
 			}
 
-			// The 'required' check is implicitly handled by the type assertion above.
 			for _, rule := range rules {
 				trimmedRule := strings.TrimSpace(rule)
 				if strings.HasPrefix(trimmedRule, "min=") {
@@ -364,10 +318,21 @@ func (sm *SystemSettingsManager) ValidateGroupConfigOverrides(configMap map[stri
 					}
 				}
 			}
+		case reflect.Bool:
+			_, ok := value.(bool)
+			if !ok {
+				if allowSkip {
+					continue
+				}
+				return fmt.Errorf("invalid type for %s: expected boolean, got %T", key, value)
+			}
 		case reflect.String:
 			strVal, ok := value.(string)
 			if !ok {
-				continue
+				if allowSkip {
+					continue
+				}
+				return fmt.Errorf("invalid type for %s: expected a string, got %T", key, value)
 			}
 			for _, rule := range rules {
 				trimmedRule := strings.TrimSpace(rule)
@@ -377,20 +342,17 @@ func (sm *SystemSettingsManager) ValidateGroupConfigOverrides(configMap map[stri
 					}
 				}
 			}
-		case reflect.Bool:
-			_, ok := value.(bool)
-			if !ok {
-				return fmt.Errorf("invalid type for %s: expected boolean, got %T", key, value)
-			}
 		default:
-			// Do not validate other types for group overrides
+			if !allowSkip {
+				return fmt.Errorf("unsupported type for setting key validation: %s", key)
+			}
 		}
 	}
 
 	return nil
 }
 
-// DisplaySystemConfig displays the current system settings.
+// DisplaySystemConfig 显示当前系统设置
 func (sm *SystemSettingsManager) DisplaySystemConfig(settings types.SystemSettings) {
 	logrus.Info("")
 	logrus.Info("========= System Settings =========")

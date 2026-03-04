@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { copy } from "@/utils/clipboard";
+import { useCopy } from "@/composables/useCopy";
 import { Copy, Key } from "@vicons/ionicons5";
 import { NButton, NIcon, NInput, NInputNumber, NModal, NSpace, useMessage } from "naive-ui";
 import { ref } from "vue";
@@ -24,8 +24,9 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<Emits>();
 
 const message = useMessage();
+const { copyWithFeedback } = useCopy();
 
-// 密钥生成弹窗相关
+// 密钥生成器模态框相关状态
 const showKeyGeneratorModal = ref(false);
 const keyCount = ref(1);
 const isGenerating = ref(false);
@@ -49,7 +50,7 @@ function generateKeys(): string[] {
   return keys;
 }
 
-// 打开密钥生成器弹窗
+// 打开密钥生成器模态框
 function openKeyGenerator() {
   showKeyGeneratorModal.value = true;
   keyCount.value = 1;
@@ -68,7 +69,7 @@ function confirmGenerateKeys() {
 
     let updatedValue = currentValue.trim();
 
-    // 处理逗号兼容情况
+    // 处理逗号兼容性
     if (updatedValue && !updatedValue.endsWith(",")) {
       updatedValue += ",";
     }
@@ -104,15 +105,10 @@ async function copyProxyKeys() {
     .filter(key => key.length > 0)
     .join("\n");
 
-  const success = await copy(formattedKeys);
-  if (success) {
-    message.success(t("keys.keysCopiedToClipboard"));
-  } else {
-    message.error(t("keys.copyFailedManual"));
-  }
+  await copyWithFeedback(formattedKeys);
 }
 
-// 处理输入框值变化
+// 处理输入值变化
 function handleInput(value: string) {
   emit("update:modelValue", value);
 }
@@ -145,7 +141,7 @@ function handleInput(value: string) {
       </template>
     </n-input>
 
-    <!-- 密钥生成器弹窗 -->
+    <!-- 密钥生成器模态框 -->
     <n-modal
       v-model:show="showKeyGeneratorModal"
       preset="dialog"
@@ -157,7 +153,7 @@ function handleInput(value: string) {
     >
       <n-space vertical :size="16">
         <div>
-          <p style="margin: 0 0 8px 0; color: #666; font-size: 14px">
+          <p style="margin: 0 0 8px 0; color: var(--text-hint); font-size: 14px">
             {{ t("keys.enterKeysCount") }}
           </p>
           <n-input-number
@@ -169,7 +165,7 @@ function handleInput(value: string) {
             :disabled="isGenerating"
           />
         </div>
-        <div style="color: #999; font-size: 12px; line-height: 1.4">
+        <div style="color: var(--text-placeholder); font-size: 12px; line-height: 1.4">
           <p>{{ t("keys.generatedKeysWillAppend") }}</p>
         </div>
       </n-space>

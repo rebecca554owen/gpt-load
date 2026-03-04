@@ -1,6 +1,6 @@
 package types
 
-// ConfigManager defines the interface for configuration management
+// ConfigManager 定义配置管理接口
 type ConfigManager interface {
 	IsMaster() bool
 	GetAuthConfig() AuthConfig
@@ -18,7 +18,7 @@ type ConfigManager interface {
 
 // SystemSettings 定义所有系统配置项
 type SystemSettings struct {
-	// 基础参数
+	// 基本参数
 	AppUrl                         string `json:"app_url" default:"http://localhost:3001" name:"config.app_url" category:"config.category.basic" desc:"config.app_url_desc" validate:"required"`
 	ProxyKeys                      string `json:"proxy_keys" name:"config.proxy_keys" category:"config.category.basic" desc:"config.proxy_keys_desc" validate:"required"`
 	RequestLogRetentionDays        int    `json:"request_log_retention_days" default:"7" name:"config.log_retention_days" category:"config.category.basic" desc:"config.log_retention_days_desc" validate:"required,min=0"`
@@ -41,11 +41,11 @@ type SystemSettings struct {
 	KeyValidationConcurrency     int `json:"key_validation_concurrency" default:"10" name:"config.key_validation_concurrency" category:"config.category.key" desc:"config.key_validation_concurrency_desc" validate:"required,min=1"`
 	KeyValidationTimeoutSeconds  int `json:"key_validation_timeout_seconds" default:"20" name:"config.key_validation_timeout" category:"config.category.key" desc:"config.key_validation_timeout_desc" validate:"required,min=1"`
 
-	// For cache
+	// 用于缓存
 	ProxyKeysMap map[string]struct{} `json:"-"`
 }
 
-// ServerConfig represents server configuration
+// ServerConfig 表示服务器配置
 type ServerConfig struct {
 	Port                    int    `json:"port"`
 	Host                    string `json:"host"`
@@ -56,12 +56,12 @@ type ServerConfig struct {
 	GracefulShutdownTimeout int    `json:"graceful_shutdown_timeout"`
 }
 
-// AuthConfig represents authentication configuration
+// AuthConfig 表示认证配置
 type AuthConfig struct {
 	Key string `json:"key"`
 }
 
-// CORSConfig represents CORS configuration
+// CORSConfig 表示 CORS 配置
 type CORSConfig struct {
 	Enabled          bool     `json:"enabled"`
 	AllowedOrigins   []string `json:"allowed_origins"`
@@ -70,12 +70,12 @@ type CORSConfig struct {
 	AllowCredentials bool     `json:"allow_credentials"`
 }
 
-// PerformanceConfig represents performance configuration
+// PerformanceConfig 表示性能配置
 type PerformanceConfig struct {
 	MaxConcurrentRequests int `json:"max_concurrent_requests"`
 }
 
-// LogConfig represents logging configuration
+// LogConfig 表示日志配置
 type LogConfig struct {
 	Level      string `json:"level"`
 	Format     string `json:"format"`
@@ -83,7 +83,7 @@ type LogConfig struct {
 	FilePath   string `json:"file_path"`
 }
 
-// DatabaseConfig represents database configuration
+// DatabaseConfig 表示数据库配置
 type DatabaseConfig struct {
 	DSN string `json:"dsn"`
 }
