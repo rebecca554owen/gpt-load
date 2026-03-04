@@ -1,12 +1,12 @@
 package i18n
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"gpt-load/internal/i18n/locales"
 
+	"github.com/goccy/go-json"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 )
@@ -47,10 +47,10 @@ func loadMessageFile(lang string) error {
 
 // GetLocalizer 获取本地化器
 func GetLocalizer(acceptLang string) *i18n.Localizer {
-	// 解析 Accept-Language 头
+	// 解析 Accept-Language 标头
 	langs := parseAcceptLanguage(acceptLang)
 
-	// 如果没有指定语言，默认使用中文
+	// 如果未指定语言，默认使用中文
 	if len(langs) == 0 {
 		langs = []string{"zh-CN"}
 	}
@@ -58,22 +58,22 @@ func GetLocalizer(acceptLang string) *i18n.Localizer {
 	return i18n.NewLocalizer(bundle, langs...)
 }
 
-// parseAcceptLanguage 解析 Accept-Language 头
+// parseAcceptLanguage 解析 Accept-Language 标头
 func parseAcceptLanguage(acceptLang string) []string {
 	if acceptLang == "" {
 		return nil
 	}
 
-	// 简单解析，只取第一个语言
+	// 简单解析，仅取第一个语言
 	parts := strings.Split(acceptLang, ",")
 	if len(parts) > 0 {
 		lang := strings.TrimSpace(parts[0])
-		// 移除质量因子 (q=...)
+		// 移除质量因子（q=...）
 		if idx := strings.Index(lang, ";"); idx > 0 {
 			lang = lang[:idx]
 		}
 
-		// 标准化语言代码
+		// 规范化语言代码
 		lang = normalizeLanguageCode(lang)
 		return []string{lang}
 	}
@@ -81,11 +81,11 @@ func parseAcceptLanguage(acceptLang string) []string {
 	return nil
 }
 
-// normalizeLanguageCode 标准化语言代码
+// normalizeLanguageCode 规范化语言代码
 func normalizeLanguageCode(lang string) string {
 	lang = strings.TrimSpace(lang)
 
-	// 映射常见的语言代码
+	// 映射常见语言代码
 	switch strings.ToLower(lang) {
 	case "zh", "zh-cn", "zh-hans":
 		return "zh-CN"
@@ -104,7 +104,7 @@ func normalizeLanguageCode(lang string) string {
 		if strings.HasPrefix(strings.ToLower(lang), "ja") {
 			return "ja-JP"
 		}
-		// 默认返回中文
+		// 默认使用中文
 		return "zh-CN"
 	}
 }
@@ -121,7 +121,7 @@ func T(localizer *i18n.Localizer, msgID string, data ...map[string]any) string {
 
 	msg, err := localizer.Localize(config)
 	if err != nil {
-		// 如果翻译失败，返回消息ID
+		// 如果翻译失败，返回消息 ID
 		return msgID
 	}
 

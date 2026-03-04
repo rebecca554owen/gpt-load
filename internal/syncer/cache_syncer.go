@@ -10,10 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// LoaderFunc defines a generic function signature for loading data from the source of truth (e.g., database).
+// LoaderFunc 定义用于从真实来源（例如数据库）加载数据的通用函数签名。
 type LoaderFunc[T any] func() (T, error)
 
-// CacheSyncer is a generic service that manages in-memory caching and cross-instance synchronization.
+// CacheSyncer 是管理内存缓存和跨实例同步的通用服务。
 type CacheSyncer[T any] struct {
 	mu          sync.RWMutex
 	cache       T
@@ -26,7 +26,7 @@ type CacheSyncer[T any] struct {
 	afterReload func(newValue T)
 }
 
-// NewCacheSyncer creates and initializes a new CacheSyncer.
+// NewCacheSyncer 创建并初始化新的 CacheSyncer。
 func NewCacheSyncer[T any](
 	loader LoaderFunc[T],
 	store store.Store,
@@ -53,27 +53,27 @@ func NewCacheSyncer[T any](
 	return s, nil
 }
 
-// Get safely returns the cached data.
+// Get 安全地返回缓存数据。
 func (s *CacheSyncer[T]) Get() T {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.cache
 }
 
-// Invalidate publishes a notification to all instances to reload their cache.
+// Invalidate 向所有实例发布通知以重新加载其缓存。
 func (s *CacheSyncer[T]) Invalidate() error {
 	s.logger.Debug("publishing invalidation notification")
 	return s.store.Publish(s.channelName, []byte("reload"))
 }
 
-// Stop gracefully shuts down the syncer's background goroutine.
+// Stop 优雅地关闭同步器的后台 goroutine。
 func (s *CacheSyncer[T]) Stop() {
 	close(s.stopChan)
 	s.wg.Wait()
 	s.logger.Info("cache syncer stopped.")
 }
 
-// reload fetches the latest data using the loader function and updates the cache.
+// reload 使用加载器函数获取最新数据并更新缓存。
 func (s *CacheSyncer[T]) reload() error {
 	s.logger.Debug("reloading cache...")
 	newData, err := s.loader()
@@ -87,7 +87,7 @@ func (s *CacheSyncer[T]) reload() error {
 	s.mu.Unlock()
 
 	s.logger.Info("cache reloaded successfully")
-	// After successfully reloading and updating the cache, trigger the hook.
+	// 成功重新加载并更新缓存后，触发钩子。
 	if s.afterReload != nil {
 		s.logger.Debug("triggering afterReload hook")
 		s.afterReload(newData)
@@ -95,7 +95,7 @@ func (s *CacheSyncer[T]) reload() error {
 	return nil
 }
 
-// listenForUpdates runs in the background, listening for invalidation messages.
+// listenForUpdates 在后台运行，监听失效消息。
 func (s *CacheSyncer[T]) listenForUpdates() {
 	defer s.wg.Done()
 
@@ -145,12 +145,12 @@ func (s *CacheSyncer[T]) listenForUpdates() {
 			}
 		}
 
-		// Before retrying, ensure the old subscription is closed.
+		// 在重试之前，确保旧订阅已关闭。
 		if err := subscription.Close(); err != nil {
 			s.logger.Errorf("failed to close subscription before retrying: %v", err)
 		}
 
-		// Wait a moment before retrying to avoid tight loops on persistent errors.
+		// 等待片刻再重试，以避免在持久性错误上出现紧密循环。
 		select {
 		case <-time.After(2 * time.Second):
 		case <-s.stopChan:

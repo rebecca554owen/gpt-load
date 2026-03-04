@@ -11,8 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Config defines the parameters for creating an HTTP client.
-// This struct is used to generate a unique fingerprint for client reuse.
+// Config 定义创建 HTTP 客户端的参数。
+// 此结构体用于生成唯一指纹以供客户端重用。
 type Config struct {
 	ConnectTimeout        time.Duration
 	RequestTimeout        time.Duration
@@ -29,28 +29,27 @@ type Config struct {
 	ProxyURL              string
 }
 
-// HTTPClientManager manages the lifecycle of HTTP clients.
-// It creates and caches clients based on their configuration fingerprint,
-// ensuring that clients with the same configuration are reused.
+// HTTPClientManager 管理 HTTP 客户端的生命周期。
+// 它基于配置指纹创建和缓存客户端，确保相同配置的客户端被重用。
 type HTTPClientManager struct {
 	clients map[string]*http.Client
 	lock    sync.RWMutex
 }
 
-// NewHTTPClientManager creates a new client manager.
+// NewHTTPClientManager 创建一个新的客户端管理器。
 func NewHTTPClientManager() *HTTPClientManager {
 	return &HTTPClientManager{
 		clients: make(map[string]*http.Client),
 	}
 }
 
-// GetClient returns an HTTP client that matches the given configuration.
-// If a matching client already exists in the cache, it is returned.
-// Otherwise, a new client is created, cached, and returned.
+// GetClient 返回与给定配置匹配的 HTTP 客户端。
+// 如果缓存中已存在匹配的客户端，则返回该客户端。
+// 否则，创建一个新客户端，进行缓存，然后返回。
 func (m *HTTPClientManager) GetClient(config *Config) *http.Client {
 	fingerprint := config.getFingerprint()
 
-	// Fast path with read lock
+	// 使用读锁的快速路径
 	m.lock.RLock()
 	client, exists := m.clients[fingerprint]
 	m.lock.RUnlock()
@@ -58,16 +57,16 @@ func (m *HTTPClientManager) GetClient(config *Config) *http.Client {
 		return client
 	}
 
-	// Slow path with write lock
+	// 使用写锁的慢速路径
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	// Double-check in case another goroutine created the client while we were waiting for the lock.
+	// 双重检查，以防另一个 goroutine 在我们等待锁时创建了客户端。
 	if client, exists = m.clients[fingerprint]; exists {
 		return client
 	}
 
-	// Create a new transport and client with the specified configuration.
+	// 使用指定配置创建新的传输和客户端。
 	transport := &http.Transport{
 		DialContext: (&net.Dialer{
 			Timeout:   config.ConnectTimeout,
@@ -85,7 +84,7 @@ func (m *HTTPClientManager) GetClient(config *Config) *http.Client {
 		ReadBufferSize:        config.ReadBufferSize,
 	}
 
-	// Set http proxy.
+	// 设置 HTTP 代理。
 	if config.ProxyURL != "" {
 		proxyURL, err := url.Parse(config.ProxyURL)
 		if err != nil {
@@ -107,7 +106,7 @@ func (m *HTTPClientManager) GetClient(config *Config) *http.Client {
 	return newClient
 }
 
-// getFingerprint generates a unique string representation of the client configuration.
+// getFingerprint 生成客户端配置的唯一字符串表示。
 func (c *Config) getFingerprint() string {
 	return fmt.Sprintf(
 		"ct:%.0fs|rt:%.0fs|it:%.0fs|mic:%d|mich:%d|rht:%.0fs|dc:%t|wbs:%d|rbs:%d|fh2:%t|tlst:%.0fs|ect:%.0fs|proxy:%s",

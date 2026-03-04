@@ -22,6 +22,7 @@ go.work
 build/
 dist/
 bin/
+gpt-load*
 
 # Environment variables
 .env
@@ -211,3 +212,12 @@ run-local.sh
 start-local.sh
 dev-setup.sh
 data/
+
+# Claude Code local settings
+.claude/
+CLAUDE.md
+tmpclaude-*-cwd
+
+# CodeArts
+.arts/
+

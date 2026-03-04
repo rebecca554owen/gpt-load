@@ -1,26 +1,32 @@
 <script setup lang="ts">
-import { useAuthService } from "@/services/auth";
-import { LogOutOutline } from "@vicons/ionicons5";
+import { useAuthService } from "@/composables/useAuth";
+import { LogInOutline, LogOutOutline } from "@vicons/ionicons5";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { computed } from "vue";
 
 const { t } = useI18n();
 
 const router = useRouter();
-const { logout } = useAuthService();
+const { checkLogin, logout } = useAuthService();
+const isLoggedIn = computed(() => checkLogin());
 
-const handleLogout = () => {
-  logout();
-  router.replace("/login");
+const handleClick = () => {
+  if (isLoggedIn.value) {
+    logout();
+    router.replace("/");
+  } else {
+    router.push("/login");
+  }
 };
 </script>
 
 <template>
-  <n-button quaternary round class="logout-button" @click="handleLogout">
+  <n-button quaternary round class="logout-button" @click="handleClick">
     <template #icon>
-      <n-icon :component="LogOutOutline" />
+      <n-icon :component="isLoggedIn ? LogOutOutline : LogInOutline" />
     </template>
-    {{ t("nav.logout") }}
+    {{ isLoggedIn ? t("nav.logout") : t("nav.login") }}
   </n-button>
 </template>
 
@@ -36,9 +42,9 @@ const handleLogout = () => {
 }
 
 .logout-button:hover {
-  color: #dc2626;
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--logout-hover-color);
+  background: var(--logout-hover-bg);
+  border-color: var(--logout-hover-border);
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
 }

@@ -1,4 +1,4 @@
-// Package app provides the main application logic and lifecycle management.
+// Package app 提供应用主逻辑和生命周期管理
 package app
 
 import (
@@ -25,7 +25,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// App holds all services and manages the application lifecycle.
+// App 持有所有服务并管理应用生命周期
 type App struct {
 	engine            *gin.Engine
 	configManager     types.ConfigManager
@@ -41,7 +41,7 @@ type App struct {
 	httpServer        *http.Server
 }
 
-// AppParams defines the dependencies for the App.
+// AppParams 定义 App 的依赖项
 type AppParams struct {
 	dig.In
 	Engine            *gin.Engine
@@ -57,7 +57,7 @@ type AppParams struct {
 	DB                *gorm.DB
 }
 
-// NewApp is the constructor for App, with dependencies injected by dig.
+// NewApp 是 App 的构造函数，通过 dig 注入依赖
 func NewApp(params AppParams) *App {
 	return &App{
 		engine:            params.Engine,
@@ -74,15 +74,15 @@ func NewApp(params AppParams) *App {
 	}
 }
 
-// Start runs the application, it is a non-blocking call.
+// Start 启动应用，非阻塞调用
 func (a *App) Start() error {
 	// 初始化 i18n
 	if err := i18n.Init(); err != nil {
 		return fmt.Errorf("failed to initialize i18n: %w", err)
 	}
 	logrus.Info("i18n initialized successfully.")
-	
-	// Master 节点执行初始化
+
+	// 主节点初始化
 	if a.configManager.IsMaster() {
 		logrus.Info("Starting as Master Node.")
 
@@ -102,7 +102,7 @@ func (a *App) Start() error {
 		); err != nil {
 			return fmt.Errorf("database auto-migration failed: %w", err)
 		}
-		// 数据修复
+		// Data migration
 		if err := db.MigrateDatabase(a.db); err != nil {
 			return fmt.Errorf("database data migration failed: %w", err)
 		}
@@ -117,17 +117,30 @@ func (a *App) Start() error {
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 
 		// 从数据库加载密钥到 Redis
-		if err := a.keyPoolProvider.LoadKeysFromDB(); err != nil {
+		if err := a.keyPoolProvider.InitializeFromDatabase(); err != nil {
 			return fmt.Errorf("failed to load keys into key pool: %w", err)
 		}
 		logrus.Debug("API keys loaded into Redis cache by master.")
 
-		// 仅 Master 节点启动的服务
+		// 仅在主节点启动的服务
 		a.requestLogService.Start()
 		a.logCleanupService.Start()
 		a.cronChecker.Start()
 	} else {
 		logrus.Info("Starting as Slave Node.")
+
+		// Slave 节点如果使用内存存储（无 Redis），需要自己初始化密钥
+		if _, isMemoryStore := a.storage.(*store.MemoryStore); isMemoryStore {
+			logrus.Warn("Slave node using in-memory store (Redis not available). Loading keys from database for local cache.")
+
+			if err := a.keyPoolProvider.InitializeFromDatabase(); err != nil {
+				return fmt.Errorf("failed to load keys into key pool: %w", err)
+			}
+			logrus.Debug("API keys loaded into memory store (Slave without Redis).")
+		} else {
+			logrus.Info("Slave node connected to Redis, keys will sync from Master.")
+		}
+
 		a.settingsManager.Initialize(a.storage, a.groupManager, a.configManager.IsMaster())
 	}
 
@@ -136,7 +149,7 @@ func (a *App) Start() error {
 
 	a.groupManager.Initialize()
 
-	// Create HTTP server
+	// 创建 HTTP 服务器
 	serverConfig := a.configManager.GetEffectiveServerConfig()
 	a.httpServer = &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", serverConfig.Host, serverConfig.Port),
@@ -147,7 +160,7 @@ func (a *App) Start() error {
 		MaxHeaderBytes: 1 << 20,
 	}
 
-	// Start HTTP server in a new goroutine
+	// 在新协程中启动 HTTP 服务器
 	go func() {
 		logrus.Infof("GPT-Load proxy server started successfully on Version: %s", version.Version)
 		logrus.Infof("Server address: http://%s:%d", serverConfig.Host, serverConfig.Port)
@@ -160,14 +173,14 @@ func (a *App) Start() error {
 	return nil
 }
 
-// Stop gracefully shuts down the application.
+// Stop 优雅关闭应用
 func (a *App) Stop(ctx context.Context) {
 	logrus.Info("Shutting down server...")
 
 	serverConfig := a.configManager.GetEffectiveServerConfig()
 	totalTimeout := time.Duration(serverConfig.GracefulShutdownTimeout) * time.Second
 
-	// 动态计算 HTTP 关机超时时间，为后台服务固定预留 5 秒
+	// 动态计算 HTTP 关闭超时，为后台服务预留 5 秒
 	httpShutdownTimeout := totalTimeout - 5*time.Second
 	httpShutdownCtx, cancelHttpShutdown := context.WithTimeout(context.Background(), httpShutdownTimeout)
 	defer cancelHttpShutdown()
@@ -181,7 +194,7 @@ func (a *App) Stop(ctx context.Context) {
 	}
 	logrus.Info("HTTP server has been shut down.")
 
-	// 使用原始的总超时 context 继续关闭其他后台服务
+	// 使用原始总超时上下文继续关闭其他后台服务
 	stoppableServices := []func(context.Context){
 		a.groupManager.Stop,
 		a.settingsManager.Stop,

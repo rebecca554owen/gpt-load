@@ -1,4 +1,4 @@
-// Package main provides the entry point for the GPT-Load proxy server
+// Package main 提供 GPT-Load 代理服务器的入口点
 package main
 
 import (
@@ -33,7 +33,7 @@ func main() {
 	}
 }
 
-// runCommand dispatches to the appropriate command handler
+// runCommand 分发到相应的命令处理器
 func runCommand() {
 	command := os.Args[1]
 	args := os.Args[2:]
@@ -50,7 +50,7 @@ func runCommand() {
 	}
 }
 
-// printHelp displays the general help information
+// printHelp 显示通用帮助信息
 func printHelp() {
 	fmt.Println("GPT-Load - Multi-channel AI proxy with intelligent key rotation.")
 	fmt.Println()
@@ -65,15 +65,15 @@ func printHelp() {
 	fmt.Println("Use 'gpt-load <command> --help' for more information about a command.")
 }
 
-// runServer run App Server
+// runServer 运行应用服务器
 func runServer() {
-	// Build the dependency injection container
+	// 构建依赖注入容器
 	container, err := container.BuildContainer()
 	if err != nil {
 		logrus.Fatalf("Failed to build container: %v", err)
 	}
 
-	// Provide UI assets to the container
+	// 向容器提供 UI 资源
 	if err := container.Provide(func() embed.FS { return buildFS }); err != nil {
 		logrus.Fatalf("Failed to provide buildFS: %v", err)
 	}
@@ -81,30 +81,30 @@ func runServer() {
 		logrus.Fatalf("Failed to provide indexPage: %v", err)
 	}
 
-	// Initialize global logger
+	// 初始化全局日志器
 	if err := container.Invoke(func(configManager types.ConfigManager) {
 		utils.SetupLogger(configManager)
 	}); err != nil {
 		logrus.Fatalf("Failed to setup logger: %v", err)
 	}
 
-	// Create and run the application
+	// 创建并运行应用
 	if err := container.Invoke(func(application *app.App, configManager types.ConfigManager) {
 		if err := application.Start(); err != nil {
 			logrus.Fatalf("Failed to start application: %v", err)
 		}
 
-		// Wait for interrupt signal for graceful shutdown
+		// 等待中断信号以实现优雅关闭
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 
-		// Create a context with timeout for shutdown
+		// 创建带超时的上下文用于关闭
 		serverConfig := configManager.GetEffectiveServerConfig()
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(serverConfig.GracefulShutdownTimeout)*time.Second)
 		defer cancel()
 
-		// Perform graceful shutdown
+		// 执行优雅关闭
 		application.Stop(shutdownCtx)
 
 	}); err != nil {

@@ -77,7 +77,7 @@ func registerSystemRoutes(router *gin.Engine, serverHandler *handler.Server) {
 	router.GET("/health", serverHandler.Health)
 }
 
-// registerAPIRoutes 注册API路由
+// registerAPIRoutes 注册 API 路由
 func registerAPIRoutes(
 	router *gin.Engine,
 	serverHandler *handler.Server,
@@ -88,22 +88,30 @@ func registerAPIRoutes(
 
 	authConfig := configManager.GetAuthConfig()
 
-	// 公开
+	// 公共路由
 	registerPublicAPIRoutes(api, serverHandler)
 
-	// 认证
+	// 认证路由
 	protectedAPI := api.Group("")
 	protectedAPI.Use(middleware.Auth(authConfig))
 	registerProtectedAPIRoutes(protectedAPI, serverHandler)
 }
 
-// registerPublicAPIRoutes 公开API路由
+// registerPublicAPIRoutes 注册公共 API 路由
 func registerPublicAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server) {
 	api.POST("/auth/login", serverHandler.Login)
 	api.GET("/integration/info", serverHandler.GetIntegrationInfo)
+
+	// Dashboard 公共端点
+	dashboard := api.Group("/dashboard")
+	{
+		dashboard.GET("/stats", serverHandler.Stats)
+		dashboard.GET("/chart", serverHandler.Chart)
+		dashboard.GET("/encryption-status", serverHandler.EncryptionStatus)
+	}
 }
 
-// registerProtectedAPIRoutes 认证API路由
+// registerProtectedAPIRoutes 注册需要认证的 API 路由
 func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Server) {
 	api.GET("/channel-types", serverHandler.CommonHandler.GetChannelTypes)
 
@@ -125,7 +133,7 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		groups.GET("/:id/parent-aggregate-groups", serverHandler.GetParentAggregateGroups)
 	}
 
-	// Key Management Routes
+	// 密钥管理路由
 	keys := api.Group("/keys")
 	{
 		keys.GET("", serverHandler.ListKeysInGroup)
@@ -140,19 +148,12 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		keys.POST("/clear-all", serverHandler.ClearAllKeys)
 		keys.POST("/validate-group", serverHandler.ValidateGroupKeys)
 		keys.POST("/test-multiple", serverHandler.TestMultipleKeys)
+		keys.POST("/test-next", serverHandler.TestNextKey)
 		keys.PUT("/:id/notes", serverHandler.UpdateKeyNotes)
 	}
 
-	// Tasks
+	// 任务
 	api.GET("/tasks/status", serverHandler.GetTaskStatus)
-
-	// 仪表板和日志
-	dashboard := api.Group("/dashboard")
-	{
-		dashboard.GET("/stats", serverHandler.Stats)
-		dashboard.GET("/chart", serverHandler.Chart)
-		dashboard.GET("/encryption-status", serverHandler.EncryptionStatus)
-	}
 
 	// 日志
 	logs := api.Group("/logs")
@@ -200,7 +201,7 @@ func registerFrontendRoutes(router *gin.Engine, buildFS embed.FS, indexPage []by
 			c.JSON(http.StatusNotFound, gin.H{"error": "Not Found"})
 			return
 		}
-		// HTML页面不缓存，确保更新能及时生效
+		// HTML 页面不缓存，确保更新立即生效
 		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Pragma", "no-cache")
 		c.Header("Expires", "0")

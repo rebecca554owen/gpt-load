@@ -20,7 +20,7 @@ const message = ref("");
 const suggestion = ref("");
 const scenarioType = ref("");
 
-// 本次会话是否已关闭
+// 当前会话是否已关闭
 const isClosedThisSession = ref(false);
 
 // 是否显示详情
@@ -49,7 +49,7 @@ const checkEncryptionStatus = async () => {
   }
 };
 
-// 关闭警告（仅本次会话）
+// 关闭警告（仅当前会话）
 const handleClose = () => {
   isClosedThisSession.value = true;
 };
@@ -89,7 +89,7 @@ onMounted(() => {
             class="solution-content"
             style="padding: 16px; border-radius: 6px; font-size: 13px; line-height: 1.6"
           >
-            <!-- 场景A: 已配置 ENCRYPTION_KEY 但数据未加密 -->
+            <!-- 场景 A：配置了 ENCRYPTION_KEY 但数据未加密 -->
             <template v-if="scenarioType === 'data_not_encrypted'">
               <p style="margin: 0 0 8px 0">
                 1. {{ t("encryptionAlert.scenario.dataNotEncrypted.step1") }}
@@ -114,7 +114,7 @@ docker compose run --rm gpt-load migrate-keys --to "your-encryption-key"</pre
               </p>
             </template>
 
-            <!-- 场景C: 密钥不匹配 -->
+            <!-- 场景 C：密钥不匹配 -->
             <template v-else-if="scenarioType === 'key_mismatch'">
               <div style="margin-bottom: 16px">
                 <strong style="color: var(--primary-color)">
@@ -171,7 +171,7 @@ docker compose run --rm gpt-load migrate-keys --from "old-key" --to "new-key"</p
               </div>
             </template>
 
-            <!-- 场景B: 数据已加密但未配置 ENCRYPTION_KEY -->
+            <!-- 场景 B：数据已加密但未配置 ENCRYPTION_KEY -->
             <template v-else-if="scenarioType === 'key_not_configured'">
               <div style="margin-bottom: 16px">
                 <strong style="color: var(--primary-color)">
@@ -248,19 +248,19 @@ docker compose run --rm gpt-load migrate-keys --from "old-key"</pre
   border: 1px solid #e1e4e8;
 }
 
-/* 浅色模式下的代码块 */
+/* 浅色主题代码块 */
 .solution-content pre {
   background: #f0f2f5;
   border: 1px solid #d6dae0;
 }
 
-/* 暗黑模式下的解决方案背景 */
+/* 暗黑主题解决方案背景 */
 :root.dark .solution-content {
   background: #1a1a1a;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* 暗黑模式下的代码块 */
+/* 暗黑主题代码块 */
 :root.dark .solution-content pre {
   background: #0d0d0d !important;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -271,7 +271,7 @@ docker compose run --rm gpt-load migrate-keys --from "old-key"</pre
   font-weight: 600;
 }
 
-/* 暗黑模式下的按钮优化 */
+/* 暗黑模式按钮优化 */
 :root.dark .encryption-docs-btn {
   background: #d32f2f !important;
   color: white !important;
@@ -283,7 +283,7 @@ docker compose run --rm gpt-load migrate-keys --from "old-key"</pre
   color: white !important;
 }
 
-/* 亮色模式下的按钮 */
+/* 浅色主题按钮 */
 :root:not(.dark) .encryption-docs-btn {
   background: #d32f2f !important;
   color: white !important;

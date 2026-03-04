@@ -24,10 +24,10 @@ const props = defineProps<Props>();
 // 本地存储键名
 const STORAGE_KEY = "security-alert-dismissed";
 
-// 检查是否已经被用户设置为不再提醒
+// 检查用户是否已永久关闭
 const isDismissedPermanently = ref(localStorage.getItem(STORAGE_KEY) === "true");
 
-// 本次会话是否已关闭
+// 当前会话是否已关闭
 const isClosedThisSession = ref(false);
 
 // 是否显示详情
@@ -52,7 +52,7 @@ const highestSeverity = computed(() => {
   }, "low");
 });
 
-// 获取警告类型的映射（调整为更温和的颜色）
+// 获取警告类型映射（调整为更柔和的颜色）
 const alertType = computed(() => {
   switch (highestSeverity.value) {
     case "high":
@@ -76,7 +76,7 @@ const warningText = computed(() => {
   }
 });
 
-// 获取严重程度标签类型
+// 获取严重级别标签类型
 const getSeverityTagType = (severity: string) => {
   switch (severity) {
     case "high":
@@ -88,7 +88,7 @@ const getSeverityTagType = (severity: string) => {
   }
 };
 
-// 获取严重程度中文
+// 获取严重级别文本
 const getSeverityText = (severity: string) => {
   switch (severity) {
     case "high":
@@ -100,7 +100,7 @@ const getSeverityText = (severity: string) => {
   }
 };
 
-// 关闭警告（仅本次会话）
+// 关闭警告（仅当前会话）
 const handleClose = () => {
   isClosedThisSession.value = true;
 };
@@ -198,7 +198,7 @@ const openSecurityDocs = () => {
 </template>
 
 <style scoped>
-/* 安全提醒按钮样式优化 */
+/* 安全警告按钮样式优化 */
 .security-primary-btn {
   font-weight: 600;
 }
@@ -207,7 +207,7 @@ const openSecurityDocs = () => {
   font-weight: 500;
 }
 
-/* 暗黑模式下的按钮优化 */
+/* 暗黑模式按钮优化 */
 :root.dark .security-primary-btn {
   background: var(--primary-color) !important;
   color: white !important;

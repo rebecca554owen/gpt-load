@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewCronChecker is responsible for periodically validating invalid keys.
+// NewCronChecker 负责定期验证无效密钥。
 type CronChecker struct {
 	DB              *gorm.DB
 	SettingsManager *config.SystemSettingsManager
@@ -23,7 +23,7 @@ type CronChecker struct {
 	wg              sync.WaitGroup
 }
 
-// NewCronChecker creates a new CronChecker.
+// NewCronChecker 创建一个新的 CronChecker 实例。
 func NewCronChecker(
 	db *gorm.DB,
 	settingsManager *config.SystemSettingsManager,
@@ -39,18 +39,18 @@ func NewCronChecker(
 	}
 }
 
-// Start begins the cron job execution.
+// Start 开始执行定时任务。
 func (s *CronChecker) Start() {
 	logrus.Debug("Starting CronChecker...")
 	s.wg.Add(1)
 	go s.runLoop()
 }
 
-// Stop stops the cron job, respecting the context for shutdown timeout.
+// Stop 停止定时任务，遵守关闭超时上下文。
 func (s *CronChecker) Stop(ctx context.Context) {
 	close(s.stopChan)
 
-	// Wait for the goroutine to finish, or for the shutdown to time out.
+	// 等待协程完成，或等待关闭超时。
 	done := make(chan struct{})
 	go func() {
 		s.wg.Wait()
@@ -84,7 +84,7 @@ func (s *CronChecker) runLoop() {
 	}
 }
 
-// submitValidationJobs finds groups whose keys need validation and validates them concurrently.
+// submitValidationJobs 查找需要验证密钥的组并并发验证它们。
 func (s *CronChecker) submitValidationJobs() {
 	var groups []models.Group
 	if err := s.DB.Where("group_type != ? OR group_type IS NULL", "aggregate").Find(&groups).Error; err != nil {
@@ -113,7 +113,7 @@ func (s *CronChecker) submitValidationJobs() {
 	wg.Wait()
 }
 
-// validateGroupKeys validates all invalid keys for a single group concurrently.
+// validateGroupKeys 并发验证单个组的所有无效密钥。
 func (s *CronChecker) validateGroupKeys(group *models.Group) {
 	groupProcessStart := time.Now()
 
@@ -148,18 +148,18 @@ func (s *CronChecker) validateGroupKeys(group *models.Group) {
 						return
 					}
 
-					// Decrypt the key before validation
+					// 验证前解密密钥
 					decryptedKey, err := s.EncryptionSvc.Decrypt(key.KeyValue)
 					if err != nil {
 						logrus.WithError(err).WithField("key_id", key.ID).Error("CronChecker: Failed to decrypt key for validation, skipping")
 						continue
 					}
 
-					// Create a copy with decrypted value for validation
+					// 创建解密值的副本用于验证
 					keyForValidation := *key
 					keyForValidation.KeyValue = decryptedKey
 
-					isValid, _ := s.Validator.ValidateSingleKey(&keyForValidation, group)
+					isValid, _ := s.Validator.ValidateSingleKey(&keyForValidation, group, "")
 					if isValid {
 						atomic.AddInt32(&becameValidCount, 1)
 					}

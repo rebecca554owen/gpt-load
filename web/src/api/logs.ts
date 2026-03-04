@@ -8,7 +8,7 @@ export const logApi = {
     return http.get("/logs", { params });
   },
 
-  // 获取分组列表（用于筛选）
+  // 获取组列表（用于过滤）
   getGroups: (): Promise<ApiResponse<Group[]>> => {
     return http.get("/groups");
   },

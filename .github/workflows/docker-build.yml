@@ -1,39 +1,51 @@
 name: Build Docker Image
 
 on:
-  push:
-    tags:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (必须以v开头，例如: v1.0.0, v2.1.3, v1.0.0-beta, v3.2.1-rc1)'
+        required: true
+        default: 'v1.8.0'
+      is_prerelease:
+        description: '标记为预发布版本 (勾选则不加 latest tag)'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
   build_docker_image:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    timeout-minutes: 45
     permissions:
       packages: write
-      contents: read
+      contents: write
     steps:
+      - name: Validate version input
+        run: |
+          if [[ ! "${{ github.event.inputs.version }}" =~ ^v.* ]]; then
+            echo "错误：版本号格式不正确，必须以 v 开头 (例如: v1.0.0, v2.1.3, v1.0.0-beta, v3.2.1-rc1)"
+            exit 1
+          fi
+          echo "版本号验证通过：${{ github.event.inputs.version }}"
+
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
         with:
-          platforms: arm64
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          driver-opts: |
+            image=moby/buildkit:buildx-stable-1
 
       - name: Log in to Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -42,25 +54,50 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            tbphp/gpt-load
-            ghcr.io/${{ github.repository }}
-          flavor: |
-            latest=false
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=tag
-            type=raw,value=beta,enable=${{ contains(github.ref, '-beta') }}
-            type=raw,value=latest,enable=${{ !contains(github.ref, '-') }}
+            type=raw,value=${{ github.event.inputs.version }}
+            type=raw,value=latest,enable=${{ github.event.inputs.is_prerelease == 'false' }}
 
       - name: Build and push Docker image
         id: build
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ github.event.inputs.version }}
+          provenance: false
+
+      - name: Get build time (UTC+8)
+        id: time
+        run: |
+          echo "build_time=$(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S (UTC+8)')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          name: ${{ github.event.inputs.version }}
+          body: |
+            ## What's Changed
+
+            **镜像**: `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version }}`
+
+            **启动容器**:
+            ```bash
+            docker run -d --name gpt-load --restart unless-stopped -p 3001:3001 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.event.inputs.version }}
+            ```
+
+            *构建时间: ${{ steps.time.outputs.build_time }}*
+            *提交: [${{ github.sha }}](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})*
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ github.event.inputs.is_prerelease == 'true' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

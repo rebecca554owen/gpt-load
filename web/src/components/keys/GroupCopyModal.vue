@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
 import type { Group } from "@/types/models";
-import { appState } from "@/utils/app-state";
+import { useAppStateStore } from "@/stores/appState";
 import { getGroupDisplayName } from "@/utils/display";
 import { CloseOutline, CopyOutline } from "@vicons/ionicons5";
 import {
@@ -48,7 +48,7 @@ const modalVisible = computed({
   set: (value: boolean) => emit("update:show", value),
 });
 
-// Watch for show prop changes to reset form
+// 监听 show 属性变化以重置表单
 watchEffect(() => {
   if (props.show) {
     resetForm();
@@ -79,20 +79,21 @@ async function handleCopy() {
 
   loading.value = true;
   try {
+    const appState = useAppStateStore();
     const copyData = {
       copy_keys: formData.value.copyKeys,
     };
     const result = await keysApi.copyGroup(props.sourceGroup.id, copyData);
 
-    // Show appropriate success message based on copy strategy
+    // 根据复制策略显示相应的成功消息
     if (formData.value.copyKeys !== "none") {
       message.success(
         t("keys.copyGroupWithKeysSuccess", {
           groupName: result.group.display_name || result.group.name,
         })
       );
-      // Trigger task polling to show import progress
-      appState.taskPollingTrigger++;
+      // 触发任务轮询以显示导入进度
+      appState.triggerTaskPolling();
     } else {
       message.success(
         t("keys.copyGroupSuccess", { groupName: result.group.display_name || result.group.name })
@@ -112,9 +113,15 @@ function handleCancel() {
 </script>
 
 <template>
-  <n-modal :show="modalVisible" @update:show="handleCancel" class="group-copy-modal">
+  <n-modal
+    :show="modalVisible"
+    @update:show="handleCancel"
+    class="group-copy-modal modal-mask"
+    :mask-closable="true"
+    :closable="false"
+  >
     <n-card
-      class="group-copy-card"
+      class="group-copy-card modal-card modal-narrow"
       :title="
         t('keys.copyGroupTitle', { groupName: sourceGroup ? getGroupDisplayName(sourceGroup) : '' })
       "
@@ -124,7 +131,7 @@ function handleCancel() {
       aria-modal="true"
     >
       <template #header-extra>
-        <n-button quaternary circle @click="handleCancel">
+        <n-button quaternary circle @click="handleCancel" class="modal-close">
           <template #icon>
             <n-icon :component="CloseOutline" />
           </template>
@@ -158,9 +165,11 @@ function handleCancel() {
       </div>
 
       <template #footer>
-        <div class="modal-actions">
-          <n-button @click="handleCancel" :disabled="loading">{{ t("common.cancel") }}</n-button>
-          <n-button type="primary" @click="handleCopy" :loading="loading">
+        <div class="modal-footer">
+          <n-button @click="handleCancel" :disabled="loading" class="btn-cancel">
+            {{ t("common.cancel") }}
+          </n-button>
+          <n-button @click="handleCopy" :loading="loading" class="btn-confirm">
             <template #icon>
               <n-icon :component="CopyOutline" />
             </template>
@@ -174,9 +183,11 @@ function handleCancel() {
 
 <style scoped>
 .group-copy-modal {
-  width: 450px;
-  max-width: 90vw;
-  --n-color: var(--modal-color);
+  /* 继承 modal-mask 样式 */
+}
+
+.group-copy-card {
+  /* 继承 modal-card 和 modal-narrow 样式 */
 }
 
 .modal-content {
@@ -247,11 +258,6 @@ function handleCancel() {
 
 :deep(.n-card__content) {
   padding: 16px 20px;
-}
-
-:deep(.n-card__footer) {
-  border-top: 1px solid var(--border-color);
-  padding: 10px 15px;
 }
 
 :deep(.n-form-item-feedback-wrapper) {

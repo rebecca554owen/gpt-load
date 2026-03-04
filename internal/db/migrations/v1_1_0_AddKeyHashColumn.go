@@ -9,9 +9,9 @@ import (
 	"gorm.io/gorm"
 )
 
-// V1_1_0_AddKeyHashColumn adds key_hash column to api_keys and request_logs tables
+// V1_1_0_AddKeyHashColumn 向 api_keys 和 request_logs 表添加 key_hash 列
 func V1_1_0_AddKeyHashColumn(db *gorm.DB) error {
-	// First check if there are any records need migration
+	// 首先检查是否有需要迁移的记录
 	var needMigrateCount int64
 	db.Model(&models.APIKey{}).
 		Where("key_hash IS NULL OR key_hash = ''").
@@ -29,12 +29,12 @@ func V1_1_0_AddKeyHashColumn(db *gorm.DB) error {
 		return fmt.Errorf("failed to initialize encryption service: %w", err)
 	}
 
-	// Process in batches to avoid memory issues
+	// 分批处理以避免内存问题
 	const batchSize = 1000
 
 	for {
 		var apiKeys []models.APIKey
-		// Only query records that need migration
+		// 仅查询需要迁移的记录
 		result := db.Where("key_hash IS NULL OR key_hash = ''").
 			Limit(batchSize).
 			Find(&apiKeys)
@@ -47,12 +47,12 @@ func V1_1_0_AddKeyHashColumn(db *gorm.DB) error {
 			break
 		}
 
-		// Update each key's hash
+		// 更新每个密钥的哈希
 		for _, key := range apiKeys {
-			// Generate hash
+			// 生成哈希
 			keyHash := encSvc.Hash(key.KeyValue)
 
-			// Update the record
+			// 更新记录
 			if err := db.Model(&models.APIKey{}).
 				Where("id = ?", key.ID).
 				Update("key_hash", keyHash).Error; err != nil {

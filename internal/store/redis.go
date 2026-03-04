@@ -10,25 +10,25 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisKeyPrefix is the prefix for all Redis keys used by GPT-Load
+// RedisKeyPrefix 是 GPT-Load 使用的所有 Redis 键的前缀
 const RedisKeyPrefix = "gpt-load:"
 
-// RedisStore is a Redis-backed key-value store.
+// RedisStore 是基于 Redis 的键值存储。
 type RedisStore struct {
 	client *redis.Client
 }
 
-// NewRedisStore creates a new RedisStore instance.
+// NewRedisStore 创建新的 RedisStore 实例。
 func NewRedisStore(client *redis.Client) *RedisStore {
 	return &RedisStore{client: client}
 }
 
-// prefixKey adds the application prefix to a key
+// prefixKey 为键添加应用程序前缀
 func (s *RedisStore) prefixKey(key string) string {
 	return RedisKeyPrefix + key
 }
 
-// prefixKeys adds the application prefix to multiple keys
+// prefixKeys 为多个键添加应用程序前缀
 func (s *RedisStore) prefixKeys(keys []string) []string {
 	prefixed := make([]string, len(keys))
 	for i, key := range keys {
@@ -37,12 +37,12 @@ func (s *RedisStore) prefixKeys(keys []string) []string {
 	return prefixed
 }
 
-// Set stores a key-value pair in Redis.
+// Set 在 Redis 中存储键值对。
 func (s *RedisStore) Set(key string, value []byte, ttl time.Duration) error {
 	return s.client.Set(context.Background(), s.prefixKey(key), value, ttl).Err()
 }
 
-// Get retrieves a value from Redis.
+// Get 从 Redis 检索值。
 func (s *RedisStore) Get(key string) ([]byte, error) {
 	val, err := s.client.Get(context.Background(), s.prefixKey(key)).Bytes()
 	if err != nil {
@@ -54,12 +54,12 @@ func (s *RedisStore) Get(key string) ([]byte, error) {
 	return val, nil
 }
 
-// Delete removes a value from Redis.
+// Delete 从 Redis 删除值。
 func (s *RedisStore) Delete(key string) error {
 	return s.client.Del(context.Background(), s.prefixKey(key)).Err()
 }
 
-// Del removes multiple values from Redis.
+// Del 从 Redis 删除多个值。
 func (s *RedisStore) Del(keys ...string) error {
 	if len(keys) == 0 {
 		return nil
@@ -67,7 +67,7 @@ func (s *RedisStore) Del(keys ...string) error {
 	return s.client.Del(context.Background(), s.prefixKeys(keys)...).Err()
 }
 
-// Exists checks if a key exists in Redis.
+// Exists 检查键是否在 Redis 中存在。
 func (s *RedisStore) Exists(key string) (bool, error) {
 	val, err := s.client.Exists(context.Background(), s.prefixKey(key)).Result()
 	if err != nil {
@@ -76,17 +76,17 @@ func (s *RedisStore) Exists(key string) (bool, error) {
 	return val > 0, nil
 }
 
-// SetNX sets a key-value pair in Redis if the key does not already exist.
+// SetNX 如果键不存在则在 Redis 中设置键值对。
 func (s *RedisStore) SetNX(key string, value []byte, ttl time.Duration) (bool, error) {
 	return s.client.SetNX(context.Background(), s.prefixKey(key), value, ttl).Result()
 }
 
-// Close closes the Redis client connection.
+// Close 关闭 Redis 客户端连接。
 func (s *RedisStore) Close() error {
 	return s.client.Close()
 }
 
-// --- HASH operations ---
+// --- HASH 操作 ---
 
 func (s *RedisStore) HSet(key string, values map[string]any) error {
 	return s.client.HSet(context.Background(), s.prefixKey(key), values).Err()
@@ -100,7 +100,7 @@ func (s *RedisStore) HIncrBy(key, field string, incr int64) (int64, error) {
 	return s.client.HIncrBy(context.Background(), s.prefixKey(key), field, incr).Result()
 }
 
-// --- LIST operations ---
+// --- LIST 操作 ---
 
 func (s *RedisStore) LPush(key string, values ...any) error {
 	return s.client.LPush(context.Background(), s.prefixKey(key), values...).Err()
@@ -122,12 +122,12 @@ func (s *RedisStore) Rotate(key string) (string, error) {
 	return val, nil
 }
 
-// LLen returns the length of a list.
+// LLen 返回列表的长度。
 func (s *RedisStore) LLen(key string) (int64, error) {
 	return s.client.LLen(context.Background(), s.prefixKey(key)).Result()
 }
 
-// --- SET operations ---
+// --- SET 操作 ---
 
 func (s *RedisStore) SAdd(key string, members ...any) error {
 	return s.client.SAdd(context.Background(), s.prefixKey(key), members...).Err()
@@ -137,25 +137,29 @@ func (s *RedisStore) SPopN(key string, count int64) ([]string, error) {
 	return s.client.SPopN(context.Background(), s.prefixKey(key), count).Result()
 }
 
-// --- Pipeliner implementation ---
+func (s *RedisStore) SMembers(key string) ([]string, error) {
+	return s.client.SMembers(context.Background(), s.prefixKey(key)).Result()
+}
+
+// --- Pipeliner 实现 ---
 
 type redisPipeliner struct {
 	pipe  redis.Pipeliner
 	store *RedisStore
 }
 
-// HSet adds an HSET command to the pipeline.
+// HSet 将 HSET 命令添加到管道。
 func (p *redisPipeliner) HSet(key string, values map[string]any) {
 	p.pipe.HSet(context.Background(), p.store.prefixKey(key), values)
 }
 
-// Exec executes all commands in the pipeline.
+// Exec 执行管道中的所有命令。
 func (p *redisPipeliner) Exec() error {
 	_, err := p.pipe.Exec(context.Background())
 	return err
 }
 
-// Pipeline creates a new pipeline.
+// Pipeline 创建新管道。
 func (s *RedisStore) Pipeline() Pipeliner {
 	return &redisPipeliner{
 		pipe:  s.client.Pipeline(),
@@ -163,16 +167,16 @@ func (s *RedisStore) Pipeline() Pipeliner {
 	}
 }
 
-// --- Pub/Sub operations ---
+// --- Pub/Sub 操作 ---
 
-// redisSubscription wraps the redis.PubSub to implement the Subscription interface.
+// redisSubscription 包装 redis.PubSub 以实现 Subscription 接口。
 type redisSubscription struct {
 	pubsub  *redis.PubSub
 	msgChan chan *Message
 	once    sync.Once
 }
 
-// Channel returns a channel that receives messages from the subscription.
+// Channel 返回从订阅接收消息的通道。
 func (rs *redisSubscription) Channel() <-chan *Message {
 	rs.once.Do(func() {
 		rs.msgChan = make(chan *Message, 10)
@@ -189,17 +193,17 @@ func (rs *redisSubscription) Channel() <-chan *Message {
 	return rs.msgChan
 }
 
-// Close closes the subscription.
+// Close 关闭订阅。
 func (rs *redisSubscription) Close() error {
 	return rs.pubsub.Close()
 }
 
-// Publish sends a message to a given channel.
+// Publish 向给定频道发送消息。
 func (s *RedisStore) Publish(channel string, message []byte) error {
 	return s.client.Publish(context.Background(), s.prefixKey(channel), message).Err()
 }
 
-// Subscribe listens for messages on a given channel.
+// Subscribe 监听给定频道的消息。
 func (s *RedisStore) Subscribe(channel string) (Subscription, error) {
 	prefixedChannel := s.prefixKey(channel)
 	pubsub := s.client.Subscribe(context.Background(), prefixedChannel)
@@ -212,17 +216,17 @@ func (s *RedisStore) Subscribe(channel string) (Subscription, error) {
 	return &redisSubscription{pubsub: pubsub}, nil
 }
 
-// Clear clears all keys with the GPT-Load prefix in the current Redis database.
-// This method only removes keys that belong to GPT-Load, preserving other applications' data.
+// Clear 清除当前 Redis 数据库中所有具有 GPT-Load 前缀的键。
+// 此方法仅删除属于 GPT-Load 的键，保留其他应用程序的数据。
 func (s *RedisStore) Clear() error {
 	ctx := context.Background()
 
-	// Use SCAN to iterate through all keys with our prefix
+	// 使用 SCAN 迭代所有带有我们前缀的键
 	var cursor uint64
 	var allKeys []string
 
 	for {
-		// Scan for keys with our prefix, 1000 at a time
+		// 扫描带有我们前缀的键，每次 1000 个
 		keys, nextCursor, err := s.client.Scan(ctx, cursor, RedisKeyPrefix+"*", 10000).Result()
 		if err != nil {
 			return fmt.Errorf("failed to scan keys: %w", err)
@@ -231,18 +235,18 @@ func (s *RedisStore) Clear() error {
 		allKeys = append(allKeys, keys...)
 		cursor = nextCursor
 
-		// When cursor is 0, we've completed the full iteration
+		// 当光标为 0 时，我们已完成完整迭代
 		if cursor == 0 {
 			break
 		}
 	}
 
-	// If no keys found, return early
+	// 如果未找到键，提前返回
 	if len(allKeys) == 0 {
 		return nil
 	}
 
-	// Delete keys in batches to avoid overwhelming Redis
+	// 分批删除键以避免压垮 Redis
 	const batchSize = 1000
 	for i := 0; i < len(allKeys); i += batchSize {
 		end := i + batchSize
