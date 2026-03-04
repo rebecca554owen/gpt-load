@@ -41,6 +41,7 @@ export default {
     viewDetails: "查看详情",
     copySuccess: "已复制到剪贴板",
     copyFailed: "复制失败",
+    noContentToCopy: "没有可复制的内容",
   },
   login: {
     title: "GPT Load",
@@ -86,6 +87,7 @@ export default {
     totalTokens: "总量",
     successRequests: "成功请求",
     failedRequests: "失败请求",
+    noData: "暂无数据",
     // 图表时间轴标签
     minutesAgo: "{value}分钟前",
     hoursAgo: "{value}小时前",

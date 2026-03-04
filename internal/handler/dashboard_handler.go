@@ -855,8 +855,8 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 	if len(chartDatasets) == 0 {
 		emptyData := make([]int64, intervals)
 		chartDatasets = append(chartDatasets, models.ChartDataset{
-			Label:    "",
-			LabelKey: "",
+			Label:    i18n.Message(c, "dashboard.noData"),
+			LabelKey: "dashboard.noData",
 			Data:     emptyData,
 		})
 	}

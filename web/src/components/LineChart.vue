@@ -94,6 +94,9 @@ const { hoveredPoint, tooltipData, tooltipPosition, handleMouseMove, hideTooltip
   );
 
 const translateLabel = (label: string): string => {
+  if (!label || label.trim() === "") {
+    return label;
+  }
   if (/[一-龥]/.test(label)) {
     return label;
   }

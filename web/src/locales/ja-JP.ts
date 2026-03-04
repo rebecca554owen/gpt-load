@@ -41,6 +41,7 @@ export default {
     viewDetails: "詳細を表示",
     copySuccess: "クリップボードにコピーしました",
     copyFailed: "コピーに失敗しました",
+    noContentToCopy: "コピーするコンテンツがありません",
   },
   login: {
     title: "GPT Load",

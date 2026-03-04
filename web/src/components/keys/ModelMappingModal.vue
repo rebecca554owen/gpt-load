@@ -307,15 +307,13 @@ function handleSubGroupChange(targetId: string, subGroupId: number) {
 // Edit model
 function editModel(target: TargetItem, event: MouseEvent) {
   target.editingModel = target.model;
-  // Use nextTick to ensure DOM updates before focusing
   nextTick(() => {
-    // Use event target element to find corresponding input
     const targetElement = event.currentTarget as HTMLElement;
     const input = targetElement?.querySelector(".model-config-input") as HTMLInputElement;
     if (input) {
       input.focus();
-      // Select all text for easy editing
-      input.select();
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
     }
   });
 }

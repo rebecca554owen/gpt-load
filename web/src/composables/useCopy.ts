@@ -12,11 +12,28 @@ export function useCopy() {
     errorKey: string = "common.copyFailed",
     params?: Record<string, unknown>
   ): Promise<boolean> {
+    if (!content || content.trim() === "") {
+      message.warning(t("common.noContentToCopy"));
+      console.warn("[useCopy] Attempted to copy empty content");
+      return false;
+    }
+
+    const preview = content.length > 50 ? content.slice(0, 50) + "..." : content;
+    console.log(`[useCopy] Attempting to copy: "${preview}" (${content.length} chars)`);
+
     const success = await copy(content);
     if (success) {
-      message.success(params ? t(successKey, params) : t(successKey));
+      const successMessage = params
+        ? t(successKey, params)
+        : t(successKey);
+      message.success(`${successMessage}: ${preview}`);
+      console.log(`[useCopy] Successfully copied: "${preview}"`);
     } else {
-      message.error(params ? t(errorKey, params) : t(errorKey));
+      const errorMessage = params
+        ? t(errorKey, params)
+        : t(errorKey);
+      message.error(`${errorMessage}: ${preview}`);
+      console.error(`[useCopy] Failed to copy: "${preview}"`);
     }
     return success;
   }
