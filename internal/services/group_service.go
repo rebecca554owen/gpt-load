@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net/http"
@@ -19,19 +18,21 @@ import (
 	"gpt-load/internal/models"
 	"gpt-load/internal/utils"
 
+	"github.com/goccy/go-json"
+
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// I18nError represents an error that carries translation metadata.
+// I18nError 表示携带翻译元数据的错误。
 type I18nError struct {
 	APIError  *app_errors.APIError
 	MessageID string
 	Template  map[string]any
 }
 
-// Error implements the error interface.
+// Error 实现 error 接口。
 func (e *I18nError) Error() string {
 	if e == nil || e.APIError == nil {
 		return ""
@@ -39,7 +40,7 @@ func (e *I18nError) Error() string {
 	return e.APIError.Error()
 }
 
-// NewI18nError is a helper to create an I18n-enabled error.
+// NewI18nError 是创建支持 i18n 的错误的辅助函数。
 func NewI18nError(apiErr *app_errors.APIError, msgID string, template map[string]any) *I18nError {
 	return &I18nError{
 		APIError:  apiErr,
@@ -48,7 +49,7 @@ func NewI18nError(apiErr *app_errors.APIError, msgID string, template map[string
 	}
 }
 
-// GroupService handles business logic for group operations.
+// GroupService 处理组操作的业务逻辑。
 type GroupService struct {
 	db                    *gorm.DB
 	settingsManager       *config.SystemSettingsManager
@@ -60,7 +61,7 @@ type GroupService struct {
 	channelRegistry       []string
 }
 
-// NewGroupService constructs a GroupService.
+// NewGroupService 构造一个 GroupService。
 func NewGroupService(
 	db *gorm.DB,
 	settingsManager *config.SystemSettingsManager,
@@ -82,7 +83,7 @@ func NewGroupService(
 	}
 }
 
-// GroupCreateParams captures all fields required to create a group.
+// GroupCreateParams 捕获创建组所需的所有字段。
 type GroupCreateParams struct {
 	Name                string
 	DisplayName         string
@@ -100,9 +101,10 @@ type GroupCreateParams struct {
 	HeaderRules         []models.HeaderRule
 	ProxyKeys           string
 	SubGroups           []SubGroupInput
+	ModelMappings       json.RawMessage
 }
 
-// GroupUpdateParams captures updatable fields for a group.
+// GroupUpdateParams 捕获组的可更新字段。
 type GroupUpdateParams struct {
 	Name                *string
 	DisplayName         *string
@@ -118,27 +120,43 @@ type GroupUpdateParams struct {
 	ParamOverrides      map[string]any
 	ModelRedirectRules  map[string]string
 	ModelRedirectStrict *bool
+	ModelMappingStrict  *bool
 	Config              map[string]any
 	HeaderRules         *[]models.HeaderRule
 	ProxyKeys           *string
 	SubGroups           *[]SubGroupInput
+	ModelMappings       json.RawMessage
+	HasModelMappings    bool
 }
 
-// KeyStats captures aggregated API key statistics for a group.
+// ModelMappingTargetInput 捕获模型别名映射中的单个目标组。
+type ModelMappingTargetInput struct {
+	SubGroupID uint   `json:"sub_group_id"`
+	Weight     int    `json:"weight"`
+	Model      string `json:"model"`
+}
+
+// ModelMappingInput 捕获模型别名与其候选子组之间的映射。
+type ModelMappingInput struct {
+	Model   string                    `json:"model"`
+	Targets []ModelMappingTargetInput `json:"targets"`
+}
+
+// KeyStats 捕获组的聚合 API 密钥统计信息。
 type KeyStats struct {
 	TotalKeys   int64 `json:"total_keys"`
 	ActiveKeys  int64 `json:"active_keys"`
 	InvalidKeys int64 `json:"invalid_keys"`
 }
 
-// RequestStats captures request success and failure ratios over a time window.
+// RequestStats 捕获时间窗口内的请求成功和失败比率。
 type RequestStats struct {
 	TotalRequests  int64   `json:"total_requests"`
 	FailedRequests int64   `json:"failed_requests"`
 	FailureRate    float64 `json:"failure_rate"`
 }
 
-// GroupStats aggregates all per-group metrics for dashboard usage.
+// GroupStats 聚合仪表盘使用的所有按组指标。
 type GroupStats struct {
 	KeyStats    KeyStats     `json:"key_stats"`
 	Stats24Hour RequestStats `json:"stats_24_hour"`
@@ -146,7 +164,7 @@ type GroupStats struct {
 	Stats30Day  RequestStats `json:"stats_30_day"`
 }
 
-// ConfigOption describes a configurable override exposed to clients.
+// ConfigOption 描述向客户端公开的可配置覆盖项。
 type ConfigOption struct {
 	Key          string
 	Name         string
@@ -154,7 +172,7 @@ type ConfigOption struct {
 	DefaultValue any
 }
 
-// CreateGroup validates and persists a new group.
+// CreateGroup 验证并持久化新组。
 func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams) (*models.Group, error) {
 	name := strings.TrimSpace(params.Name)
 	if !isValidGroupName(name) {
@@ -214,12 +232,12 @@ func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams
 		headerRulesJSON = datatypes.JSON("[]")
 	}
 
-	// Validate model redirect rules for aggregate groups
+	// 验证聚合组的模型重定向规则
 	if groupType == "aggregate" && len(params.ModelRedirectRules) > 0 {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
 	}
 
-	// Validate model redirect rules format
+	// 验证模型重定向规则格式
 	if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
 	}
@@ -242,6 +260,12 @@ func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams
 		ProxyKeys:           strings.TrimSpace(params.ProxyKeys),
 	}
 
+	modelMappings, err := s.processModelMappings(ctx, 0, groupType, params.ModelMappings, nil)
+	if err != nil {
+		return nil, err
+	}
+	group.ModelMappings = modelMappings
+
 	tx := s.db.WithContext(ctx).Begin()
 	if err := tx.Error; err != nil {
 		return nil, app_errors.ErrDatabase
@@ -263,17 +287,29 @@ func (s *GroupService) CreateGroup(ctx context.Context, params GroupCreateParams
 	return &group, nil
 }
 
-// ListGroups returns all groups without sub-group relations.
+// ListGroups 返回所有组，不包括子组关系。
 func (s *GroupService) ListGroups(ctx context.Context) ([]models.Group, error) {
 	var groups []models.Group
 	if err := s.db.WithContext(ctx).Order("sort asc, id desc").Find(&groups).Error; err != nil {
 		return nil, app_errors.ParseDBError(err)
 	}
 
+	// 解析每个组的模型映射 JSON
+	for i := range groups {
+		if len(groups[i].ModelMappings) > 0 {
+			if err := json.Unmarshal(groups[i].ModelMappings, &groups[i].ModelMappingList); err != nil {
+				logrus.WithError(err).WithField("group_name", groups[i].Name).Warn("Failed to parse model mappings for group")
+				groups[i].ModelMappingList = nil
+			}
+		} else {
+			groups[i].ModelMappingList = nil
+		}
+	}
+
 	return groups, nil
 }
 
-// UpdateGroup validates and updates an existing group.
+// UpdateGroup 验证并更新现有组。
 func (s *GroupService) UpdateGroup(ctx context.Context, id uint, params GroupUpdateParams) (*models.Group, error) {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, id).Error; err != nil {
@@ -286,129 +322,8 @@ func (s *GroupService) UpdateGroup(ctx context.Context, id uint, params GroupUpd
 	}
 	defer tx.Rollback()
 
-	if params.Name != nil {
-		cleanedName := strings.TrimSpace(*params.Name)
-		if !isValidGroupName(cleanedName) {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_group_name", nil)
-		}
-		group.Name = cleanedName
-	}
-
-	if params.DisplayName != nil {
-		group.DisplayName = strings.TrimSpace(*params.DisplayName)
-	}
-
-	if params.Description != nil {
-		group.Description = strings.TrimSpace(*params.Description)
-	}
-
-	if params.HasUpstreams {
-		cleanedUpstreams, err := s.validateAndCleanUpstreams(params.Upstreams)
-		if err != nil {
-			return nil, err
-		}
-		group.Upstreams = cleanedUpstreams
-	}
-
-	// Check if this group is used as a sub-group in aggregate groups before allowing critical changes
-	if group.GroupType != "aggregate" && (params.ChannelType != nil || params.ValidationEndpoint != nil) {
-		count, err := s.aggregateGroupService.CountAggregateGroupsUsingSubGroup(ctx, group.ID)
-		if err != nil {
-			return nil, err
-		}
-
-		if count > 0 {
-			// Check if ChannelType is being changed
-			if params.ChannelType != nil {
-				cleanedChannelType := strings.TrimSpace(*params.ChannelType)
-				if group.ChannelType != cleanedChannelType {
-					return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
-						map[string]any{"count": count})
-				}
-			}
-
-			// Check if ValidationEndpoint is being changed
-			if params.ValidationEndpoint != nil {
-				cleanedValidationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
-				if group.ValidationEndpoint != cleanedValidationEndpoint {
-					return nil, NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
-						map[string]any{"count": count})
-				}
-			}
-		}
-	}
-
-	if params.ChannelType != nil && group.GroupType != "aggregate" {
-		cleanedChannelType := strings.TrimSpace(*params.ChannelType)
-		if !s.isValidChannelType(cleanedChannelType) {
-			supported := strings.Join(s.channelRegistry, ", ")
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_channel_type", map[string]any{"types": supported})
-		}
-		group.ChannelType = cleanedChannelType
-	}
-
-	if params.Sort != nil {
-		group.Sort = *params.Sort
-	}
-
-	if params.HasTestModel {
-		cleanedTestModel := strings.TrimSpace(params.TestModel)
-		if cleanedTestModel == "" {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.test_model_empty", nil)
-		}
-		group.TestModel = cleanedTestModel
-	}
-
-	if params.ParamOverrides != nil {
-		group.ParamOverrides = params.ParamOverrides
-	}
-
-	// Validate model redirect rules for aggregate groups
-	if group.GroupType == "aggregate" && params.ModelRedirectRules != nil && len(params.ModelRedirectRules) > 0 {
-		return nil, NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
-	}
-
-	// Validate model redirect rules format
-	if params.ModelRedirectRules != nil {
-		if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
-		}
-		group.ModelRedirectRules = convertToJSONMap(params.ModelRedirectRules)
-	}
-
-	if params.ModelRedirectStrict != nil {
-		group.ModelRedirectStrict = *params.ModelRedirectStrict
-	}
-
-	if params.ValidationEndpoint != nil {
-		validationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
-		if !isValidValidationEndpoint(validationEndpoint) {
-			return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_test_path", nil)
-		}
-		group.ValidationEndpoint = validationEndpoint
-	}
-
-	if params.Config != nil {
-		cleanedConfig, err := s.validateAndCleanConfig(params.Config)
-		if err != nil {
-			return nil, err
-		}
-		group.Config = cleanedConfig
-	}
-
-	if params.ProxyKeys != nil {
-		group.ProxyKeys = strings.TrimSpace(*params.ProxyKeys)
-	}
-
-	if params.HeaderRules != nil {
-		headerRulesJSON, err := s.normalizeHeaderRules(*params.HeaderRules)
-		if err != nil {
-			return nil, err
-		}
-		if headerRulesJSON == nil {
-			headerRulesJSON = datatypes.JSON("[]")
-		}
-		group.HeaderRules = headerRulesJSON
+	if err := s.validateAndUpdateGroupFields(ctx, &group, params, tx); err != nil {
+		return nil, err
 	}
 
 	if err := tx.Save(&group).Error; err != nil {
@@ -426,8 +341,150 @@ func (s *GroupService) UpdateGroup(ctx context.Context, id uint, params GroupUpd
 	return &group, nil
 }
 
-// DeleteGroup removes a group and associated resources.
-func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
+// validateAndUpdateGroupFields 根据提供的参数验证并更新组字段。
+func (s *GroupService) validateAndUpdateGroupFields(ctx context.Context, group *models.Group, params GroupUpdateParams, tx *gorm.DB) error {
+	if params.Name != nil {
+		cleanedName := strings.TrimSpace(*params.Name)
+		if !isValidGroupName(cleanedName) {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_group_name", nil)
+		}
+		group.Name = cleanedName
+	}
+
+	if params.DisplayName != nil {
+		group.DisplayName = strings.TrimSpace(*params.DisplayName)
+	}
+
+	if params.Description != nil {
+		group.Description = strings.TrimSpace(*params.Description)
+	}
+
+	if params.HasUpstreams {
+		cleanedUpstreams, err := s.validateAndCleanUpstreams(params.Upstreams)
+		if err != nil {
+			return err
+		}
+		group.Upstreams = cleanedUpstreams
+	}
+
+	if err := s.validateChannelTypeUpdate(ctx, group, params, tx); err != nil {
+		return err
+	}
+
+	if params.Sort != nil {
+		group.Sort = *params.Sort
+	}
+
+	if params.HasTestModel {
+		cleanedTestModel := strings.TrimSpace(params.TestModel)
+		if cleanedTestModel == "" {
+			return NewI18nError(app_errors.ErrValidation, "validation.test_model_empty", nil)
+		}
+		group.TestModel = cleanedTestModel
+	}
+
+	if params.ParamOverrides != nil {
+		group.ParamOverrides = params.ParamOverrides
+	}
+
+	if err := s.validateModelRedirectRulesForUpdate(group, params); err != nil {
+		return err
+	}
+
+	if params.ValidationEndpoint != nil {
+		validationEndpoint := strings.TrimSpace(*params.ValidationEndpoint)
+		if !isValidValidationEndpoint(validationEndpoint) {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_test_path", nil)
+		}
+		group.ValidationEndpoint = validationEndpoint
+	}
+
+	if params.Config != nil {
+		cleanedConfig, err := s.validateAndCleanConfig(params.Config)
+		if err != nil {
+			return err
+		}
+		group.Config = cleanedConfig
+	}
+
+	if params.ProxyKeys != nil {
+		group.ProxyKeys = strings.TrimSpace(*params.ProxyKeys)
+	}
+
+	if params.HeaderRules != nil {
+		headerRulesJSON, err := s.normalizeHeaderRules(*params.HeaderRules)
+		if err != nil {
+			return err
+		}
+		if headerRulesJSON == nil {
+			headerRulesJSON = datatypes.JSON("[]")
+		}
+		group.HeaderRules = headerRulesJSON
+	}
+
+	if params.ModelMappingStrict != nil {
+		group.ModelMappingStrict = *params.ModelMappingStrict
+	}
+
+	if params.HasModelMappings {
+		modelMappings, err := s.processModelMappings(ctx, group.ID, group.GroupType, params.ModelMappings, tx)
+		if err != nil {
+			return err
+		}
+		group.ModelMappings = modelMappings
+	}
+
+	return nil
+}
+
+// validateChannelTypeUpdate 验证非聚合组的通道类型更新。
+func (s *GroupService) validateChannelTypeUpdate(ctx context.Context, group *models.Group, params GroupUpdateParams, tx *gorm.DB) error {
+	if group.GroupType == "aggregate" || params.ChannelType == nil {
+		return nil
+	}
+
+	count, err := s.aggregateGroupService.CountAggregateGroupsUsingSubGroupTx(ctx, group.ID, tx)
+	if err != nil {
+		return err
+	}
+
+	cleanedChannelType := strings.TrimSpace(*params.ChannelType)
+	if count > 0 && group.ChannelType != cleanedChannelType {
+		return NewI18nError(app_errors.ErrValidation, "validation.sub_group_referenced_cannot_modify",
+			map[string]any{"count": count})
+	}
+
+	if !s.isValidChannelType(cleanedChannelType) {
+		supported := strings.Join(s.channelRegistry, ", ")
+		return NewI18nError(app_errors.ErrValidation, "validation.invalid_channel_type", map[string]any{"types": supported})
+	}
+
+	group.ChannelType = cleanedChannelType
+	return nil
+}
+
+// validateModelRedirectRulesForUpdate 在组更新期间验证模型重定向规则。
+func (s *GroupService) validateModelRedirectRulesForUpdate(group *models.Group, params GroupUpdateParams) error {
+	if group.GroupType == "aggregate" && params.ModelRedirectRules != nil && len(params.ModelRedirectRules) > 0 {
+		return NewI18nError(app_errors.ErrValidation, "validation.aggregate_no_model_redirect", nil)
+	}
+
+	if params.ModelRedirectRules != nil {
+		if err := validateModelRedirectRules(params.ModelRedirectRules); err != nil {
+			return NewI18nError(app_errors.ErrValidation, "validation.invalid_model_redirect", map[string]any{"error": err.Error()})
+		}
+		group.ModelRedirectRules = convertToJSONMap(params.ModelRedirectRules)
+	}
+
+	if params.ModelRedirectStrict != nil {
+		group.ModelRedirectStrict = *params.ModelRedirectStrict
+	}
+
+	return nil
+}
+
+// DeleteGroup 删除组及关联资源。
+func (s *GroupService) DeleteGroup(ctx context.Context, id uint) (err error) {
 	var apiKeys []models.APIKey
 	if err := s.db.WithContext(ctx).Where("group_id = ?", id).Find(&apiKeys).Error; err != nil {
 		return app_errors.ParseDBError(err)
@@ -439,11 +496,11 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	}
 
 	tx := s.db.WithContext(ctx).Begin()
-	if err := tx.Error; err != nil {
+	if tx.Error != nil {
 		return app_errors.ErrDatabase
 	}
 	defer func() {
-		if tx != nil {
+		if err != nil {
 			tx.Rollback()
 		}
 	}()
@@ -451,6 +508,11 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	var group models.Group
 	if err := tx.First(&group, id).Error; err != nil {
 		return app_errors.ParseDBError(err)
+	}
+
+	// 清理所有引用该组的聚合组的模型映射（必须在删除 GroupSubGroup 记录之前执行）
+	if err := s.aggregateGroupService.CleanupModelMappingsForDeletedSubGroup(ctx, tx, id); err != nil {
+		return fmt.Errorf("failed to cleanup model mappings: %w", err)
 	}
 
 	if err := tx.Where("group_id = ? OR sub_group_id = ?", id, id).Delete(&models.GroupSubGroup{}).Error; err != nil {
@@ -478,7 +540,6 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	if err := tx.Commit().Error; err != nil {
 		return app_errors.ErrDatabase
 	}
-	tx = nil
 
 	if err := s.groupManager.Invalidate(); err != nil {
 		logrus.WithContext(ctx).WithError(err).Error("failed to invalidate group cache")
@@ -487,7 +548,7 @@ func (s *GroupService) DeleteGroup(ctx context.Context, id uint) error {
 	return nil
 }
 
-// CopyGroup duplicates a group and optionally copies active keys.
+// CopyGroup 复制组，可选择复制活动密钥。
 func (s *GroupService) CopyGroup(ctx context.Context, sourceGroupID uint, copyKeysOption string) (*models.Group, error) {
 	option := strings.TrimSpace(copyKeysOption)
 	if option == "" {
@@ -574,7 +635,7 @@ func (s *GroupService) CopyGroup(ctx context.Context, sourceGroupID uint, copyKe
 	return &newGroup, nil
 }
 
-// GetGroupStats returns aggregated usage statistics for a group.
+// GetGroupStats 返回组的聚合使用统计信息。
 func (s *GroupService) GetGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
@@ -589,7 +650,7 @@ func (s *GroupService) GetGroupStats(ctx context.Context, groupID uint) (*GroupS
 	return s.getStandardGroupStats(ctx, groupID)
 }
 
-// queryGroupHourlyStats queries aggregated hourly statistics from group_hourly_stats table
+// queryGroupHourlyStats 从 group_hourly_stats 表查询聚合的每小时统计信息
 func (s *GroupService) queryGroupHourlyStats(ctx context.Context, groupID uint, hours int) (RequestStats, error) {
 	var result struct {
 		SuccessCount int64
@@ -598,7 +659,7 @@ func (s *GroupService) queryGroupHourlyStats(ctx context.Context, groupID uint, 
 
 	now := time.Now()
 	currentHour := now.Truncate(time.Hour)
-	endTime := currentHour.Add(time.Hour) // Include current hour
+	endTime := currentHour.Add(time.Hour) // 包含当前小时
 	startTime := endTime.Add(-time.Duration(hours) * time.Hour)
 
 	if err := s.db.WithContext(ctx).Model(&models.GroupHourlyStat{}).
@@ -611,7 +672,7 @@ func (s *GroupService) queryGroupHourlyStats(ctx context.Context, groupID uint, 
 	return calculateRequestStats(result.SuccessCount+result.FailureCount, result.FailureCount), nil
 }
 
-// fetchKeyStats retrieves API key statistics for a group
+// fetchKeyStats 获取组的 API 密钥统计信息
 func (s *GroupService) fetchKeyStats(ctx context.Context, groupID uint) (KeyStats, error) {
 	var totalKeys, activeKeys int64
 
@@ -634,13 +695,13 @@ func (s *GroupService) fetchKeyStats(ctx context.Context, groupID uint) (KeyStat
 	}, nil
 }
 
-// fetchRequestStats retrieves request statistics for multiple time periods
+// fetchRequestStats 获取多个时间段的请求统计信息
 func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stats *GroupStats) []error {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	var errs []error
 
-	// Define time periods and their corresponding setters
+	// 定义时间段及其对应的设置函数
 	timePeriods := []struct {
 		hours  int
 		name   string
@@ -651,7 +712,7 @@ func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stat
 		{30 * 24, "30-day", func(r RequestStats) { stats.Stats30Day = r }},
 	}
 
-	// Fetch statistics for each time period concurrently
+	// 并发获取各时间段的统计信息
 	for _, period := range timePeriods {
 		wg.Add(1)
 		go func(hours int, name string, setter func(RequestStats)) {
@@ -676,14 +737,14 @@ func (s *GroupService) fetchRequestStats(ctx context.Context, groupID uint, stat
 }
 
 func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
-	stats := &GroupStats{}
+	stats := new(GroupStats)
 	var allErrors []error
 
-	// Fetch key statistics (only for standard groups)
+	// 获取密钥统计信息（仅标准组需要）
 	keyStats, err := s.fetchKeyStats(ctx, groupID)
 	if err != nil {
 		allErrors = append(allErrors, err)
-		// Log error but continue to fetch request stats
+		// 记录错误但继续获取请求统计
 		logrus.WithContext(ctx).WithError(err).Warn("failed to fetch key stats, continuing with request stats")
 	} else {
 		stats.KeyStats = keyStats
@@ -694,10 +755,10 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 		allErrors = append(allErrors, errs...)
 	}
 
-	// Handle errors
+	// 处理错误
 	if len(allErrors) > 0 {
 		logrus.WithContext(ctx).WithError(allErrors[0]).Error("errors occurred while fetching group stats")
-		// Return partial stats if we have some data
+		// 如果有部分数据，返回部分统计
 		if stats.Stats24Hour.TotalRequests > 0 || stats.Stats7Day.TotalRequests > 0 || stats.Stats30Day.TotalRequests > 0 {
 			return stats, nil
 		}
@@ -708,12 +769,12 @@ func (s *GroupService) getStandardGroupStats(ctx context.Context, groupID uint) 
 }
 
 func (s *GroupService) getAggregateGroupStats(ctx context.Context, groupID uint) (*GroupStats, error) {
-	stats := &GroupStats{}
+	stats := new(GroupStats)
 
-	// Aggregate groups only need request statistics, not key statistics
+	// 聚合组只需要请求统计，不需要密钥统计
 	if errs := s.fetchRequestStats(ctx, groupID, stats); len(errs) > 0 {
 		logrus.WithContext(ctx).WithError(errs[0]).Error("errors occurred while fetching aggregate group stats")
-		// Return partial stats if we have some data
+		// 如果有部分数据，返回部分统计
 		if stats.Stats24Hour.TotalRequests > 0 || stats.Stats7Day.TotalRequests > 0 || stats.Stats30Day.TotalRequests > 0 {
 			return stats, nil
 		}
@@ -723,7 +784,7 @@ func (s *GroupService) getAggregateGroupStats(ctx context.Context, groupID uint)
 	return stats, nil
 }
 
-// GetGroupConfigOptions returns metadata describing available overrides.
+// GetGroupConfigOptions 返回描述可用覆盖项的元数据。
 func (s *GroupService) GetGroupConfigOptions() ([]ConfigOption, error) {
 	defaultSettings := utils.DefaultSystemSettings()
 	settingDefinitions := utils.GenerateSettingsMetadata(&defaultSettings)
@@ -775,7 +836,7 @@ func (s *GroupService) GetGroupConfigOptions() ([]ConfigOption, error) {
 	return options, nil
 }
 
-// validateAndCleanConfig verifies GroupConfig overrides.
+// validateAndCleanConfig 验证 GroupConfig 覆盖项。
 func (s *GroupService) validateAndCleanConfig(configMap map[string]any) (map[string]any, error) {
 	if configMap == nil {
 		return nil, nil
@@ -826,7 +887,7 @@ func (s *GroupService) validateAndCleanConfig(configMap map[string]any) (map[str
 	return finalMap, nil
 }
 
-// normalizeHeaderRules deduplicates and normalises header rules.
+// normalizeHeaderRules 去重并规范化头部规则。
 func (s *GroupService) normalizeHeaderRules(rules []models.HeaderRule) (datatypes.JSON, error) {
 	if len(rules) == 0 {
 		return nil, nil
@@ -860,7 +921,7 @@ func (s *GroupService) normalizeHeaderRules(rules []models.HeaderRule) (datatype
 	return datatypes.JSON(headerRulesBytes), nil
 }
 
-// validateAndCleanUpstreams validates upstream definitions.
+// validateAndCleanUpstreams 验证上游定义。
 func (s *GroupService) validateAndCleanUpstreams(upstreams json.RawMessage) (datatypes.JSON, error) {
 	if len(upstreams) == 0 {
 		return nil, NewI18nError(app_errors.ErrValidation, "validation.invalid_upstreams", map[string]any{"error": "upstreams field is required"})
@@ -945,7 +1006,7 @@ func (s *GroupService) generateUniqueGroupName(ctx context.Context, baseName str
 	return copyName
 }
 
-// isValidGroupName validates the group name.
+// isValidGroupName 验证组名。
 func isValidGroupName(name string) bool {
 	if name == "" {
 		return false
@@ -954,7 +1015,7 @@ func isValidGroupName(name string) bool {
 	return match
 }
 
-// isValidValidationEndpoint validates custom validation endpoint path.
+// isValidValidationEndpoint 验证自定义验证端点路径。
 func isValidValidationEndpoint(endpoint string) bool {
 	if endpoint == "" {
 		return true
@@ -968,7 +1029,7 @@ func isValidValidationEndpoint(endpoint string) bool {
 	return true
 }
 
-// isValidChannelType checks channel type against registered channels.
+// isValidChannelType 根据已注册的通道检查通道类型。
 func (s *GroupService) isValidChannelType(channelType string) bool {
 	for _, t := range s.channelRegistry {
 		if t == channelType {
@@ -978,7 +1039,7 @@ func (s *GroupService) isValidChannelType(channelType string) bool {
 	return false
 }
 
-// convertToJSONMap converts a map[string]string to datatypes.JSONMap
+// convertToJSONMap 将 map[string]string 转换为 datatypes.JSONMap
 func convertToJSONMap(input map[string]string) datatypes.JSONMap {
 	if len(input) == 0 {
 		return datatypes.JSONMap{}
@@ -991,7 +1052,175 @@ func convertToJSONMap(input map[string]string) datatypes.JSONMap {
 	return result
 }
 
-// validateModelRedirectRules validates the format and content of model redirect rules
+// subGroupMapBuilder 为聚合组构建有效子组 ID 的映射
+func (s *GroupService) subGroupMapBuilder(ctx context.Context, groupID uint, tx *gorm.DB) (map[uint]struct{}, error) {
+	var subGroups []models.GroupSubGroup
+	db := s.db
+	if tx != nil {
+		db = tx
+	}
+	if err := db.WithContext(ctx).Where("group_id = ?", groupID).Find(&subGroups).Error; err != nil {
+		return nil, app_errors.ParseDBError(err)
+	}
+
+	subGroupMap := make(map[uint]struct{}, len(subGroups))
+	for _, sg := range subGroups {
+		subGroupMap[sg.SubGroupID] = struct{}{}
+	}
+	return subGroupMap, nil
+}
+
+// validateModelAlias 验证模型别名并检查重复
+func validateModelAlias(alias string, aliasSet map[string]struct{}) (string, string, error) {
+	trimmed := strings.TrimSpace(alias)
+	if trimmed == "" {
+		return "", "", NewI18nError(app_errors.ErrValidation, "validation.model_mapping_alias_required", nil)
+	}
+
+	lowerAlias := strings.ToLower(trimmed)
+	if _, exists := aliasSet[lowerAlias]; exists {
+		return "", "", NewI18nError(app_errors.ErrValidation, "validation.model_mapping_duplicate_alias", map[string]any{"model": trimmed})
+	}
+
+	return trimmed, lowerAlias, nil
+}
+
+// validateAndNormalizeTargets 验证并规范化模型映射的所有目标
+func (s *GroupService) validateAndNormalizeTargets(
+	ctx context.Context,
+	groupID uint,
+	alias string,
+	targets []ModelMappingTargetInput,
+	subGroupMap map[uint]struct{},
+) ([]models.ModelMappingTarget, error) {
+	if len(targets) == 0 {
+		return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_targets_required", map[string]any{"model": alias})
+	}
+
+	normalizedTargets := make([]models.ModelMappingTarget, 0, len(targets))
+	targetSet := make(map[string]struct{}, len(targets))
+
+	for _, target := range targets {
+		if _, ok := subGroupMap[target.SubGroupID]; !ok {
+			if groupID == 0 {
+				return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_invalid_sub_group",
+					map[string]any{"model": alias, "sub_group_id": target.SubGroupID})
+			}
+			logrus.WithContext(ctx).WithFields(logrus.Fields{
+				"group_id":             groupID,
+				"model_alias":          alias,
+				"invalid_sub_group_id": target.SubGroupID,
+			}).Warn("Model mapping target references invalid sub-group, allowing save for manual fix")
+		}
+
+		if target.Weight < 0 {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_invalid_weight",
+				map[string]any{"model": alias, "sub_group_id": target.SubGroupID})
+		}
+
+		modelName := strings.TrimSpace(target.Model)
+		if modelName == "" {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_target_model_required",
+				map[string]any{"model": alias})
+		}
+
+		compositeKey := fmt.Sprintf("%d:%s", target.SubGroupID, strings.ToLower(modelName))
+		if _, duplicated := targetSet[compositeKey]; duplicated {
+			return nil, NewI18nError(app_errors.ErrValidation, "validation.model_mapping_duplicate_target",
+				map[string]any{"model": alias})
+		}
+
+		normalizedTargets = append(normalizedTargets, models.ModelMappingTarget{
+			SubGroupID: target.SubGroupID,
+			Weight:     target.Weight,
+			Model:      modelName,
+		})
+		targetSet[compositeKey] = struct{}{}
+	}
+
+	return normalizedTargets, nil
+}
+
+// buildModelMappingList 创建规范化模型映射列表
+func (s *GroupService) buildModelMappingList(
+	ctx context.Context,
+	groupID uint,
+	inputs []ModelMappingInput,
+	subGroupMap map[uint]struct{},
+) ([]models.ModelMapping, error) {
+	result := make([]models.ModelMapping, 0, len(inputs))
+	aliasSet := make(map[string]struct{}, len(inputs))
+
+	for _, mapping := range inputs {
+		alias, lowerAlias, err := validateModelAlias(mapping.Model, aliasSet)
+		if err != nil {
+			return nil, err
+		}
+
+		normalizedTargets, err := s.validateAndNormalizeTargets(ctx, groupID, alias, mapping.Targets, subGroupMap)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, models.ModelMapping{
+			Model:   alias,
+			Targets: normalizedTargets,
+		})
+		aliasSet[lowerAlias] = struct{}{}
+	}
+
+	return result, nil
+}
+
+// processModelMappings 根据组类型验证并规范化模型映射
+// 对于聚合组，它解析并规范化映射。
+// 对于非聚合组，它存储原始 JSON。
+// groupID 是组的 ID（对于尚未创建的组使用 0）。
+func (s *GroupService) processModelMappings(ctx context.Context, groupID uint, groupType string, modelMappingsJSON json.RawMessage, tx *gorm.DB) (datatypes.JSON, error) {
+	if groupType == "aggregate" && modelMappingsJSON != nil {
+		var modelMappingInputs []ModelMappingInput
+		if err := json.Unmarshal(modelMappingsJSON, &modelMappingInputs); err != nil {
+			return nil, app_errors.NewAPIError(app_errors.ErrInvalidJSON, fmt.Sprintf("invalid model mappings format: %v", err))
+		}
+
+		normalizedMappings, err := s.normalizeModelMappings(ctx, groupID, modelMappingInputs, tx)
+		if err != nil {
+			return nil, err
+		}
+		return normalizedMappings, nil
+	}
+
+	if modelMappingsJSON != nil {
+		return datatypes.JSON(modelMappingsJSON), nil
+	}
+
+	return datatypes.JSON("[]"), nil
+}
+
+// normalizeModelMappings 验证并规范化聚合组的模型映射
+func (s *GroupService) normalizeModelMappings(ctx context.Context, groupID uint, inputs []ModelMappingInput, tx *gorm.DB) (datatypes.JSON, error) {
+	if len(inputs) == 0 {
+		return datatypes.JSON("[]"), nil
+	}
+
+	subGroupMap, err := s.subGroupMapBuilder(ctx, groupID, tx)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.buildModelMappingList(ctx, groupID, inputs, subGroupMap)
+	if err != nil {
+		return nil, err
+	}
+
+	bytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, app_errors.NewAPIError(app_errors.ErrInternalServer, fmt.Sprintf("failed to marshal model mappings: %v", err))
+	}
+
+	return datatypes.JSON(bytes), nil
+}
+// validateModelRedirectRules 验证模型重定向规则的格式和内容
 func validateModelRedirectRules(rules map[string]string) error {
 	if len(rules) == 0 {
 		return nil
