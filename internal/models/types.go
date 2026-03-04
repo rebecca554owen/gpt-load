@@ -151,7 +151,7 @@ const (
 // RequestLog 对应 request_logs 表
 type RequestLog struct {
 	ID              string    `gorm:"type:varchar(36);primaryKey" json:"id"`
-	Timestamp       time.Time `gorm:"not null;index:idx_request_logs_timestamp_request_type,priority:1" json:"timestamp"`
+	Timestamp       time.Time `gorm:"not null;index" json:"timestamp"`
 	GroupID         uint      `gorm:"not null;index" json:"group_id"`
 	GroupName       string    `gorm:"type:varchar(255);index" json:"group_name"`
 	ParentGroupID   uint      `gorm:"index" json:"parent_group_id"`
@@ -167,7 +167,7 @@ type RequestLog struct {
 	Duration        int64     `gorm:"not null" json:"duration_ms"`
 	ErrorMessage    string    `gorm:"type:text" json:"error_message"`
 	UserAgent       string    `gorm:"type:varchar(512)" json:"user_agent"`
-	RequestType     string    `gorm:"type:varchar(20);not null;default:'final';index:idx_request_logs_timestamp_request_type,priority:2" json:"request_type"`
+	RequestType     string    `gorm:"type:varchar(20);not null;default:'final';index" json:"request_type"`
 	UpstreamAddr    string    `gorm:"type:varchar(500)" json:"upstream_addr"`
 	IsStream        bool      `gorm:"not null" json:"is_stream"`
 	RequestBody     string    `gorm:"type:text" json:"request_body"`
