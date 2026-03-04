@@ -1,25 +1,37 @@
-import type { ChartData, DashboardStatsResponse, Group } from "@/types/models";
+import type { ChartData, ChartViewType, DashboardStatsResponse, Group } from "@/types/models";
 import http from "@/utils/http";
 
-/**
- * 获取仪表盘基础统计数据
- */
-export const getDashboardStats = () => {
-  return http.get<DashboardStatsResponse>("/dashboard/stats");
-};
+interface ApiError {
+  code: number;
+  message: string;
+  error?: string;
+}
+
+export type ApiResult<T> = { data: T } | ApiError;
 
 /**
- * 获取仪表盘图表数据
- * @param groupId 可选的分组ID
+ * 获取仪表板基本统计数据
+ * @param hours 时间范围（小时）(1/5/24/168/720)
  */
-export const getDashboardChart = (groupId?: number) => {
-  return http.get<ChartData>("/dashboard/chart", {
-    params: groupId ? { groupId } : {},
+export const getDashboardStats = (hours: number = 5) => {
+  return http.get<DashboardStatsResponse>("/dashboard/stats", {
+    params: { hours },
   });
 };
 
 /**
- * 获取用于筛选的分组列表
+ * 获取仪表板图表数据
+ * @param view 视图类型 (request/token/token_speed)
+ * @param hours 时间范围（小时）(1/5/24/168/720)
+ */
+export const getDashboardChart = (view: ChartViewType = "token", hours: number = 5) => {
+  return http.get<ChartData>("/dashboard/chart", {
+    params: { view, hours },
+  });
+};
+
+/**
+ * 获取用于过滤的组列表
  */
 export const getGroupList = () => {
   return http.get<Group[]>("/groups/list");

@@ -2,15 +2,16 @@ package services
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"gpt-load/internal/config"
 	"gpt-load/internal/models"
 	"gpt-load/internal/store"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -23,7 +24,15 @@ const (
 	DefaultLogFlushBatchSize = 200
 )
 
-// RequestLogService is responsible for managing request logs.
+// HourlyStat 表示内存缓冲区中的聚合每小时统计
+type HourlyStat struct {
+	Time         time.Time
+	GroupID      uint
+	SuccessCount int64
+	FailureCount int64
+}
+
+// RequestLogService 负责管理请求日志。
 type RequestLogService struct {
 	db              *gorm.DB
 	store           store.Store
@@ -31,22 +40,28 @@ type RequestLogService struct {
 	stopChan        chan struct{}
 	wg              sync.WaitGroup
 	ticker          *time.Ticker
+	statsBuffer     map[string]*HourlyStat
+	statsBufferMu   sync.Mutex
+	statsFlushChan  chan struct{}
 }
 
-// NewRequestLogService creates a new RequestLogService instance
+// NewRequestLogService 创建一个新的 RequestLogService 实例
 func NewRequestLogService(db *gorm.DB, store store.Store, sm *config.SystemSettingsManager) *RequestLogService {
 	return &RequestLogService{
 		db:              db,
 		store:           store,
 		settingsManager: sm,
 		stopChan:        make(chan struct{}),
+		statsBuffer:     make(map[string]*HourlyStat),
+		statsFlushChan:  make(chan struct{}, 1),
 	}
 }
 
-// Start initializes the service and starts the periodic flush routine
+// Start 初始化服务并启动定期刷新程序
 func (s *RequestLogService) Start() {
-	s.wg.Add(1)
+	s.wg.Add(2)
 	go s.runLoop()
+	go s.runStatsFlusher()
 }
 
 func (s *RequestLogService) runLoop() {
@@ -81,7 +96,7 @@ func (s *RequestLogService) runLoop() {
 	}
 }
 
-// Stop gracefully stops the RequestLogService
+// Stop 优雅地停止 RequestLogService
 func (s *RequestLogService) Stop(ctx context.Context) {
 	close(s.stopChan)
 
@@ -94,19 +109,25 @@ func (s *RequestLogService) Stop(ctx context.Context) {
 	select {
 	case <-done:
 		s.flush()
+		s.FlushStats()
 		logrus.Info("RequestLogService stopped gracefully.")
 	case <-ctx.Done():
 		logrus.Warn("RequestLogService stop timed out.")
 	}
 }
 
-// Record logs a request to the database and cache
+// Record 将请求记录到数据库和缓存
 func (s *RequestLogService) Record(log *models.RequestLog) error {
 	log.ID = uuid.NewString()
 	log.Timestamp = time.Now()
 
 	if s.settingsManager.GetSettings().RequestLogWriteIntervalMinutes == 0 {
-		return s.writeLogsToDB([]*models.RequestLog{log})
+		go func() {
+			if err := s.writeLogsToDB([]*models.RequestLog{log}); err != nil {
+				logrus.Errorf("Failed to write request log in sync mode: %v", err)
+			}
+		}()
+		return nil
 	}
 
 	cacheKey := RequestLogCachePrefix + log.ID
@@ -124,7 +145,7 @@ func (s *RequestLogService) Record(log *models.RequestLog) error {
 	return s.store.SAdd(PendingLogKeysSet, cacheKey)
 }
 
-// flush data from cache to database
+// flush 将数据从缓存刷新到数据库
 func (s *RequestLogService) flush() {
 	if s.settingsManager.GetSettings().RequestLogWriteIntervalMinutes == 0 {
 		logrus.Debug("Sync mode enabled, skipping scheduled log flush.")
@@ -196,7 +217,7 @@ func (s *RequestLogService) flush() {
 	}
 }
 
-// writeLogsToDB writes a batch of request logs to the database
+// writeLogsToDB 将一批请求日志写入数据库
 func (s *RequestLogService) writeLogsToDB(logs []*models.RequestLog) error {
 	if len(logs) == 0 {
 		return nil
@@ -266,67 +287,214 @@ func (s *RequestLogService) writeLogsToDB(logs []*models.RequestLog) error {
 			}
 		}
 
-		// 更新统计表
-		hourlyStats := make(map[struct {
-			Time    time.Time
-			GroupID uint
-		}]struct{ Success, Failure int64 })
-		for _, log := range logs {
-			if log.RequestType == models.RequestTypeRetry {
-				continue
-			}
-			hourlyTime := log.Timestamp.Truncate(time.Hour)
-			key := struct {
-				Time    time.Time
-				GroupID uint
-			}{Time: hourlyTime, GroupID: log.GroupID}
-
-			counts := hourlyStats[key]
-			if log.IsSuccess {
-				counts.Success++
-			} else {
-				counts.Failure++
-			}
-			hourlyStats[key] = counts
-
-			if log.ParentGroupID > 0 {
-				parentKey := struct {
-					Time    time.Time
-					GroupID uint
-				}{Time: hourlyTime, GroupID: log.ParentGroupID}
-
-				parentCounts := hourlyStats[parentKey]
-				if log.IsSuccess {
-					parentCounts.Success++
-				} else {
-					parentCounts.Failure++
-				}
-				hourlyStats[parentKey] = parentCounts
-			}
-		}
-
-		if len(hourlyStats) > 0 {
-			for key, counts := range hourlyStats {
-				err := tx.Clauses(clause.OnConflict{
-					Columns: []clause.Column{{Name: "time"}, {Name: "group_id"}},
-					DoUpdates: clause.Assignments(map[string]any{
-						"success_count": gorm.Expr("group_hourly_stats.success_count + ?", counts.Success),
-						"failure_count": gorm.Expr("group_hourly_stats.failure_count + ?", counts.Failure),
-						"updated_at":    time.Now(),
-					}),
-				}).Create(&models.GroupHourlyStat{
-					Time:         key.Time,
-					GroupID:      key.GroupID,
-					SuccessCount: counts.Success,
-					FailureCount: counts.Failure,
-				}).Error
-
-				if err != nil {
-					return fmt.Errorf("failed to upsert group hourly stat: %w", err)
-				}
-			}
-		}
+		s.updateStatsBuffer(logs)
 
 		return nil
 	})
+}
+
+func isDeadlockError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "Error 1213") ||
+		strings.Contains(err.Error(), "Deadlock found")
+}
+
+// runStatsFlusher 在后台运行定期统计刷新程序
+func (s *RequestLogService) runStatsFlusher() {
+	defer s.wg.Done()
+
+	flushInterval := time.Minute
+	ticker := time.NewTicker(flushInterval)
+	defer ticker.Stop()
+
+	logrus.Info("Stats flusher started with interval: ", flushInterval)
+
+	for {
+		select {
+		case <-ticker.C:
+			s.FlushStats()
+		case <-s.statsFlushChan:
+			s.FlushStats()
+		case <-s.stopChan:
+			return
+		}
+	}
+}
+
+// updateStatsBuffer 从日志更新内存中的统计缓冲区
+func (s *RequestLogService) updateStatsBuffer(logs []*models.RequestLog) {
+	s.statsBufferMu.Lock()
+	defer s.statsBufferMu.Unlock()
+
+	for _, log := range logs {
+		if log.RequestType == models.RequestTypeRetry {
+			continue
+		}
+
+		hourlyTime := log.Timestamp.Truncate(time.Hour)
+		key := fmt.Sprintf("%d-%d", hourlyTime.Unix(), log.GroupID)
+
+		if _, exists := s.statsBuffer[key]; !exists {
+			s.statsBuffer[key] = &HourlyStat{
+				Time:    hourlyTime,
+				GroupID: log.GroupID,
+			}
+		}
+
+		if log.IsSuccess {
+			s.statsBuffer[key].SuccessCount++
+		} else {
+			s.statsBuffer[key].FailureCount++
+		}
+
+		if log.ParentGroupID > 0 {
+			parentKey := fmt.Sprintf("%d-%d", hourlyTime.Unix(), log.ParentGroupID)
+			if _, exists := s.statsBuffer[parentKey]; !exists {
+				s.statsBuffer[parentKey] = &HourlyStat{
+					Time:    hourlyTime,
+					GroupID: log.ParentGroupID,
+				}
+			}
+			if log.IsSuccess {
+				s.statsBuffer[parentKey].SuccessCount++
+			} else {
+				s.statsBuffer[parentKey].FailureCount++
+			}
+		}
+	}
+}
+
+// FlushStats 将缓冲的统计信息刷新到数据库（单线程以避免死锁）
+func (s *RequestLogService) FlushStats() {
+	s.statsBufferMu.Lock()
+	if len(s.statsBuffer) == 0 {
+		s.statsBufferMu.Unlock()
+		return
+	}
+
+	// Deep copy HourlyStat to avoid race condition with updateStatsBuffer
+	statsToFlush := make([]*HourlyStat, 0, len(s.statsBuffer))
+	for _, stat := range s.statsBuffer {
+		statCopy := &HourlyStat{
+			Time:         stat.Time,
+			GroupID:      stat.GroupID,
+			SuccessCount: stat.SuccessCount,
+			FailureCount: stat.FailureCount,
+		}
+		statsToFlush = append(statsToFlush, statCopy)
+	}
+	s.statsBuffer = make(map[string]*HourlyStat)
+	s.statsBufferMu.Unlock()
+
+	if len(statsToFlush) == 0 {
+		return
+	}
+
+	var statsToUpsert []models.GroupHourlyStat
+	for _, stat := range statsToFlush {
+		statsToUpsert = append(statsToUpsert, models.GroupHourlyStat{
+			Time:         stat.Time,
+			GroupID:      stat.GroupID,
+			SuccessCount: stat.SuccessCount,
+			FailureCount: stat.FailureCount,
+		})
+	}
+
+	sort.Slice(statsToUpsert, func(i, j int) bool {
+		if statsToUpsert[i].Time.Equal(statsToUpsert[j].Time) {
+			return statsToUpsert[i].GroupID < statsToUpsert[j].GroupID
+		}
+		return statsToUpsert[i].Time.Before(statsToUpsert[j].Time)
+	})
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		return tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "time"}, {Name: "group_id"}},
+			DoUpdates: clause.Assignments(map[string]any{
+				"success_count": gorm.Expr("group_hourly_stats.success_count + VALUES(success_count)"),
+				"failure_count": gorm.Expr("group_hourly_stats.failure_count + VALUES(failure_count)"),
+				"updated_at":    time.Now(),
+			}),
+		}).CreateInBatches(statsToUpsert, 100).Error
+	})
+
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"count": len(statsToUpsert),
+			"error": err,
+		}).Error("Failed to flush stats to database")
+
+		s.statsBufferMu.Lock()
+		for _, stat := range statsToFlush {
+			key := fmt.Sprintf("%d-%d", stat.Time.Unix(), stat.GroupID)
+			if existing, exists := s.statsBuffer[key]; exists {
+				existing.SuccessCount += stat.SuccessCount
+				existing.FailureCount += stat.FailureCount
+			} else {
+				s.statsBuffer[key] = stat
+			}
+		}
+		s.statsBufferMu.Unlock()
+
+		return
+	}
+
+	logrus.WithField("count", len(statsToUpsert)).Debug("Successfully flushed stats to database")
+}
+
+// GetPendingLogs 从 Redis 缓存中检索尚未刷新到数据库的日志
+// 这用于仪表盘的实时统计
+func (s *RequestLogService) GetPendingLogs() ([]*models.RequestLog, error) {
+	keys, err := s.store.SMembers(PendingLogKeysSet)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get pending log keys: %w", err)
+	}
+
+	if len(keys) == 0 {
+		return []*models.RequestLog{}, nil
+	}
+
+	var logs []*models.RequestLog
+	for _, key := range keys {
+		logBytes, err := s.store.Get(key)
+		if err != nil {
+			if err == store.ErrNotFound {
+				logrus.Debugf("Log key %s not found in cache, skipping", key)
+			} else {
+				logrus.Warnf("Failed to get log for key %s: %v", key, err)
+			}
+			continue
+		}
+
+		var log models.RequestLog
+		if err := json.Unmarshal(logBytes, &log); err != nil {
+			logrus.Warnf("Failed to unmarshal log for key %s: %v", key, err)
+			continue
+		}
+		logs = append(logs, &log)
+	}
+
+	return logs, nil
+}
+
+// GetPendingStats 返回当前统计缓冲区的快照
+// 这用于仪表盘的实时统计
+func (s *RequestLogService) GetPendingStats() map[string]*HourlyStat {
+	s.statsBufferMu.Lock()
+	defer s.statsBufferMu.Unlock()
+
+	statsCopy := make(map[string]*HourlyStat, len(s.statsBuffer))
+	for key, stat := range s.statsBuffer {
+		statCopy := &HourlyStat{
+			Time:         stat.Time,
+			GroupID:      stat.GroupID,
+			SuccessCount: stat.SuccessCount,
+			FailureCount: stat.FailureCount,
+		}
+		statsCopy[key] = statCopy
+	}
+
+	return statsCopy
 }
