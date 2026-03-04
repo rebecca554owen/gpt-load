@@ -4,6 +4,8 @@ import type { Group, SubGroupInfo } from "@/types/models";
 import { getGroupDisplayName } from "@/utils/display";
 import {
   Add,
+  ChevronDownOutline,
+  ChevronUpOutline,
   CreateOutline,
   EyeOutline,
   InformationCircleOutline,
@@ -69,11 +71,14 @@ const addModalShow = ref(false);
 const editModalShow = ref(false);
 const editingSubGroup = ref<SubGroupInfo | null>(null);
 
-// 搜索和过滤状态
+// 搜索和筛选状态
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "disabled" | "unavailable">("all");
 
-// 状态过滤选项
+// 折叠状态 - 默认折叠
+const isCollapsed = ref(true);
+
+// 状态筛选选项
 const statusOptions = [
   { label: t("common.all"), value: "all" },
   { label: t("subGroups.statusActive"), value: "active" },
@@ -81,7 +86,7 @@ const statusOptions = [
   { label: t("subGroups.statusUnavailable"), value: "unavailable" },
 ];
 
-// 计算带百分比的子分组数据并按权重排序
+// 计算子分组数据（含百分比）并按权重排序
 const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
   if (!props.subGroups) {
     return [];
@@ -96,11 +101,11 @@ const sortedSubGroupsWithPercentage = computed<SubGroupRow[]>(() => {
   return withPercentage.sort((a, b) => b.weight - a.weight);
 });
 
-// 过滤后的子分组（应用搜索和状态过滤）
+// 筛选后的子分组（应用搜索和状态筛选）
 const filteredSubGroups = computed<SubGroupRow[]>(() => {
   let filtered = sortedSubGroupsWithPercentage.value;
 
-  // 名称搜索过滤（不区分大小写）
+  // 名称搜索筛选（不区分大小写）
   if (searchText.value.trim()) {
     const searchLower = searchText.value.trim().toLowerCase();
     filtered = filtered.filter(sg => {
@@ -110,7 +115,7 @@ const filteredSubGroups = computed<SubGroupRow[]>(() => {
     });
   }
 
-  // 状态过滤
+  // 状态筛选
   if (statusFilter.value !== "all") {
     filtered = filtered.filter(sg => {
       const status = getSubGroupStatus(sg).status;
@@ -173,14 +178,19 @@ function formatNumber(num: number): string {
   }
   return num.toString();
 }
+
+// Toggle collapse state
+function toggleCollapse() {
+  isCollapsed.value = !isCollapsed.value;
+}
 </script>
 
 <template>
   <div class="key-table-container">
-    <!-- 工具栏 -->
+    <!-- Toolbar -->
     <div class="toolbar">
       <div class="toolbar-left">
-        <n-button type="info" size="small" @click="addModalShow = true">
+        <n-button class="btn-create" size="small" @click="addModalShow = true">
           <template #icon>
             <n-icon :component="Add" />
           </template>
@@ -209,8 +219,8 @@ function formatNumber(num: number): string {
       </div>
     </div>
 
-    <!-- 子分组卡片网格 -->
-    <div class="keys-grid-container">
+    <!-- Sub-group card grid -->
+    <div class="keys-grid-container" v-show="!isCollapsed">
       <n-spin :show="props.loading || false">
         <div v-if="!props.subGroups || props.subGroups.length === 0" class="empty-container">
           <n-empty :description="t('subGroups.noSubGroups')" />
@@ -237,7 +247,7 @@ function formatNumber(num: number): string {
               </div>
             </div>
 
-            <!-- 权重显示 -->
+            <!-- Weight display -->
             <div class="weight-display">
               <div class="weight-bar-container">
                 <span class="weight-label">
@@ -258,7 +268,7 @@ function formatNumber(num: number): string {
               </div>
             </div>
 
-            <!-- 密钥统计 -->
+            <!-- Key statistics -->
             <div class="key-stats-row">
               <div class="stats-left">
                 <span class="stat-item">
@@ -278,19 +288,25 @@ function formatNumber(num: number): string {
               </n-tag>
             </div>
 
-            <!-- 操作按钮行 -->
+            <!-- Action buttons row -->
             <div class="key-bottom">
               <div class="key-stats">
-                <n-tooltip trigger="hover" placement="top">
+                <n-tooltip trigger="hover" placement="right">
                   <template #trigger>
-                    <n-button round tertiary type="default" size="tiny">
+                    <n-button
+                      round
+                      tertiary
+                      type="default"
+                      size="tiny"
+                      :aria-label="t('common.viewDetails')"
+                    >
                       <template #icon>
                         <n-icon :component="InformationCircleOutline" />
                       </template>
                     </n-button>
                   </template>
                   <div class="sub-group-info-tooltip">
-                    <!-- 分组名称和状态 -->
+                    <!-- Group name and status -->
                     <div class="info-header">
                       <div class="info-title">{{ getGroupDisplayName(subGroup) }}</div>
                       <n-tag :type="getSubGroupStatus(subGroup).type" size="small">
@@ -298,7 +314,7 @@ function formatNumber(num: number): string {
                       </n-tag>
                     </div>
 
-                    <!-- 详细信息 -->
+                    <!-- Detailed information -->
                     <div class="info-details">
                       <div class="info-row">
                         <span class="info-label">{{ t("keys.testModel") }}:</span>
@@ -311,7 +327,7 @@ function formatNumber(num: number): string {
                         </span>
                       </div>
 
-                      <!-- 上游地址 -->
+                      <!-- Upstream addresses -->
                       <div
                         class="info-row"
                         v-if="subGroup.group.upstreams && subGroup.group.upstreams.length > 0"
@@ -335,7 +351,7 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
-                  type="default"
+                  class="btn-view"
                   size="tiny"
                   @click="subGroup.group.id && goToGroupInfo(subGroup.group.id)"
                   :title="t('subGroups.viewSubGroup')"
@@ -348,7 +364,7 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
-                  type="info"
+                  class="btn-edit"
                   size="tiny"
                   @click="openEditModal(subGroup)"
                   :title="t('subGroups.editWeight')"
@@ -361,8 +377,8 @@ function formatNumber(num: number): string {
                 <n-button
                   round
                   tertiary
+                  class="btn-delete"
                   size="tiny"
-                  type="error"
                   @click="deleteSubGroup(subGroup)"
                   :title="t('subGroups.removeSubGroup')"
                 >
@@ -378,15 +394,21 @@ function formatNumber(num: number): string {
       </n-spin>
     </div>
 
-    <!-- 底部信息 -->
+    <!-- Footer information -->
     <div class="pagination-container">
       <div class="pagination-info">
         <span>
-          {{ t("subGroups.totalSubGroups", { total: filteredSubGroups.length }) }}
+          {{ t("subGroups.totalSubGroups", { count: filteredSubGroups.length }) }}
           <template v-if="filteredSubGroups.length !== (props.subGroups?.length || 0)">
             / {{ props.subGroups?.length || 0 }}
           </template>
         </span>
+        <n-icon
+          :component="isCollapsed ? ChevronDownOutline : ChevronUpOutline"
+          size="18"
+          style="cursor: pointer; color: var(--text-secondary); margin-left: 8px"
+          @click="toggleCollapse"
+        />
       </div>
       <div class="pagination-controls">
         <span class="page-info">
@@ -395,7 +417,7 @@ function formatNumber(num: number): string {
       </div>
     </div>
 
-    <!-- 添加子分组弹窗 -->
+    <!-- Add sub-group modal -->
     <add-sub-group-modal
       v-if="selectedGroup?.id"
       v-model:show="addModalShow"
@@ -405,7 +427,7 @@ function formatNumber(num: number): string {
       @success="handleSuccess"
     />
 
-    <!-- 编辑权重弹窗 -->
+    <!-- Edit weight modal -->
     <edit-sub-group-weight-modal
       v-if="editingSubGroup && selectedGroup?.id"
       v-model:show="editModalShow"
@@ -423,309 +445,27 @@ function formatNumber(num: number): string {
 </template>
 
 <style scoped>
-/* 直接复用KeyTable的所有样式 */
-.key-table-container {
-  background: var(--card-bg-solid);
-  border-radius: 8px;
-  box-shadow: var(--shadow-md);
-  border: 1px solid var(--border-color);
-  overflow: hidden;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
+/* Component-specific styles only - shared styles in components.css */
 
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--card-bg-solid);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-  gap: 16px;
-  min-height: 64px;
-}
-
-.toolbar :deep(.n-button) {
-  font-weight: 500;
-}
-
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.keys-grid-container {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.keys-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.key-card {
-  background: var(--card-bg-solid);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 14px;
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.key-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-.key-card.status-valid {
-  border-color: var(--success-border);
-  background: var(--success-bg);
-  border-width: 1.5px;
-}
-
-/* 子分组专用样式 - 蓝色主题 */
-.key-card.status-sub-group {
-  border-color: #2080f0;
-  background: #f0f7ff;
-  border-width: 1.5px;
-}
-
-/* 暗黑模式下的子分组样式 */
-:root.dark .key-card.status-sub-group {
-  border-color: #4098fc;
-  background: #1a2332;
-}
-
-/* 子分组名称样式 */
-.sub-group-names {
-  display: flex;
-  align-items: baseline;
-  flex: 1;
-  min-width: 0;
-}
-
-.display-name {
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex: 1;
-}
-
+/* Sub-group specific - group name tag style override */
 .group-name {
   font-size: 13px;
   font-weight: 500;
-  color: #2080f0;
+  color: var(--sub-group-primary);
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  background: #e6f4ff;
+  background: var(--sub-group-bg);
   padding: 2px 6px;
   border-radius: 4px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
-/* 暗黑模式下的分组名样式 */
-:root.dark .group-name {
-  background: #0f1419;
-  color: #4098fc;
-}
-
-/* 权重显示样式 */
-.weight-display {
-  margin: 4px 0;
-}
-
-.weight-bar-container {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.weight-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.weight-label strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.key-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-}
-
-.key-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-stats {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  flex: 1;
-  min-width: 0;
-}
-
-.stat-item {
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-.stat-item strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.key-actions {
-  flex-shrink: 0;
-}
-
-.key-actions :deep(.n-button) {
-  padding: 0 4px;
-}
-
-.key-text {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-:root:not(.dark) .key-text {
-  color: #495057;
-  background: #f8f9fa;
-}
-
-:root.dark .key-text {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-:deep(.n-input__input-el) {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13px;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.sub-group-id {
-  font-size: 12px;
-  color: var(--text-secondary);
-  background: var(--bg-tertiary);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.weight-bar {
-  flex: 1;
-  height: 8px;
-  background: var(--bg-tertiary);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.weight-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
-
-/* Active state - green gradient */
-.key-card .weight-fill-active {
-  background: linear-gradient(90deg, #0e7a43, #18a058, #36ad6a, #5fd299) !important;
-}
-
-:root.dark .key-card .weight-fill-active {
-  background: linear-gradient(90deg, #4aba7d, #63e2b7, #7fe7c4, #a3f5d0) !important;
-}
-
-/* Unavailable state - striped pattern (red/orange warning) */
-.key-card .weight-fill-unavailable {
-  background: repeating-linear-gradient(
-    45deg,
-    #f5a9a9,
-    #f5a9a9 8px,
-    #e88592 8px,
-    #e88592 16px
-  ) !important;
-  opacity: 0.85;
-}
-
-:root.dark .key-card .weight-fill-unavailable {
-  background: repeating-linear-gradient(
-    45deg,
-    #8b3a3a,
-    #8b3a3a 8px,
-    #a04848 8px,
-    #a04848 16px
-  ) !important;
-  opacity: 0.8;
-}
-
-.weight-text {
-  font-weight: 600;
-  color: var(--text-primary);
-  font-size: 14px;
-  min-width: 40px;
-  text-align: right;
-}
-
-/* Key stats row styles */
+/* Key stats row - component specific layout */
 .key-stats-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
-}
-
-.stats-left {
-  display: flex;
-  align-items: center;
-  font-size: 14px;
-  flex: 1;
 }
 
 .stat-item {
@@ -748,85 +488,7 @@ function formatNumber(num: number): string {
   opacity: 0.5;
 }
 
-.stat-success {
-  color: #18a058;
-  font-weight: 600;
-}
-
-:root.dark .stat-success {
-  color: #63e2b7;
-}
-
-.stat-error {
-  color: #d03050;
-  font-weight: 600;
-}
-
-:root.dark .stat-error {
-  color: #e88080;
-}
-
-.pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--card-bg-solid);
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.pagination-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-info {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.empty-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 200px;
-}
-
-@media (max-width: 768px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-/* 禁用状态样式 - 与密钥列表中禁用密钥的样式一致 */
-.key-card.disabled {
-  opacity: 0.6;
-  background: var(--bg-secondary);
-}
-
-:root.dark .key-card.disabled {
-  background: var(--bg-disabled);
-}
-
+/* Disabled state styles */
 .key-card.disabled .display-name,
 .key-card.disabled .group-name,
 .key-card.disabled .weight-label {
@@ -837,83 +499,8 @@ function formatNumber(num: number): string {
   background: var(--color-disabled);
 }
 
-/* Tooltip 样式 */
+/* Tooltip override */
 .sub-group-info-tooltip {
   min-width: 450px;
-  max-width: 600px;
-  padding: 8px;
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.info-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 10px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
-}
-
-:root:not(.dark) .info-header {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.info-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: inherit;
-}
-
-.info-details {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  font-size: 13px;
-  line-height: 1.5;
-  gap: 12px;
-}
-
-.info-label {
-  color: inherit;
-  opacity: 0.7;
-  flex-shrink: 0;
-  min-width: 100px;
-}
-
-.info-value {
-  color: inherit;
-  font-weight: 500;
-  text-align: right;
-  word-break: break-word;
-  flex: 1;
-}
-
-.upstream-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-}
-
-.upstream-input {
-  width: 100%;
-  font-size: 12px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  padding: 4px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.05);
-  color: inherit;
-  outline: none;
-  overflow-x: auto;
-  white-space: nowrap;
 }
 </style>

@@ -1,43 +1,29 @@
 <script setup lang="ts">
 import { keysApi } from "@/api/keys";
-import type { APIKey, Group, KeyStatus } from "@/types/models";
-import { appState, triggerSyncOperationRefresh } from "@/utils/app-state";
-import { copy } from "@/utils/clipboard";
+
+defineOptions({
+  name: "KeyTable",
+});
+import type { Group, KeyRow, KeyStatus } from "@/types/models";
+import { useAppStateStore } from "@/stores/appState";
+import { useCopy } from "@/composables/useCopy";
 import { getGroupDisplayName, maskKey } from "@/utils/display";
-import {
-  AddCircleOutline,
-  AlertCircleOutline,
-  CheckmarkCircle,
-  CopyOutline,
-  EyeOffOutline,
-  EyeOutline,
-  Pencil,
-  RemoveCircleOutline,
-  Search,
-} from "@vicons/ionicons5";
-import {
-  NButton,
-  NDropdown,
-  NEmpty,
-  NIcon,
-  NInput,
-  NModal,
-  NSelect,
-  NSpace,
-  NSpin,
-  useDialog,
-  type MessageReactive,
-} from "naive-ui";
-import { h, ref, watch } from "vue";
+import { formatDuration } from "@/utils/format";
+import { PAGINATION } from "@/constants/chart";
+import { NButton, NEmpty, NInput, NModal, NSpin, useDialog, type MessageReactive } from "naive-ui";
+import { h, ref, watch, nextTick, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import KeyCreateDialog from "./KeyCreateDialog.vue";
 import KeyDeleteDialog from "./KeyDeleteDialog.vue";
+import KeyCard from "./KeyCard.vue";
+import KeyToolbar from "./KeyToolbar.vue";
+import KeyPagination from "./KeyPagination.vue";
+import { useVirtualGrid } from "@/composables/useVirtualList";
 
 const { t } = useI18n();
+const { copyWithFeedback } = useCopy();
 
-interface KeyRow extends APIKey {
-  is_visible: boolean;
-}
+const appState = useAppStateStore();
 
 interface Props {
   selectedGroup: Group | null;
@@ -50,62 +36,52 @@ const loading = ref(false);
 const searchText = ref("");
 const statusFilter = ref<"all" | "active" | "invalid">("all");
 const currentPage = ref(1);
-const pageSize = ref(12);
+const pageSize = ref<12 | 24 | 60 | 120>(PAGINATION.defaultPageSize);
 const total = ref(0);
 const totalPages = ref(0);
 const dialog = useDialog();
 const confirmInput = ref("");
 
-// 状态过滤选项
-const statusOptions = [
-  { label: t("common.all"), value: "all" },
-  { label: t("keys.valid"), value: "active" },
-  { label: t("keys.invalid"), value: "invalid" },
-];
-
-// 更多操作下拉菜单选项
-const moreOptions = [
-  { label: t("keys.exportAllKeys"), key: "copyAll" },
-  { label: t("keys.exportValidKeys"), key: "copyValid" },
-  { label: t("keys.exportInvalidKeys"), key: "copyInvalid" },
-  { type: "divider" },
-  { label: t("keys.restoreAllInvalidKeys"), key: "restoreAll" },
-  {
-    label: t("keys.clearAllInvalidKeys"),
-    key: "clearInvalid",
-    props: { style: { color: "#d03050" } },
-  },
-  {
-    label: t("keys.clearAllKeys"),
-    key: "clearAll",
-    props: { style: { color: "red", fontWeight: "bold" } },
-  },
-  { type: "divider" },
-  { label: t("keys.validateAllKeys"), key: "validateAll" },
-  { label: t("keys.validateValidKeys"), key: "validateActive" },
-  { label: t("keys.validateInvalidKeys"), key: "validateInvalid" },
-];
-
-let testingMsg: MessageReactive | null = null;
+const testingMsg = ref<MessageReactive | null>(null);
 const isDeling = ref(false);
 const isRestoring = ref(false);
 
 const createDialogShow = ref(false);
 const deleteDialogShow = ref(false);
 
-// 备注编辑相关
 const notesDialogShow = ref(false);
 const editingKey = ref<KeyRow | null>(null);
 const editingNotes = ref("");
+
+// 虚拟滚动容器
+const gridContainerRef = ref<HTMLElement | null>(null);
+const containerHeight = computed(() => {
+  if (!gridContainerRef.value) {
+    return 600;
+  }
+  // 使用实际容器高度减去工具栏和分页
+  const containerHeight = gridContainerRef.value.clientHeight;
+  return Math.max(400, containerHeight - 150); // 为工具栏和分页预留空间
+});
+
+// 对大数据集使用虚拟滚动
+const shouldUseVirtualScroll = computed(() => {
+  return keys.value.length > 24; // 仅对超过 24 项的数据使用虚拟滚动
+});
+
+// 设置虚拟列表
+const {
+  list: virtualList,
+  containerProps,
+  wrapperProps,
+} = useVirtualGrid(keys, containerHeight.value);
 
 watch(
   () => props.selectedGroup,
   async newGroup => {
     if (newGroup) {
-      // 检查重置页面是否会触发分页观察者。
       const willWatcherTrigger = currentPage.value !== 1 || statusFilter.value !== "all";
       resetPage();
-      // 如果分页观察者不触发，则手动加载。
       if (!willWatcherTrigger) {
         await loadKeys();
       }
@@ -126,29 +102,46 @@ watch(statusFilter, async () => {
   }
 });
 
-// 监听任务完成事件，自动刷新密钥列表
+// 监听任务完成事件（如批量验证、导入、删除）
+// 当任务在当前分组完成时，刷新密钥列表
 watch(
   () => appState.groupDataRefreshTrigger,
-  () => {
-    // 检查是否需要刷新当前分组的密钥列表
-    if (appState.lastCompletedTask && props.selectedGroup) {
-      // 通过分组名称匹配
-      const isCurrentGroup = appState.lastCompletedTask.groupName === props.selectedGroup.name;
+  async () => {
+    if (props.selectedGroup) {
+      const isCurrentGroupTask =
+        appState.lastCompletedTask &&
+        appState.lastCompletedTask.groupName === props.selectedGroup.name;
 
-      const shouldRefresh =
-        appState.lastCompletedTask.taskType === "KEY_VALIDATION" ||
-        appState.lastCompletedTask.taskType === "KEY_IMPORT" ||
-        appState.lastCompletedTask.taskType === "KEY_DELETE";
+      const isRelevantTaskType =
+        isCurrentGroupTask &&
+        ["KEY_VALIDATION", "KEY_IMPORT", "KEY_DELETE"].includes(
+          appState.lastCompletedTask?.taskType || ""
+        );
 
-      if (isCurrentGroup && shouldRefresh) {
-        // 刷新当前分组的密钥列表
-        loadKeys();
+      if (isRelevantTaskType) {
+        await loadKeys();
       }
     }
   }
 );
 
-// 处理搜索输入的防抖
+// 监听同步操作事件（如单个密钥测试、恢复、删除）
+// 当同步操作在当前分组完成时，刷新密钥列表
+watch(
+  () => appState.syncOperationTrigger,
+  async () => {
+    if (props.selectedGroup) {
+      const isCurrentGroupSync =
+        appState.lastSyncOperation &&
+        appState.lastSyncOperation.groupName === props.selectedGroup.name;
+
+      if (isCurrentGroupSync) {
+        await loadKeys();
+      }
+    }
+  }
+);
+
 function handleSearchInput() {
   if (currentPage.value !== 1) {
     currentPage.value = 1;
@@ -157,7 +150,6 @@ function handleSearchInput() {
   }
 }
 
-// 处理更多操作菜单
 function handleMoreAction(key: string) {
   switch (key) {
     case "copyAll":
@@ -204,38 +196,36 @@ async function loadKeys() {
       status: statusFilter.value === "all" ? undefined : (statusFilter.value as KeyStatus),
       key_value: searchText.value.trim() || undefined,
     });
-    keys.value = result.items as KeyRow[];
+    keys.value = result.items.map(key => ({ ...key, is_visible: false }));
     total.value = result.pagination.total_items;
     totalPages.value = result.pagination.total_pages;
+
+    // Reset virtual scroll position when data changes
+    if (gridContainerRef.value) {
+      gridContainerRef.value.scrollTop = 0;
+    }
   } finally {
     loading.value = false;
   }
 }
 
-// 处理批量删除成功后的刷新
 async function handleBatchDeleteSuccess() {
   await loadKeys();
-  // 触发同步操作刷新
   if (props.selectedGroup) {
-    triggerSyncOperationRefresh(props.selectedGroup.name, "BATCH_DELETE");
+    appState.triggerSyncOperationRefresh(props.selectedGroup.name, "BATCH_DELETE");
   }
 }
 
 async function copyKey(key: KeyRow) {
-  const success = await copy(key.key_value);
-  if (success) {
-    window.$message.success(t("keys.keyCopied"));
-  } else {
-    window.$message.error(t("keys.copyFailed"));
-  }
+  await copyWithFeedback(key.key_value);
 }
 
 async function testKey(_key: KeyRow) {
-  if (!props.selectedGroup?.id || !_key.key_value || testingMsg) {
+  if (!props.selectedGroup?.id || !_key.key_value || testingMsg.value) {
     return;
   }
 
-  testingMsg = window.$message.info(t("keys.testingKey"), {
+  testingMsg.value = window.$message.info(t("keys.testingKeyWithEllipsis"), {
     duration: 0,
   });
 
@@ -253,60 +243,30 @@ async function testKey(_key: KeyRow) {
         closable: true,
       });
     }
+    appState.triggerSyncOperationRefresh(props.selectedGroup.name, "TEST_SINGLE");
+    await nextTick();
     await loadKeys();
-    // 触发同步操作刷新
-    triggerSyncOperationRefresh(props.selectedGroup.name, "TEST_SINGLE");
   } catch (_error) {
     console.error("Test failed");
   } finally {
-    testingMsg?.destroy();
-    testingMsg = null;
+    testingMsg.value?.destroy();
+    testingMsg.value = null;
   }
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 0) {
-    return "0ms";
-  }
-
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.floor((ms % 60000) / 1000);
-  const milliseconds = ms % 1000;
-
-  let result = "";
-  if (minutes > 0) {
-    result += `${minutes}m`;
-  }
-  if (seconds > 0) {
-    result += `${seconds}s`;
-  }
-  if (milliseconds > 0 || result === "") {
-    result += `${milliseconds}ms`;
-  }
-
-  return result;
 }
 
 function toggleKeyVisibility(key: KeyRow) {
-  key.is_visible = !key.is_visible;
-}
-
-// 获取要显示的值（备注优先，否则显示密钥）
-function getDisplayValue(key: KeyRow): string {
-  if (key.notes && !key.is_visible) {
-    return key.notes;
+  const index = keys.value.findIndex(k => k.id === key.id);
+  if (index !== -1) {
+    keys.value[index] = { ...keys.value[index], is_visible: !keys.value[index].is_visible };
   }
-  return key.is_visible ? key.key_value : maskKey(key.key_value);
 }
 
-// 编辑密钥备注
 function editKeyNotes(key: KeyRow) {
   editingKey.value = key;
   editingNotes.value = key.notes || "";
   notesDialogShow.value = true;
 }
 
-// 保存备注
 async function saveKeyNotes() {
   if (!editingKey.value) {
     return;
@@ -344,8 +304,7 @@ async function restoreKey(key: KeyRow) {
       try {
         await keysApi.restoreKeys(props.selectedGroup.id, key.key_value);
         await loadKeys();
-        // 触发同步操作刷新
-        triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_SINGLE");
+        appState.triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_SINGLE");
       } catch (_error) {
         console.error("Restore failed");
       } finally {
@@ -377,8 +336,7 @@ async function deleteKey(key: KeyRow) {
       try {
         await keysApi.deleteKeys(props.selectedGroup.id, key.key_value);
         await loadKeys();
-        // 触发同步操作刷新
-        triggerSyncOperationRefresh(props.selectedGroup.name, "DELETE_SINGLE");
+        appState.triggerSyncOperationRefresh(props.selectedGroup.name, "DELETE_SINGLE");
       } catch (_error) {
         console.error("Delete failed");
       } finally {
@@ -387,43 +345,6 @@ async function deleteKey(key: KeyRow) {
       }
     },
   });
-}
-
-function formatRelativeTime(date: string) {
-  if (!date) {
-    return t("keys.never");
-  }
-  const now = new Date();
-  const target = new Date(date);
-  const diffSeconds = Math.floor((now.getTime() - target.getTime()) / 1000);
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  const diffHours = Math.floor(diffMinutes / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) {
-    return t("keys.daysAgo", { days: diffDays });
-  }
-  if (diffHours > 0) {
-    return t("keys.hoursAgo", { hours: diffHours });
-  }
-  if (diffMinutes > 0) {
-    return t("keys.minutesAgo", { minutes: diffMinutes });
-  }
-  if (diffSeconds > 0) {
-    return t("keys.secondsAgo", { seconds: diffSeconds });
-  }
-  return t("keys.justNow");
-}
-
-function getStatusClass(status: KeyStatus): string {
-  switch (status) {
-    case "active":
-      return "status-valid";
-    case "invalid":
-      return "status-invalid";
-    default:
-      return "status-unknown";
-  }
 }
 
 async function copyAllKeys() {
@@ -470,8 +391,7 @@ async function restoreAllInvalid() {
       try {
         await keysApi.restoreAllInvalidKeys(props.selectedGroup.id);
         await loadKeys();
-        // 触发同步操作刷新
-        triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_ALL_INVALID");
+        appState.triggerSyncOperationRefresh(props.selectedGroup.name, "RESTORE_ALL_INVALID");
       } catch (_error) {
         console.error("Restore failed");
       } finally {
@@ -483,7 +403,7 @@ async function restoreAllInvalid() {
 }
 
 async function validateKeys(status: "all" | "active" | "invalid") {
-  if (!props.selectedGroup?.id || testingMsg) {
+  if (!props.selectedGroup?.id || testingMsg.value) {
     return;
   }
 
@@ -494,19 +414,19 @@ async function validateKeys(status: "all" | "active" | "invalid") {
     statusText = t("keys.invalid");
   }
 
-  testingMsg = window.$message.info(t("keys.validatingKeysMsg", { type: statusText }), {
+  testingMsg.value = window.$message.info(t("keys.validatingKeysMsg", { type: statusText }), {
     duration: 0,
   });
 
   try {
     await keysApi.validateGroupKeys(props.selectedGroup.id, status === "all" ? undefined : status);
     localStorage.removeItem("last_closed_task");
-    appState.taskPollingTrigger++;
+    appState.triggerTaskPolling();
   } catch (_error) {
     console.error("Test failed");
   } finally {
-    testingMsg?.destroy();
-    testingMsg = null;
+    testingMsg.value?.destroy();
+    testingMsg.value = null;
   }
 }
 
@@ -528,11 +448,10 @@ async function clearAllInvalid() {
       isDeling.value = true;
       d.loading = true;
       try {
-        const { data } = await keysApi.clearAllInvalidKeys(props.selectedGroup.id);
-        window.$message.success(data?.message || t("keys.clearSuccess"));
+        await keysApi.clearAllInvalidKeys(props.selectedGroup.id);
+        window.$message.success(t("keys.clearSuccess"));
         await loadKeys();
-        // 触发同步操作刷新
-        triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL_INVALID");
+        appState.triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL_INVALID");
       } catch (_error) {
         console.error("Delete failed");
       } finally {
@@ -554,7 +473,7 @@ async function clearAll() {
     positiveText: t("common.confirm"),
     negativeText: t("common.cancel"),
     onPositiveClick: () => {
-      confirmInput.value = ""; // Reset before opening second dialog
+      confirmInput.value = "";
       dialog.create({
         title: t("keys.enterGroupNameToConfirm"),
         content: () =>
@@ -563,7 +482,7 @@ async function clearAll() {
               t("keys.dangerousOperationWarning1"),
               h("strong", null, t("common.all")),
               t("keys.dangerousOperationWarning2"),
-              h("strong", { style: { color: "#d03050" } }, props.selectedGroup?.name),
+              h("strong", { style: { color: "var(--error-color)" } }, props.selectedGroup?.name),
               t("keys.toConfirm"),
             ]),
             h(NInput, {
@@ -579,7 +498,7 @@ async function clearAll() {
         onPositiveClick: async () => {
           if (confirmInput.value !== props.selectedGroup?.name) {
             window.$message.error(t("keys.incorrectGroupName"));
-            return false; // Prevent dialog from closing
+            return false;
           }
 
           if (!props.selectedGroup?.id) {
@@ -591,8 +510,7 @@ async function clearAll() {
             await keysApi.clearAllKeys(props.selectedGroup.id);
             window.$message.success(t("keys.clearAllKeysSuccess"));
             await loadKeys();
-            // Trigger sync operation refresh
-            triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL");
+            appState.triggerSyncOperationRefresh(props.selectedGroup.name, "CLEAR_ALL");
           } catch (_error) {
             console.error("Clear all failed", _error);
           } finally {
@@ -604,15 +522,6 @@ async function clearAll() {
   });
 }
 
-function changePage(page: number) {
-  currentPage.value = page;
-}
-
-function changePageSize(size: number) {
-  pageSize.value = size;
-  currentPage.value = 1;
-}
-
 function resetPage() {
   currentPage.value = 1;
   searchText.value = "";
@@ -621,211 +530,69 @@ function resetPage() {
 </script>
 
 <template>
-  <div class="key-table-container">
-    <!-- 工具栏 -->
-    <div class="toolbar">
-      <div class="toolbar-left">
-        <n-button type="success" size="small" @click="createDialogShow = true">
-          <template #icon>
-            <n-icon :component="AddCircleOutline" />
-          </template>
-          {{ t("keys.addKey") }}
-        </n-button>
-        <n-button type="error" size="small" @click="deleteDialogShow = true">
-          <template #icon>
-            <n-icon :component="RemoveCircleOutline" />
-          </template>
-          {{ t("keys.deleteKey") }}
-        </n-button>
-      </div>
-      <div class="toolbar-right">
-        <n-space :size="12" align="center">
-          <n-select
-            v-model:value="statusFilter"
-            :options="statusOptions"
-            size="small"
-            style="width: 120px"
-            :placeholder="t('keys.allStatus')"
-          />
-          <n-input-group>
-            <n-input
-              v-model:value="searchText"
-              :placeholder="t('keys.keyExactMatch')"
-              size="small"
-              style="width: 200px"
-              clearable
-              @keyup.enter="handleSearchInput"
-            >
-              <template #prefix>
-                <n-icon :component="Search" />
-              </template>
-            </n-input>
-            <n-button
-              type="primary"
-              ghost
-              size="small"
-              :disabled="loading"
-              @click="handleSearchInput"
-            >
-              {{ t("common.search") }}
-            </n-button>
-          </n-input-group>
-          <n-dropdown :options="moreOptions" trigger="click" @select="handleMoreAction">
-            <n-button size="small" tertiary>
-              <template #icon>
-                <span style="font-size: 16px; font-weight: bold">⋯</span>
-              </template>
-            </n-button>
-          </n-dropdown>
-        </n-space>
-      </div>
-    </div>
+  <div class="key-table-container" ref="gridContainerRef">
+    <key-toolbar
+      :loading="loading"
+      v-model:status-filter="statusFilter"
+      v-model:search-text="searchText"
+      @handle-search="handleSearchInput"
+      @create-click="createDialogShow = true"
+      @delete-click="deleteDialogShow = true"
+      @more-action="handleMoreAction"
+    />
 
-    <!-- 密钥卡片网格 -->
     <div class="keys-grid-container">
       <n-spin :show="loading">
         <div v-if="keys.length === 0 && !loading" class="empty-container">
           <n-empty :description="t('keys.noMatchingKeys')" />
         </div>
-        <div v-else class="keys-grid">
-          <div
-            v-for="key in keys"
-            :key="key.id"
-            class="key-card"
-            :class="getStatusClass(key.status)"
-          >
-            <!-- 主要信息行：Key + 快速操作 -->
-            <div class="key-main">
-              <div class="key-section">
-                <n-tag v-if="key.status === 'active'" type="success" :bordered="false" round>
-                  <template #icon>
-                    <n-icon :component="CheckmarkCircle" />
-                  </template>
-                  {{ t("keys.validShort") }}
-                </n-tag>
-                <n-tag v-else :bordered="false" round>
-                  <template #icon>
-                    <n-icon :component="AlertCircleOutline" />
-                  </template>
-                  {{ t("keys.invalidShort") }}
-                </n-tag>
-                <n-input class="key-text" :value="getDisplayValue(key)" readonly size="small" />
-                <div class="quick-actions">
-                  <n-button
-                    size="tiny"
-                    text
-                    @click="editKeyNotes(key)"
-                    :title="t('keys.editNotes')"
-                  >
-                    <template #icon>
-                      <n-icon :component="Pencil" />
-                    </template>
-                  </n-button>
-                  <n-button
-                    size="tiny"
-                    text
-                    @click="toggleKeyVisibility(key)"
-                    :title="t('keys.showHide')"
-                  >
-                    <template #icon>
-                      <n-icon :component="key.is_visible ? EyeOffOutline : EyeOutline" />
-                    </template>
-                  </n-button>
-                  <n-button size="tiny" text @click="copyKey(key)" :title="t('common.copy')">
-                    <template #icon>
-                      <n-icon :component="CopyOutline" />
-                    </template>
-                  </n-button>
-                </div>
-              </div>
-            </div>
 
-            <!-- 统计信息 + 操作按钮行 -->
-            <div class="key-bottom">
-              <div class="key-stats">
-                <span class="stat-item">
-                  {{ t("keys.requestsShort") }}
-                  <strong>{{ key.request_count }}</strong>
-                </span>
-                <span class="stat-item">
-                  {{ t("keys.failuresShort") }}
-                  <strong>{{ key.failure_count }}</strong>
-                </span>
-                <span class="stat-item">
-                  {{ key.last_used_at ? formatRelativeTime(key.last_used_at) : t("keys.unused") }}
-                </span>
-              </div>
-              <n-button-group class="key-actions">
-                <n-button
-                  round
-                  tertiary
-                  type="info"
-                  size="tiny"
-                  @click="testKey(key)"
-                  :title="t('keys.testKey')"
-                >
-                  {{ t("keys.testShort") }}
-                </n-button>
-                <n-button
-                  v-if="key.status !== 'active'"
-                  tertiary
-                  size="tiny"
-                  @click="restoreKey(key)"
-                  :title="t('keys.restoreKey')"
-                  type="warning"
-                >
-                  {{ t("keys.restoreShort") }}
-                </n-button>
-                <n-button
-                  round
-                  tertiary
-                  size="tiny"
-                  type="error"
-                  @click="deleteKey(key)"
-                  :title="t('keys.deleteKey')"
-                >
-                  {{ t("common.deleteShort") }}
-                </n-button>
-              </n-button-group>
+        <!-- Virtual scrolling for large datasets -->
+        <div
+          v-else-if="shouldUseVirtualScroll"
+          v-bind="containerProps"
+          class="virtual-grid-container"
+        >
+          <div v-bind="wrapperProps" class="virtual-grid-wrapper">
+            <div class="keys-grid keys-grid-virtual">
+              <key-card
+                v-for="item in virtualList"
+                :key="item.data.id"
+                :key-data="item.data"
+                @edit-notes="editKeyNotes"
+                @toggle-visibility="toggleKeyVisibility"
+                @copy="copyKey"
+                @test="testKey"
+                @restore="restoreKey"
+                @delete="deleteKey"
+              />
             </div>
           </div>
+        </div>
+
+        <!-- Regular grid for small datasets -->
+        <div v-else class="keys-grid">
+          <key-card
+            v-for="key in keys"
+            :key="key.id"
+            :key-data="key"
+            @edit-notes="editKeyNotes"
+            @toggle-visibility="toggleKeyVisibility"
+            @copy="copyKey"
+            @test="testKey"
+            @restore="restoreKey"
+            @delete="deleteKey"
+          />
         </div>
       </n-spin>
     </div>
 
-    <!-- 分页 -->
-    <div class="pagination-container">
-      <div class="pagination-info">
-        <span>{{ t("keys.totalRecords", { total }) }}</span>
-        <n-select
-          v-model:value="pageSize"
-          :options="[
-            { label: t('keys.recordsPerPage', { count: 12 }), value: 12 },
-            { label: t('keys.recordsPerPage', { count: 24 }), value: 24 },
-            { label: t('keys.recordsPerPage', { count: 60 }), value: 60 },
-            { label: t('keys.recordsPerPage', { count: 120 }), value: 120 },
-          ]"
-          size="small"
-          style="width: 100px; margin-left: 12px"
-          @update:value="changePageSize"
-        />
-      </div>
-      <div class="pagination-controls">
-        <n-button size="small" :disabled="currentPage <= 1" @click="changePage(currentPage - 1)">
-          {{ t("common.previousPage") }}
-        </n-button>
-        <span class="page-info">
-          {{ t("keys.pageInfo", { current: currentPage, total: totalPages }) }}
-        </span>
-        <n-button
-          size="small"
-          :disabled="currentPage >= totalPages"
-          @click="changePage(currentPage + 1)"
-        >
-          {{ t("common.nextPage") }}
-        </n-button>
-      </div>
-    </div>
+    <key-pagination
+      v-model:current-page="currentPage"
+      v-model:page-size="pageSize"
+      :total-pages="totalPages"
+      :total="total"
+    />
 
     <key-create-dialog
       v-if="selectedGroup?.id"
@@ -844,7 +611,6 @@ function resetPage() {
     />
   </div>
 
-  <!-- 备注编辑对话框 -->
   <n-modal v-model:show="notesDialogShow" preset="dialog" :title="t('keys.editKeyNotes')">
     <n-input
       v-model:value="editingNotes"
@@ -855,8 +621,12 @@ function resetPage() {
       show-count
     />
     <template #action>
-      <n-button @click="notesDialogShow = false">{{ t("common.cancel") }}</n-button>
-      <n-button type="primary" @click="saveKeyNotes">{{ t("common.save") }}</n-button>
+      <n-button @click="notesDialogShow = false" class="btn-cancel">
+        {{ t("common.cancel") }}
+      </n-button>
+      <n-button @click="saveKeyNotes" class="btn-confirm">
+        {{ t("common.save") }}
+      </n-button>
     </template>
   </n-modal>
 </template>
@@ -873,160 +643,12 @@ function resetPage() {
   flex-direction: column;
 }
 
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  background: var(--card-bg-solid);
-  border-bottom: 1px solid var(--border-color);
-  flex-shrink: 0;
-  gap: 16px;
-  min-height: 64px;
-}
-
-.toolbar :deep(.n-button) {
-  font-weight: 500;
-}
-
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  flex: 1;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.more-actions {
-  position: relative;
-}
-
-.more-menu {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  background: var(--card-bg-solid);
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  box-shadow: var(--shadow-lg);
-  min-width: 180px;
-  z-index: 1000;
-  overflow: hidden;
-}
-
-.menu-item {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: none;
-  text-align: left;
-  cursor: pointer;
-  font-size: 14px;
-  color: #333;
-  transition: background-color 0.2s;
-}
-
-.menu-item:hover {
-  background: #f8f9fa;
-}
-
-.menu-item.danger {
-  color: #dc3545;
-}
-
-.menu-item.danger:hover {
-  background: #f8d7da;
-}
-
-.menu-divider {
-  height: 1px;
-  background: #e9ecef;
-  margin: 4px 0;
-}
-
-.btn {
-  padding: 6px 12px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-
-.btn-sm {
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: #545b62;
-}
-
-.more-icon {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.filter-select,
-.search-input,
-.page-size-select {
-  padding: 4px 8px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.search-input {
-  width: 180px;
-}
-
-.filter-select:focus,
-.search-input:focus,
-.page-size-select:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-/* 密钥卡片网格 */
 .keys-grid-container {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .keys-grid {
@@ -1035,258 +657,29 @@ function resetPage() {
   gap: 16px;
 }
 
-.key-card {
-  background: var(--card-bg-solid);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 14px;
-  transition: all 0.2s;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.key-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
-}
-
-/* 状态相关样式 */
-.key-card.status-valid {
-  border-color: var(--success-border);
-  background: var(--success-bg);
-  border-width: 1.5px;
-}
-
-.key-card.status-invalid {
-  border-color: var(--invalid-border);
-  background: var(--card-bg-solid);
-  opacity: 0.85;
-}
-
-.key-card.status-error {
-  border-color: var(--error-border);
-  background: var(--error-bg);
-}
-
-/* 主要信息行 */
-.key-main {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.key-section {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Virtual grid container */
+.virtual-grid-container {
   flex: 1;
-  min-width: 0;
+  overflow-y: auto;
+  padding: 0 8px;
 }
 
-/* 底部统计和按钮行 */
-.key-bottom {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
+.virtual-grid-wrapper {
+  position: relative;
+  width: 100%;
 }
 
-.key-stats {
-  display: flex;
-  gap: 8px;
-  font-size: 12px;
-  overflow: hidden;
-  color: var(--text-secondary);
-  flex: 1;
-  min-width: 0;
+.keys-grid-virtual {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+  padding: 8px;
 }
 
-.stat-item {
-  white-space: nowrap;
-  color: var(--text-secondary);
-}
-
-.stat-item strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
-.key-actions {
-  flex-shrink: 0;
-  &:deep(.n-button) {
-    padding: 0 4px;
-  }
-}
-
-.key-text {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-weight: 500;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-/* 浅色主题 */
-:root:not(.dark) .key-text {
-  color: #495057;
-  background: #f8f9fa;
-}
-
-/* 暗黑主题 */
-:root.dark .key-text {
-  color: var(--text-primary);
-  background: var(--bg-tertiary);
-}
-
-:deep(.n-input__input-el) {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-  font-size: 13px;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.quick-btn {
-  padding: 4px 6px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 12px;
-  transition: background-color 0.2s;
-}
-
-/* 浅色主题 */
-:root:not(.dark) .quick-btn:hover {
-  background: #e9ecef;
-}
-
-/* 暗黑主题 */
-:root.dark .quick-btn:hover {
-  background: var(--bg-tertiary);
-}
-
-/* 统计信息行 */
-
-.action-btn {
-  padding: 2px 6px;
-  border: 1px solid var(--border-color);
-  background: var(--card-bg-solid);
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 500;
-  transition: all 0.2s;
-  white-space: nowrap;
-  color: var(--text-primary);
-}
-
-.action-btn:hover {
-  background: var(--bg-secondary);
-}
-
-.action-btn.primary {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
-}
-
-.action-btn.primary:hover {
-  background: var(--primary-color);
-  color: white;
-}
-
-.action-btn.secondary {
-  border-color: #6c757d;
-  color: #6c757d;
-}
-
-.action-btn.secondary:hover {
-  background: #6c757d;
-  color: white;
-}
-
-.action-btn.danger {
-  border-color: #dc3545;
-  color: #dc3545;
-}
-
-.action-btn.danger:hover {
-  background: #dc3545;
-  color: white;
-}
-
-/* 加载和空状态 */
-.loading-state,
-.empty-state {
+.empty-container {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 200px;
-  color: #6c757d;
-}
-
-.loading-spinner {
-  font-size: 14px;
-}
-
-.empty-text {
-  font-size: 14px;
-}
-
-/* 分页 */
-.pagination-container {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: var(--card-bg-solid);
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
-  border-radius: 0 0 8px 8px;
-}
-
-.pagination-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.pagination-controls {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-info {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-@media (max-width: 768px) {
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .toolbar-left,
-  .toolbar-right {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .toolbar-right .n-space {
-    width: 100%;
-    justify-content: space-between;
-  }
 }
 </style>
