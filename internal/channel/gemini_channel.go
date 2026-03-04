@@ -1,19 +1,15 @@
 package channel
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
-	"gpt-load/internal/utils"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 )
 
@@ -36,7 +32,7 @@ func newGeminiChannel(f *Factory, group *models.Group) (ChannelProxy, error) {
 	}, nil
 }
 
-// ModifyRequest adds the API key as a query parameter for Gemini requests.
+// ModifyRequest 为 Gemini 请求添加 API 密钥作为查询参数
 func (ch *GeminiChannel) ModifyRequest(req *http.Request, apiKey *models.APIKey, group *models.Group) {
 	if strings.Contains(req.URL.Path, "v1beta/openai") {
 		req.Header.Set("Authorization", "Bearer "+apiKey.KeyValue)
@@ -47,34 +43,19 @@ func (ch *GeminiChannel) ModifyRequest(req *http.Request, apiKey *models.APIKey,
 	}
 }
 
-// IsStreamRequest checks if the request is for a streaming response.
+// IsStreamRequest 检查请求是否为流式响应
 func (ch *GeminiChannel) IsStreamRequest(c *gin.Context, bodyBytes []byte) bool {
-	path := c.Request.URL.Path
-	if strings.HasSuffix(path, ":streamGenerateContent") {
+	// 检查 Gemini 特定的流式路径
+	if strings.HasSuffix(c.Request.URL.Path, ":streamGenerateContent") {
 		return true
 	}
 
-	// Also check for standard streaming indicators as a fallback.
-	if strings.Contains(c.GetHeader("Accept"), "text/event-stream") {
-		return true
-	}
-	if c.Query("stream") == "true" {
-		return true
-	}
-
-	type streamPayload struct {
-		Stream bool `json:"stream"`
-	}
-	var p streamPayload
-	if err := json.Unmarshal(bodyBytes, &p); err == nil {
-		return p.Stream
-	}
-
-	return false
+	// 使用基础通道方法检查标准流式指示器
+	return ch.BaseChannel.IsStreamRequest(c, bodyBytes)
 }
 
 func (ch *GeminiChannel) ExtractModel(c *gin.Context, bodyBytes []byte) string {
-	// gemini format
+	// gemini 格式：从 URL 路径提取
 	path := c.Request.URL.Path
 	parts := strings.Split(path, "/")
 	for i, part := range parts {
@@ -84,83 +65,44 @@ func (ch *GeminiChannel) ExtractModel(c *gin.Context, bodyBytes []byte) string {
 		}
 	}
 
-	// openai format
-	type modelPayload struct {
-		Model string `json:"model"`
-	}
-	var p modelPayload
-	if err := json.Unmarshal(bodyBytes, &p); err == nil && p.Model != "" {
-		return p.Model
-	}
-
-	return ""
+	// openai 格式：使用基础通道方法
+	return ch.BaseChannel.ExtractModel(c, bodyBytes)
 }
 
-// ValidateKey checks if the given API key is valid by making a generateContent request.
-func (ch *GeminiChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group) (bool, error) {
-	upstreamURL := ch.getUpstreamURL()
-	if upstreamURL == nil {
-		return false, fmt.Errorf("no upstream URL configured for channel %s", ch.Name)
-	}
-
-	// Safely join the path segments
-	reqURL, err := url.JoinPath(upstreamURL.String(), "v1beta", "models", ch.TestModel+":generateContent")
-	if err != nil {
-		return false, fmt.Errorf("failed to create gemini validation path: %w", err)
-	}
-	reqURL += "?key=" + apiKey.KeyValue
-
-	payload := gin.H{
-		"contents": []gin.H{
-			{
-				"role": "user",
-				"parts": []gin.H{
-					{"text": "hi"},
+// ValidateKey 通过发送 generateContent 请求检查给定的 API 密钥是否有效
+func (ch *GeminiChannel) ValidateKey(ctx context.Context, apiKey *models.APIKey, group *models.Group, model string) (bool, error) {
+	return ch.validateKeyCommon(ctx, apiKey, group, model, ValidateKeyConfig{
+		BuildPayload: func(testModel string) (map[string]any, error) {
+			return gin.H{
+				"contents": []gin.H{
+					{
+						"role": "user",
+						"parts": []gin.H{
+							{"text": "hi"},
+						},
+					},
 				},
-			},
+			}, nil
 		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return false, fmt.Errorf("failed to marshal validation payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", reqURL, bytes.NewBuffer(body))
-	if err != nil {
-		return false, fmt.Errorf("failed to create validation request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	// Apply custom header rules if available
-	if len(group.HeaderRuleList) > 0 {
-		headerCtx := utils.NewHeaderVariableContext(group, apiKey)
-		utils.ApplyHeaderRules(req, group.HeaderRuleList, headerCtx)
-	}
-
-	resp, err := ch.HTTPClient.Do(req)
-	if err != nil {
-		return false, fmt.Errorf("failed to send validation request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Any 2xx status code indicates the key is valid.
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		return true, nil
-	}
-
-	// For non-200 responses, parse the body to provide a more specific error reason.
-	errorBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return false, fmt.Errorf("key is invalid (status %d), but failed to read error body: %w", resp.StatusCode, err)
-	}
-
-	// Use the new parser to extract a clean error message.
-	parsedError := app_errors.ParseUpstreamError(errorBody)
-
-	return false, fmt.Errorf("[status %d] %s", resp.StatusCode, parsedError)
+		SetAuthHeaders: func(req *http.Request, apiKey *models.APIKey) {
+			// Gemini 将 API 密钥作为查询参数添加，而非请求头
+		},
+		BuildRequestURL: func(upstreamURL *url.URL) (string, error) {
+			// 使用提供的模型或回退到通道的 TestModel
+			testModel := model
+			if testModel == "" {
+				testModel = ch.TestModel
+			}
+			reqURL, err := url.JoinPath(upstreamURL.String(), "v1beta", "models", testModel+":generateContent")
+			if err != nil {
+				return "", fmt.Errorf("failed to create gemini validation path: %w", err)
+			}
+			return reqURL + "?key=" + apiKey.KeyValue, nil
+		},
+	})
 }
 
-// ApplyModelRedirect overrides the default implementation for Gemini channel.
+// ApplyModelRedirect 覆盖 Gemini 通道的默认实现
 func (ch *GeminiChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error) {
 	if len(group.ModelRedirectMap) == 0 {
 		return bodyBytes, nil
@@ -173,7 +115,7 @@ func (ch *GeminiChannel) ApplyModelRedirect(req *http.Request, bodyBytes []byte,
 	return ch.applyNativeFormatRedirect(req, bodyBytes, group)
 }
 
-// applyNativeFormatRedirect handles model redirection for Gemini native format.
+// applyNativeFormatRedirect 处理 Gemini 原生格式的模型重定向
 func (ch *GeminiChannel) applyNativeFormatRedirect(req *http.Request, bodyBytes []byte, group *models.Group) ([]byte, error) {
 	path := req.URL.Path
 	parts := strings.Split(path, "/")
@@ -183,18 +125,18 @@ func (ch *GeminiChannel) applyNativeFormatRedirect(req *http.Request, bodyBytes 
 			modelPart := parts[i+1]
 			originalModel := strings.Split(modelPart, ":")[0]
 
-			if targetModel, found := group.ModelRedirectMap[originalModel]; found {
+			if actualModel, found := group.ModelRedirectMap[originalModel]; found {
 				suffix := ""
 				if colonIndex := strings.Index(modelPart, ":"); colonIndex != -1 {
 					suffix = modelPart[colonIndex:]
 				}
-				parts[i+1] = targetModel + suffix
+				parts[i+1] = actualModel + suffix
 				req.URL.Path = strings.Join(parts, "/")
 
 				logrus.WithFields(logrus.Fields{
 					"group":          group.Name,
 					"original_model": originalModel,
-					"target_model":   targetModel,
+					"model":          actualModel,
 					"channel":        "gemini_native",
 					"original_path":  path,
 					"new_path":       req.URL.Path,
@@ -213,7 +155,7 @@ func (ch *GeminiChannel) applyNativeFormatRedirect(req *http.Request, bodyBytes 
 	return bodyBytes, nil
 }
 
-// TransformModelList transforms the model list response based on redirect rules.
+// TransformModelList 根据重定向规则转换模型列表响应
 func (ch *GeminiChannel) TransformModelList(req *http.Request, bodyBytes []byte, group *models.Group) (map[string]any, error) {
 	var response map[string]any
 	if err := json.Unmarshal(bodyBytes, &response); err != nil {
@@ -232,7 +174,7 @@ func (ch *GeminiChannel) TransformModelList(req *http.Request, bodyBytes []byte,
 	return response, nil
 }
 
-// transformGeminiNativeFormat transforms Gemini native format model list
+// transformGeminiNativeFormat 转换 Gemini 原生格式的模型列表
 func (ch *GeminiChannel) transformGeminiNativeFormat(req *http.Request, response map[string]any, modelsInterface any, group *models.Group) map[string]any {
 	upstreamModels, ok := modelsInterface.([]any)
 	if !ok {
@@ -241,7 +183,7 @@ func (ch *GeminiChannel) transformGeminiNativeFormat(req *http.Request, response
 
 	configuredModels := buildConfiguredGeminiModels(group.ModelRedirectMap)
 
-	// Strict mode: return only configured models (whitelist)
+	// 严格模式：仅返回配置的模型（白名单）
 	if group.ModelRedirectStrict {
 		response["models"] = configuredModels
 		delete(response, "nextPageToken")
@@ -256,7 +198,7 @@ func (ch *GeminiChannel) transformGeminiNativeFormat(req *http.Request, response
 		return response
 	}
 
-	// Non-strict mode: merge upstream + configured models (upstream priority)
+	// 非严格模式：合并上游 + 配置的模型（上游优先）
 	var merged []any
 	if isFirstPage(req) {
 		merged = mergeGeminiModelLists(upstreamModels, configuredModels)
@@ -284,7 +226,7 @@ func (ch *GeminiChannel) transformGeminiNativeFormat(req *http.Request, response
 	return response
 }
 
-// buildConfiguredGeminiModels builds a list of models from redirect rules for Gemini format
+// buildConfiguredGeminiModels 为 Gemini 格式从重定向规则构建模型列表
 func buildConfiguredGeminiModels(redirectMap map[string]string) []any {
 	if len(redirectMap) == 0 {
 		return []any{}
@@ -306,7 +248,7 @@ func buildConfiguredGeminiModels(redirectMap map[string]string) []any {
 	return models
 }
 
-// mergeGeminiModelLists merges upstream and configured model lists for Gemini format
+// mergeGeminiModelLists 为 Gemini 格式合并上游和配置的模型列表
 func mergeGeminiModelLists(upstream []any, configured []any) []any {
 	upstreamNames := make(map[string]bool)
 	for _, item := range upstream {
@@ -319,11 +261,11 @@ func mergeGeminiModelLists(upstream []any, configured []any) []any {
 		}
 	}
 
-	// Start with all upstream models
+	// 从所有上游模型开始
 	result := make([]any, len(upstream))
 	copy(result, upstream)
 
-	// Add configured models that don't exist in upstream
+	// 添加上游中不存在的配置模型
 	for _, item := range configured {
 		if modelObj, ok := item.(map[string]any); ok {
 			if modelName, ok := modelObj["name"].(string); ok {
@@ -338,7 +280,7 @@ func mergeGeminiModelLists(upstream []any, configured []any) []any {
 	return result
 }
 
-// isFirstPage checks if this is the first page of a Gemini paginated request
+// isFirstPage 检查这是否是 Gemini 分页请求的第一页
 func isFirstPage(req *http.Request) bool {
 	pageToken := req.URL.Query().Get("pageToken")
 	return pageToken == ""
