@@ -1,4 +1,3 @@
-import { useAuthService } from "@/services/auth";
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import Layout from "@/components/Layout.vue";
 
@@ -36,21 +35,23 @@ const routes: Array<RouteRecordRaw> = [
   },
 ];
 
+const PUBLIC_PATHS = ["/", "/login"];
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
 });
 
-const { checkLogin } = useAuthService();
-
 router.beforeEach((to, _from, next) => {
-  const loggedIn = checkLogin();
-  if (to.path !== "/login" && !loggedIn) {
-    return next({ path: "/login" });
+  const loggedIn = !!localStorage.getItem("authKey");
+
+  if (PUBLIC_PATHS.includes(to.path)) {
+    next();
+    return;
   }
 
-  if (to.path === "/login" && loggedIn) {
-    return next({ path: "/" });
+  if (!loggedIn) {
+    return next({ path: "/login" });
   }
 
   next();

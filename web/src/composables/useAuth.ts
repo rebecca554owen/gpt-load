@@ -1,30 +1,34 @@
 import http from "@/utils/http";
-import { useState } from "@/utils/state";
+import { useAuthStore } from "@/stores/auth";
 
-const AUTH_KEY = "authKey";
-
-export const useAuthKey = () => {
-  return useState<string | null>(AUTH_KEY, () => null);
-};
+export function useAuthKey() {
+  const authStore = useAuthStore();
+  return {
+    get value() {
+      return authStore.authKey;
+    },
+    set value(key: string | null) {
+      authStore.setAuthKey(key);
+    },
+  };
+}
 
 export function useAuthService() {
   const authKey = useAuthKey();
+  const authStore = useAuthStore();
 
   const login = async (key: string): Promise<boolean> => {
     try {
       await http.post("/auth/login", { auth_key: key });
-      localStorage.setItem(AUTH_KEY, key);
-      authKey.value = key;
+      authStore.setAuthKey(key);
       return true;
     } catch (_error) {
-      // 错误已记录
       return false;
     }
   };
 
   const logout = (): void => {
-    localStorage.removeItem(AUTH_KEY);
-    authKey.value = null;
+    authStore.clearAuthKey();
   };
 
   const checkLogin = (): boolean => {
@@ -32,9 +36,9 @@ export function useAuthService() {
       return true;
     }
 
-    const key = localStorage.getItem(AUTH_KEY);
+    const key = localStorage.getItem("authKey");
     if (key) {
-      authKey.value = key;
+      authStore.setAuthKey(key);
     }
     return !!authKey.value;
   };
