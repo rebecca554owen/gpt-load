@@ -7,7 +7,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Key状态
+// 密钥状态常量
 const (
 	KeyStatusActive  = "active"
 	KeyStatusInvalid = "invalid"
@@ -23,7 +23,7 @@ type SystemSetting struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// GroupConfig 存储特定于分组的配置
+// GroupConfig 存储组特定配置
 type GroupConfig struct {
 	RequestTimeout               *int    `json:"request_timeout,omitempty"`
 	IdleConnTimeout              *int    `json:"idle_conn_timeout,omitempty"`
@@ -40,14 +40,14 @@ type GroupConfig struct {
 	EnableRequestBodyLogging     *bool   `json:"enable_request_body_logging,omitempty"`
 }
 
-// HeaderRule defines a single rule for header manipulation.
+// HeaderRule 定义单个标头操作规则。
 type HeaderRule struct {
 	Key    string `json:"key"`
 	Value  string `json:"value"`
 	Action string `json:"action"` // "set" or "remove"
 }
 
-// GroupSubGroup 聚合分组和子分组的关联表
+// GroupSubGroup 聚合组和子组的关联表
 type GroupSubGroup struct {
 	ID         uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	GroupID    uint      `gorm:"not null;uniqueIndex:idx_group_sub" json:"group_id"`
@@ -56,11 +56,11 @@ type GroupSubGroup struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
-	// Lightweight association - only store necessary info for performance
+	// 轻量级关联 - 仅存储性能所需的信息
 	SubGroupName string `gorm:"-" json:"sub_group_name,omitempty"`
 }
 
-// SubGroupInfo 用于API响应的子分组信息
+// SubGroupInfo API 响应的子组信息
 type SubGroupInfo struct {
 	Group       Group `json:"group"`
 	Weight      int   `json:"weight"`
@@ -69,12 +69,27 @@ type SubGroupInfo struct {
 	InvalidKeys int64 `json:"invalid_keys"`
 }
 
-// ParentAggregateGroupInfo 用于API响应的父聚合分组信息
+// ParentAggregateGroupInfo API 响应的父聚合组信息
 type ParentAggregateGroupInfo struct {
 	GroupID     uint   `json:"group_id"`
 	Name        string `json:"name"`
 	DisplayName string `json:"display_name"`
 	Weight      int    `json:"weight"`
+}
+
+// ModelMappingTarget 定义模型映射的单个目标
+type ModelMappingTarget struct {
+	SubGroupID   uint     `json:"sub_group_id"`
+	Weight       int      `json:"weight"`
+	SubGroupName string   `json:"sub_group_name,omitempty"`
+	Model        string   `json:"model"`  // 向后兼容
+	Models       []string `json:"models"` // 多模型支持
+}
+
+// ModelMapping 定义从模型名称到子组集合的映射
+type ModelMapping struct {
+	Model   string               `json:"model"`
+	Targets []ModelMappingTarget `json:"targets"`
 }
 
 // Group 对应 groups 表
@@ -97,13 +112,16 @@ type Group struct {
 	HeaderRules         datatypes.JSON       `gorm:"type:json" json:"header_rules"`
 	ModelRedirectRules  datatypes.JSONMap    `gorm:"type:json" json:"model_redirect_rules"`
 	ModelRedirectStrict bool                 `gorm:"default:false" json:"model_redirect_strict"`
+	ModelMappings       datatypes.JSON       `gorm:"type:json" json:"model_mappings"`
+	ModelMappingStrict  bool                 `gorm:"default:false" json:"model_mapping_strict"`
+	ModelMappingList    []ModelMapping       `gorm:"-" json:"model_mappings_list,omitempty"`
 	APIKeys             []APIKey             `gorm:"foreignKey:GroupID" json:"api_keys"`
 	SubGroups           []GroupSubGroup      `gorm:"-" json:"sub_groups,omitempty"`
 	LastValidatedAt     *time.Time           `json:"last_validated_at"`
 	CreatedAt           time.Time            `json:"created_at"`
 	UpdatedAt           time.Time            `json:"updated_at"`
 
-	// For cache
+	// 用于缓存
 	ProxyKeysMap     map[string]struct{} `gorm:"-" json:"-"`
 	HeaderRuleList   []HeaderRule        `gorm:"-" json:"-"`
 	ModelRedirectMap map[string]string   `gorm:"-" json:"-"`
@@ -133,7 +151,7 @@ const (
 // RequestLog 对应 request_logs 表
 type RequestLog struct {
 	ID              string    `gorm:"type:varchar(36);primaryKey" json:"id"`
-	Timestamp       time.Time `gorm:"not null;index" json:"timestamp"`
+	Timestamp       time.Time `gorm:"not null;index:idx_request_logs_timestamp_request_type,priority:1" json:"timestamp"`
 	GroupID         uint      `gorm:"not null;index" json:"group_id"`
 	GroupName       string    `gorm:"type:varchar(255);index" json:"group_name"`
 	ParentGroupID   uint      `gorm:"index" json:"parent_group_id"`
@@ -141,6 +159,7 @@ type RequestLog struct {
 	KeyValue        string    `gorm:"type:text" json:"key_value"`
 	KeyHash         string    `gorm:"type:varchar(128);index" json:"key_hash"`
 	Model           string    `gorm:"type:varchar(255);index" json:"model"`
+	OriginalModel   string    `gorm:"type:varchar(255);index" json:"original_model"` // 原始请求的模型名称，用于与映射模型区分
 	IsSuccess       bool      `gorm:"not null" json:"is_success"`
 	SourceIP        string    `gorm:"type:varchar(64)" json:"source_ip"`
 	StatusCode      int       `gorm:"not null" json:"status_code"`
@@ -148,13 +167,18 @@ type RequestLog struct {
 	Duration        int64     `gorm:"not null" json:"duration_ms"`
 	ErrorMessage    string    `gorm:"type:text" json:"error_message"`
 	UserAgent       string    `gorm:"type:varchar(512)" json:"user_agent"`
-	RequestType     string    `gorm:"type:varchar(20);not null;default:'final';index" json:"request_type"`
+	RequestType     string    `gorm:"type:varchar(20);not null;default:'final';index:idx_request_logs_timestamp_request_type,priority:2" json:"request_type"`
 	UpstreamAddr    string    `gorm:"type:varchar(500)" json:"upstream_addr"`
 	IsStream        bool      `gorm:"not null" json:"is_stream"`
 	RequestBody     string    `gorm:"type:text" json:"request_body"`
+	// Token 统计字段
+	PromptTokens     int64 `gorm:"default:0" json:"prompt_tokens"`     // 输入提示 tokens
+	CompletionTokens int64 `gorm:"default:0" json:"completion_tokens"` // 输出完成 tokens
+	TotalTokens      int64 `gorm:"default:0" json:"total_tokens"`      // 总 tokens
+	CachedTokens     int64 `gorm:"default:0" json:"cached_tokens"`     // 缓存的 tokens (Claude)
 }
 
-// StatCard 用于仪表盘的单个统计卡片数据
+// StatCard 仪表板的统计卡片数据
 type StatCard struct {
 	Value         float64 `json:"value"`
 	SubValue      int64   `json:"sub_value,omitempty"`
@@ -163,40 +187,46 @@ type StatCard struct {
 	TrendIsGrowth bool    `json:"trend_is_growth"`
 }
 
-// SecurityWarning 用于安全警告信息
+// SecurityWarning 安全警告信息
 type SecurityWarning struct {
-	Type       string `json:"type"`       // 警告类型：auth_key, encryption_key 等
-	Message    string `json:"message"`    // 警告信息
-	Severity   string `json:"severity"`   // 严重程度：low, medium, high
-	Suggestion string `json:"suggestion"` // 建议解决方案
+	Type       string `json:"type"`       // 警告类型：auth_key、encryption_key 等
+	Message    string `json:"message"`    // 警告消息
+	Severity   string `json:"severity"`   // 严重程度级别：low、medium、high
+	Suggestion string `json:"suggestion"` // 建议的解决方案
 }
 
-// DashboardStatsResponse 用于仪表盘基础统计的API响应
+// DashboardStatsResponse 仪表板基本统计的 API 响应
 type DashboardStatsResponse struct {
-	KeyCount         StatCard          `json:"key_count"`
-	RPM              StatCard          `json:"rpm"`
-	RequestCount     StatCard          `json:"request_count"`
-	ErrorRate        StatCard          `json:"error_rate"`
-	SecurityWarnings []SecurityWarning `json:"security_warnings"`
+	KeyCount             StatCard          `json:"key_count"`               // 密钥数量
+	TokenConsumption     StatCard          `json:"token_consumption"`       // 总 tokens
+	PromptTokens         StatCard          `json:"prompt_tokens"`           // 输入 tokens
+	NonCachedPromptTokens StatCard          `json:"non_cached_prompt_tokens"` // 非缓存输入 tokens
+	CachedTokens         StatCard          `json:"cached_tokens"`           // 缓存的 tokens (输入)
+	CompletionTokens     StatCard          `json:"completion_tokens"`       // 完成 tokens (输出)
+	TotalTokens          StatCard          `json:"total_tokens"`            // 总 tokens
+	RPM                  StatCard          `json:"rpm"`                     // RPM
+	RequestCount         StatCard          `json:"request_count"`           // 请求数量
+	ErrorRate            StatCard          `json:"error_rate"`              // 错误率
+	SecurityWarnings     []SecurityWarning `json:"security_warnings"`
 }
 
-// ChartDataset 用于图表的数据集
+// ChartDataset 图表数据集
 type ChartDataset struct {
-	Label string  `json:"label"`
-	Data  []int64 `json:"data"`
-	Color string  `json:"color"`
+	Label     string  `json:"label"`     // 翻译的显示名称
+	LabelKey  string  `json:"label_key"` // 用于颜色映射的 i18n 键
+	Data      []int64 `json:"data"`
 }
 
-// ChartData 用于图表的API响应
+// ChartData 图表的 API 响应
 type ChartData struct {
 	Labels   []string       `json:"labels"`
 	Datasets []ChartDataset `json:"datasets"`
 }
 
-// GroupHourlyStat 对应 group_hourly_stats 表，用于存储每个分组每小时的请求统计
+// GroupHourlyStat 对应 group_hourly_stats 表，存储每个组的每小时请求统计
 type GroupHourlyStat struct {
 	ID           uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Time         time.Time `gorm:"not null;uniqueIndex:idx_group_time" json:"time"` // 整点时间
+	Time         time.Time `gorm:"not null;uniqueIndex:idx_group_time" json:"time"` // 每小时时间戳
 	GroupID      uint      `gorm:"not null;uniqueIndex:idx_group_time" json:"group_id"`
 	SuccessCount int64     `gorm:"not null;default:0" json:"success_count"`
 	FailureCount int64     `gorm:"not null;default:0" json:"failure_count"`
