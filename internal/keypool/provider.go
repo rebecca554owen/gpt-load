@@ -146,20 +146,21 @@ func (p *KeyProvider) executeTransactionWithRetry(operation func(tx *gorm.DB) er
 }
 
 func (p *KeyProvider) handleSuccess(keyID uint, keyHashKey, activeKeysListKey string) error {
-	keyDetails, err := p.store.HGetAll(keyHashKey)
-	if err != nil {
-		return fmt.Errorf("failed to get key details from store: %w", err)
-	}
-
-	failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
-	isActive := keyDetails["status"] == models.KeyStatusActive
-
-	// 无论失败计数如何，都更新请求计数和最后使用时间
 	return p.executeTransactionWithRetry(func(tx *gorm.DB) error {
 		var key models.APIKey
 		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&key, keyID).Error; err != nil {
 			return fmt.Errorf("failed to lock key %d for update: %w", keyID, err)
 		}
+
+		// 在事务内检查缓存状态
+		keyDetails, err := p.store.HGetAll(keyHashKey)
+		if err != nil {
+			return fmt.Errorf("failed to get key details from store: %w", err)
+		}
+
+		failureCount, _ := strconv.ParseInt(keyDetails["failure_count"], 10, 64)
+		isActive := keyDetails["status"] == models.KeyStatusActive
+		keyExistsInStore := len(keyDetails) > 0
 
 		now := time.Now()
 		updates := map[string]any{
@@ -177,6 +178,24 @@ func (p *KeyProvider) handleSuccess(keyID uint, keyHashKey, activeKeysListKey st
 
 		if err := tx.Model(&key).Updates(updates).Error; err != nil {
 			return fmt.Errorf("failed to update key in DB: %w", err)
+		}
+
+		// 如果密钥不在缓存中或缓存不完整，重新初始化缓存
+		if !keyExistsInStore {
+			logrus.WithField("keyID", keyID).Debug("Key not found in store, reinitializing cache.")
+			if failureCount > 0 {
+				key.FailureCount = 0
+			}
+			if !isActive {
+				key.Status = models.KeyStatusActive
+			}
+			if err := p.addKeyToStore(&key); err != nil {
+				return fmt.Errorf("failed to reinitialize key in store: %w", err)
+			}
+			if !isActive {
+				logrus.WithField("keyID", keyID).Info("Key has recovered and been restored to active pool.")
+			}
+			return nil
 		}
 
 		// 更新存储中的数据
