@@ -138,9 +138,7 @@ func (s *CronChecker) validateGroupKeys(group *models.Group) {
 
 	concurrency := group.EffectiveConfig.KeyValidationConcurrency
 	for range concurrency {
-		keyWg.Add(1)
-		go func() {
-			defer keyWg.Done()
+		keyWg.Go(func() {
 			for {
 				select {
 				case key, ok := <-jobs:
@@ -167,7 +165,7 @@ func (s *CronChecker) validateGroupKeys(group *models.Group) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 DistributeLoop:

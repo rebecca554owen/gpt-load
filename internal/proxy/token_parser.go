@@ -152,9 +152,9 @@ func isEmoji(r rune) bool {
 }
 
 var (
-	mathSymbolMap map[rune]bool
+	mathSymbolMap    map[rune]bool
 	mathSymbolRanges []struct{ min, max rune }
-	urlDelimMap map[rune]bool
+	urlDelimMap      map[rune]bool
 )
 
 func init() {
@@ -217,7 +217,7 @@ func (u *TokenUsage) Total() int64 {
 	return u.PromptTokens + u.CompletionTokens
 }
 
-func extractTokenFields(u map[string]interface{}, usage *TokenUsage, channelType string) {
+func extractTokenFields(u map[string]any, usage *TokenUsage, channelType string) {
 	// 提取 prompt/input tokens
 	if pt, ok := u["prompt_tokens"].(float64); ok {
 		usage.PromptTokens = int64(pt)
@@ -239,10 +239,10 @@ func extractTokenFields(u map[string]interface{}, usage *TokenUsage, channelType
 	processCacheByChannel(usage, channelType)
 }
 
-func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
+func extractCachedTokens(u map[string]any, usage *TokenUsage) {
 	// 尝试 OpenAI prompt_tokens_details.cached_tokens
 	if usage.CachedTokens == 0 {
-		if ptd, ok := u["prompt_tokens_details"].(map[string]interface{}); ok {
+		if ptd, ok := u["prompt_tokens_details"].(map[string]any); ok {
 			if ct, ok := ptd["cached_tokens"].(float64); ok {
 				usage.CachedTokens = int64(ct)
 			}
@@ -251,7 +251,7 @@ func extractCachedTokens(u map[string]interface{}, usage *TokenUsage) {
 
 	// 尝试 OpenAI 兼容的 input_tokens_details.cached_tokens
 	if usage.CachedTokens == 0 {
-		if itd, ok := u["input_tokens_details"].(map[string]interface{}); ok {
+		if itd, ok := u["input_tokens_details"].(map[string]any); ok {
 			if ct, ok := itd["cached_tokens"].(float64); ok {
 				usage.CachedTokens = int64(ct)
 			}
@@ -294,14 +294,14 @@ func ParseUsage(body []byte, channelType string) *TokenUsage {
 		return nil
 	}
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil
 	}
 
 	usage := &TokenUsage{}
 
-	if u, ok := resp["usage"].(map[string]interface{}); ok {
+	if u, ok := resp["usage"].(map[string]any); ok {
 		extractTokenFields(u, usage, channelType)
 	} else {
 		// 尝试 Anthropic 格式（顶级字段）
@@ -343,15 +343,15 @@ func ParseUsageFromStream(tailData []byte, channelType string) *TokenUsage {
 			continue
 		}
 
-		if strings.HasPrefix(line, "data: ") {
-			line = strings.TrimPrefix(line, "data: ")
+		if after, ok := strings.CutPrefix(line, "data: "); ok {
+			line = after
 		}
 
 		if !strings.Contains(line, `"usage"`) {
 			continue
 		}
 
-		var data map[string]interface{}
+		var data map[string]any
 		if err := json.Unmarshal([]byte(line), &data); err != nil {
 			continue
 		}
@@ -359,13 +359,13 @@ func ParseUsageFromStream(tailData []byte, channelType string) *TokenUsage {
 		usage := &TokenUsage{}
 		found := false
 
-		if u, ok := data["usage"].(map[string]interface{}); ok {
+		if u, ok := data["usage"].(map[string]any); ok {
 			extractTokenFields(u, usage, channelType)
 			found = true
 		}
 
-		if msg, ok := data["message"].(map[string]interface{}); ok {
-			if u, ok := msg["usage"].(map[string]interface{}); ok {
+		if msg, ok := data["message"].(map[string]any); ok {
+			if u, ok := msg["usage"].(map[string]any); ok {
 				extractTokenFields(u, usage, channelType)
 				found = true
 			}
@@ -436,7 +436,7 @@ func estimateTokensFromStream(model string, requestBody, streamData []byte) *Tok
 
 // extractPromptFromRequest 从请求体中提取提示文本
 func extractPromptFromRequest(body []byte) string {
-	var req map[string]interface{}
+	var req map[string]any
 	if err := json.Unmarshal(body, &req); err != nil {
 		return ""
 	}
@@ -444,18 +444,18 @@ func extractPromptFromRequest(body []byte) string {
 	var textBuilder strings.Builder
 
 	// 从消息数组提取（OpenAI/Claude 格式）
-	if messages, ok := req["messages"].([]interface{}); ok {
+	if messages, ok := req["messages"].([]any); ok {
 		for _, msg := range messages {
-			if m, ok := msg.(map[string]interface{}); ok {
+			if m, ok := msg.(map[string]any); ok {
 				// 处理内容为字符串的情况
 				if content, ok := m["content"].(string); ok {
 					textBuilder.WriteString(content)
 					textBuilder.WriteString(" ")
 				}
 				// 处理内容为数组的情况（多模态）
-				if contentArr, ok := m["content"].([]interface{}); ok {
+				if contentArr, ok := m["content"].([]any); ok {
 					for _, item := range contentArr {
-						if itemMap, ok := item.(map[string]interface{}); ok {
+						if itemMap, ok := item.(map[string]any); ok {
 							if text, ok := itemMap["text"].(string); ok {
 								textBuilder.WriteString(text)
 								textBuilder.WriteString(" ")
@@ -477,7 +477,7 @@ func extractPromptFromRequest(body []byte) string {
 
 // extractCompletionFromResponse 从响应体中提取完成文本
 func extractCompletionFromResponse(body []byte) string {
-	var resp map[string]interface{}
+	var resp map[string]any
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return ""
 	}
@@ -485,10 +485,10 @@ func extractCompletionFromResponse(body []byte) string {
 	var textBuilder strings.Builder
 
 	// OpenAI 格式：choices[].message.content
-	if choices, ok := resp["choices"].([]interface{}); ok {
+	if choices, ok := resp["choices"].([]any); ok {
 		for _, choice := range choices {
-			if c, ok := choice.(map[string]interface{}); ok {
-				if message, ok := c["message"].(map[string]interface{}); ok {
+			if c, ok := choice.(map[string]any); ok {
+				if message, ok := c["message"].(map[string]any); ok {
 					if content, ok := message["content"].(string); ok {
 						textBuilder.WriteString(content)
 						textBuilder.WriteString(" ")
@@ -504,9 +504,9 @@ func extractCompletionFromResponse(body []byte) string {
 	}
 
 	// Claude 格式：content[].text
-	if content, ok := resp["content"].([]interface{}); ok {
+	if content, ok := resp["content"].([]any); ok {
 		for _, item := range content {
-			if itemMap, ok := item.(map[string]interface{}); ok {
+			if itemMap, ok := item.(map[string]any); ok {
 				if text, ok := itemMap["text"].(string); ok {
 					textBuilder.WriteString(text)
 					textBuilder.WriteString(" ")
@@ -519,23 +519,23 @@ func extractCompletionFromResponse(body []byte) string {
 }
 
 // parseStreamChunks 解析 SSE 数据块并对每个块调用提供的函数
-func parseStreamChunks(data []byte, fn func(chunk map[string]interface{})) {
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
+func parseStreamChunks(data []byte, fn func(chunk map[string]any)) {
+	lines := strings.SplitSeq(string(data), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || line == "data: [DONE]" || line == "[DONE]" {
 			continue
 		}
 
-		if strings.HasPrefix(line, "data: ") {
-			line = strings.TrimPrefix(line, "data: ")
+		if after, ok := strings.CutPrefix(line, "data: "); ok {
+			line = after
 		}
 
 		if line == "" {
 			continue
 		}
 
-		var chunk map[string]interface{}
+		var chunk map[string]any
 		if err := json.Unmarshal([]byte(line), &chunk); err != nil {
 			continue
 		}
@@ -547,12 +547,12 @@ func parseStreamChunks(data []byte, fn func(chunk map[string]interface{})) {
 // extractCompletionFromStream 从 SSE 流式数据中提取完成文本
 func extractCompletionFromStream(streamData []byte) string {
 	var textBuilder strings.Builder
-	parseStreamChunks(streamData, func(data map[string]interface{}) {
+	parseStreamChunks(streamData, func(data map[string]any) {
 		// OpenAI 格式：choices[].delta.content
-		if choices, ok := data["choices"].([]interface{}); ok {
+		if choices, ok := data["choices"].([]any); ok {
 			for _, choice := range choices {
-				if c, ok := choice.(map[string]interface{}); ok {
-					if delta, ok := c["delta"].(map[string]interface{}); ok {
+				if c, ok := choice.(map[string]any); ok {
+					if delta, ok := c["delta"].(map[string]any); ok {
 						if content, ok := delta["content"].(string); ok {
 							textBuilder.WriteString(content)
 						}
@@ -561,7 +561,7 @@ func extractCompletionFromStream(streamData []byte) string {
 			}
 		}
 		// Claude 格式：delta.text
-		if delta, ok := data["delta"].(map[string]interface{}); ok {
+		if delta, ok := data["delta"].(map[string]any); ok {
 			if text, ok := delta["text"].(string); ok {
 				textBuilder.WriteString(text)
 			}
@@ -573,12 +573,12 @@ func extractCompletionFromStream(streamData []byte) string {
 // containsContent 检查数据块是否包含实际的 token 内容（不仅仅是控制消息）
 func containsContent(chunk []byte) bool {
 	found := false
-	parseStreamChunks(chunk, func(data map[string]interface{}) {
+	parseStreamChunks(chunk, func(data map[string]any) {
 		// OpenAI 格式：choices[].delta.content
-		if choices, ok := data["choices"].([]interface{}); ok {
+		if choices, ok := data["choices"].([]any); ok {
 			for _, choice := range choices {
-				if c, ok := choice.(map[string]interface{}); ok {
-					if delta, ok := c["delta"].(map[string]interface{}); ok {
+				if c, ok := choice.(map[string]any); ok {
+					if delta, ok := c["delta"].(map[string]any); ok {
 						if content, ok := delta["content"].(string); ok && content != "" {
 							found = true
 							return
@@ -588,7 +588,7 @@ func containsContent(chunk []byte) bool {
 			}
 		}
 		// Claude 格式：delta.text
-		if delta, ok := data["delta"].(map[string]interface{}); ok {
+		if delta, ok := data["delta"].(map[string]any); ok {
 			if text, ok := delta["text"].(string); ok && text != "" {
 				found = true
 			}

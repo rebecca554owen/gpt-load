@@ -4,6 +4,7 @@ package middleware
 import (
 	"crypto/subtle"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -236,12 +237,7 @@ var monitoringPaths = []string{"/health"}
 
 // isMonitoringEndpoint 检查路径是否为监控端点
 func isMonitoringEndpoint(path string) bool {
-	for _, monitoringPath := range monitoringPaths {
-		if path == monitoringPath {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(monitoringPaths, path)
 }
 
 // extractAuthKey 提取认证密钥

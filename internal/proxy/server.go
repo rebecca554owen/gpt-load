@@ -632,9 +632,9 @@ func (ps *ProxyServer) handleAggregateModelsRequest(c *gin.Context, aggregateGro
 		logrus.WithField("group_name", aggregateGroup.Name).Info("Using test model as fallback for aggregate group")
 	}
 
-	models := make([]map[string]interface{}, len(modelList))
+	models := make([]map[string]any, len(modelList))
 	for i, model := range modelList {
-		models[i] = map[string]interface{}{
+		models[i] = map[string]any{
 			"id":       model,
 			"object":   "model",
 			"created":  time.Now().Unix(),
@@ -642,7 +642,7 @@ func (ps *ProxyServer) handleAggregateModelsRequest(c *gin.Context, aggregateGro
 		}
 	}
 
-	response := map[string]interface{}{
+	response := map[string]any{
 		"object": "list",
 		"data":   models,
 	}

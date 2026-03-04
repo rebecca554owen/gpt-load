@@ -1,8 +1,8 @@
 package services
 
 import (
-	"gpt-load/internal/models"
 	app_errors "gpt-load/internal/errors"
+	"gpt-load/internal/models"
 
 	"github.com/sirupsen/logrus"
 )
@@ -82,10 +82,7 @@ func (s *KeyDeleteService) processAndDeleteKeys(
 	var totalDeletedCount int64
 
 	for i := 0; i < len(keys); i += deleteChunkSize {
-		end := i + deleteChunkSize
-		if end > len(keys) {
-			end = len(keys)
-		}
+		end := min(i+deleteChunkSize, len(keys))
 		chunk := keys[i:end]
 
 		deletedChunkCount, err := s.KeyService.KeyProvider.RemoveKeys(groupID, chunk)

@@ -139,10 +139,7 @@ func (s *KeyService) processAndCreateKeys(
 
 	// 3. Use KeyProvider to add keys in chunks
 	for i := 0; i < len(newKeysToCreate); i += chunkSize {
-		end := i + chunkSize
-		if end > len(newKeysToCreate) {
-			end = len(newKeysToCreate)
-		}
+		end := min(i+chunkSize, len(newKeysToCreate))
 		chunk := newKeysToCreate[i:end]
 		if err := s.KeyProvider.AddKeys(groupID, chunk); err != nil {
 			return addedCount, len(keys) - addedCount, err

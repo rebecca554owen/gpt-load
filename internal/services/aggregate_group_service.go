@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -105,7 +106,7 @@ func (s *AggregateGroupService) ValidateSubGroups(ctx context.Context, channelTy
 func (s *AggregateGroupService) GetSubGroups(ctx context.Context, groupID uint) ([]models.SubGroupInfo, error) {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, NewI18nError(app_errors.ErrResourceNotFound, "group.not_found", nil)
 		}
 		return nil, err
@@ -165,7 +166,7 @@ func (s *AggregateGroupService) GetSubGroups(ctx context.Context, groupID uint) 
 func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, inputs []SubGroupInput) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return NewI18nError(app_errors.ErrResourceNotFound, "group.not_found", nil)
 		}
 		return err
@@ -228,7 +229,7 @@ func (s *AggregateGroupService) AddSubGroups(ctx context.Context, groupID uint, 
 func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupID, subGroupID uint, weight int) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return NewI18nError(app_errors.ErrResourceNotFound, "group.not_found", nil)
 		}
 		return err
@@ -249,7 +250,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 	// 检查子组关联是否存在
 	var existingRecord models.GroupSubGroup
 	if err := s.db.WithContext(ctx).Where("group_id = ? AND sub_group_id = ?", groupID, subGroupID).First(&existingRecord).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return NewI18nError(app_errors.ErrResourceNotFound, "group.sub_group_not_found", nil)
 		}
 		return err
@@ -280,7 +281,7 @@ func (s *AggregateGroupService) UpdateSubGroupWeight(ctx context.Context, groupI
 func (s *AggregateGroupService) DeleteSubGroup(ctx context.Context, groupID, subGroupID uint) error {
 	var group models.Group
 	if err := s.db.WithContext(ctx).First(&group, groupID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return NewI18nError(app_errors.ErrResourceNotFound, "group.not_found", nil)
 		}
 		return err

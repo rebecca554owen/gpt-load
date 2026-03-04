@@ -2,6 +2,7 @@ package modifier
 
 import (
 	"gpt-load/internal/utils/jsonutil"
+	"maps"
 
 	"github.com/sirupsen/logrus"
 )
@@ -32,12 +33,8 @@ func (m *ParamOverrideModifier) Modify(ctx *ModificationContext, bodyBytes []byt
 
 	if ctx.IsAggregate && ctx.OriginalGroup.ID != ctx.SelectedGroup.ID {
 		overrides = make(map[string]any)
-		for key, value := range ctx.OriginalGroup.ParamOverrides {
-			overrides[key] = value
-		}
-		for key, value := range ctx.SelectedGroup.ParamOverrides {
-			overrides[key] = value
-		}
+		maps.Copy(overrides, ctx.OriginalGroup.ParamOverrides)
+		maps.Copy(overrides, ctx.SelectedGroup.ParamOverrides)
 	} else {
 		overrides = ctx.SelectedGroup.ParamOverrides
 	}

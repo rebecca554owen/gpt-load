@@ -2,6 +2,7 @@ package jsonutil
 
 import (
 	"fmt"
+	"maps"
 
 	"github.com/goccy/go-json"
 )
@@ -16,9 +17,7 @@ func SetFields(bodyBytes []byte, fields map[string]any) ([]byte, error) {
 		return nil, err
 	}
 
-	for field, value := range fields {
-		data[field] = value
-	}
+	maps.Copy(data, fields)
 
 	return json.Marshal(data)
 }

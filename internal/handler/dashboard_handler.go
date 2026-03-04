@@ -263,14 +263,8 @@ func (s *Server) Stats(c *gin.Context) {
 	}
 
 	// 计算非缓存的 prompt token
-	currentNonCachedPrompt := currentTokenStats.PromptTokens - currentTokenStats.CachedTokens
-	if currentNonCachedPrompt < 0 {
-		currentNonCachedPrompt = 0
-	}
-	previousNonCachedPrompt := previousTokenStats.PromptTokens - previousTokenStats.CachedTokens
-	if previousNonCachedPrompt < 0 {
-		previousNonCachedPrompt = 0
-	}
+	currentNonCachedPrompt := max(currentTokenStats.PromptTokens-currentTokenStats.CachedTokens, 0)
+	previousNonCachedPrompt := max(previousTokenStats.PromptTokens-previousTokenStats.CachedTokens, 0)
 
 	// 获取安全警告信息（仅限已认证用户）
 	var securityWarnings []models.SecurityWarning
@@ -318,10 +312,7 @@ func (s *Server) Chart(c *gin.Context) {
 
 // getRequestChart 返回带有动态粒度的请求统计图表数据
 func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
-	totalHours := int(endTime.Sub(startTime).Hours())
-	if totalHours < 1 {
-		totalHours = 1
-	}
+	totalHours := max(int(endTime.Sub(startTime).Hours()), 1)
 
 	var intervalMinutes int
 	switch {
@@ -428,10 +419,7 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 	}
 
 	totalMinutes := totalHours * 60
-	intervals := totalMinutes / intervalMinutes
-	if intervals < 1 {
-		intervals = 1
-	}
+	intervals := max(totalMinutes/intervalMinutes, 1)
 	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
 	if lastSlotEnd.Before(endTime) {
 		intervals++
@@ -488,10 +476,7 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 
 // getTokenChart 返回带有动态粒度的 token 统计图表数据
 func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
-	totalHours := int(endTime.Sub(startTime).Hours())
-	if totalHours < 1 {
-		totalHours = 1
-	}
+	totalHours := max(int(endTime.Sub(startTime).Hours()), 1)
 
 	var intervalMinutes int
 	switch {
@@ -596,10 +581,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 	var nonCachedPromptData, cachedData, outputData, totalData []int64
 
 	totalMinutes := totalHours * 60
-	intervals := totalMinutes / intervalMinutes
-	if intervals < 1 {
-		intervals = 1
-	}
+	intervals := max(totalMinutes/intervalMinutes, 1)
 	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
 	if lastSlotEnd.Before(endTime) {
 		intervals++
@@ -622,10 +604,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 			}
 		}
 
-		nonCachedPromptSum := promptSum - cachedSum
-		if nonCachedPromptSum < 0 {
-			nonCachedPromptSum = 0
-		}
+		nonCachedPromptSum := max(promptSum-cachedSum, 0)
 
 		nonCachedPromptData = append(nonCachedPromptData, nonCachedPromptSum)
 		cachedData = append(cachedData, cachedSum)
@@ -664,10 +643,7 @@ func (s *Server) getTokenChart(c *gin.Context, startTime, endTime time.Time) {
 
 // getTokenSpeedChart 返回 token 速度统计图表数据
 func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time) {
-	totalHours := int(endTime.Sub(startTime).Hours())
-	if totalHours < 1 {
-		totalHours = 1
-	}
+	totalHours := max(int(endTime.Sub(startTime).Hours()), 1)
 
 	var intervalMinutes int
 	switch {
@@ -685,8 +661,8 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 
 	// 使用 group_id 和 JOIN groups 表查询以获取当前组显示名称
 	type speedRawData struct {
-		GroupID           uint
-		DisplayName       string
+		GroupID          uint
+		DisplayName      string
 		Model            string
 		Timestamp        time.Time
 		Duration         int64
@@ -717,7 +693,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		completionTokens []float64
 	}
 	dataByTimeCombo := make(map[timeComboKey]*timeComboData)
-	comboSet := make(map[string]bool) // 内部：groupID_model
+	comboSet := make(map[string]bool)            // 内部：groupID_model
 	comboDisplayNames := make(map[string]string) // 显示：groupID_model -> displayName - model
 
 	for _, data := range rawData {
@@ -745,10 +721,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 
 	var labels []string
 	totalMinutes := totalHours * 60
-	intervals := totalMinutes / intervalMinutes
-	if intervals < 1 {
-		intervals = 1
-	}
+	intervals := max(totalMinutes/intervalMinutes, 1)
 	lastSlotEnd := startTime.Truncate(time.Minute).Add(time.Duration(intervals*intervalMinutes) * time.Minute)
 	if lastSlotEnd.Before(endTime) {
 		intervals++
@@ -830,10 +803,7 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 	})
 
 	// 按 P90 速度选择前 7 个组合
-	topCount := topCombosLimit
-	if len(comboList) < topCount {
-		topCount = len(comboList)
-	}
+	topCount := min(len(comboList), topCombosLimit)
 	topComboList := comboList[:topCount]
 
 	var chartDatasets []models.ChartDataset

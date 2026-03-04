@@ -66,7 +66,7 @@ func validateKeysText(c *gin.Context, keysText string) bool {
 func (s *Server) findGroupByID(c *gin.Context, groupID uint) (*models.Group, bool) {
 	var group models.Group
 	if err := s.DB.First(&group, groupID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			response.Error(c, app_errors.ErrResourceNotFound)
 		} else {
 			response.Error(c, app_errors.ParseDBError(err))
@@ -564,7 +564,7 @@ func (s *Server) UpdateKeyNotes(c *gin.Context) {
 	// 检查密钥是否存在并更新其备注
 	var key models.APIKey
 	if err := s.DB.First(&key, keyID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			response.Error(c, app_errors.ErrResourceNotFound)
 		} else {
 			response.Error(c, app_errors.ParseDBError(err))

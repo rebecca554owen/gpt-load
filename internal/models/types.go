@@ -95,7 +95,7 @@ type ModelMapping struct {
 // Group 对应 groups 表
 type Group struct {
 	ID                  uint                 `gorm:"primaryKey;autoIncrement" json:"id"`
-	EffectiveConfig     types.SystemSettings `gorm:"-" json:"effective_config,omitempty"`
+	EffectiveConfig     types.SystemSettings `gorm:"-" json:"effective_config"`
 	Name                string               `gorm:"type:varchar(255);not null;unique" json:"name"`
 	Endpoint            string               `gorm:"-" json:"endpoint"`
 	DisplayName         string               `gorm:"type:varchar(255)" json:"display_name"`
@@ -197,24 +197,24 @@ type SecurityWarning struct {
 
 // DashboardStatsResponse 仪表板基本统计的 API 响应
 type DashboardStatsResponse struct {
-	KeyCount             StatCard          `json:"key_count"`               // 密钥数量
-	TokenConsumption     StatCard          `json:"token_consumption"`       // 总 tokens
-	PromptTokens         StatCard          `json:"prompt_tokens"`           // 输入 tokens
+	KeyCount              StatCard          `json:"key_count"`                // 密钥数量
+	TokenConsumption      StatCard          `json:"token_consumption"`        // 总 tokens
+	PromptTokens          StatCard          `json:"prompt_tokens"`            // 输入 tokens
 	NonCachedPromptTokens StatCard          `json:"non_cached_prompt_tokens"` // 非缓存输入 tokens
-	CachedTokens         StatCard          `json:"cached_tokens"`           // 缓存的 tokens (输入)
-	CompletionTokens     StatCard          `json:"completion_tokens"`       // 完成 tokens (输出)
-	TotalTokens          StatCard          `json:"total_tokens"`            // 总 tokens
-	RPM                  StatCard          `json:"rpm"`                     // RPM
-	RequestCount         StatCard          `json:"request_count"`           // 请求数量
-	ErrorRate            StatCard          `json:"error_rate"`              // 错误率
-	SecurityWarnings     []SecurityWarning `json:"security_warnings"`
+	CachedTokens          StatCard          `json:"cached_tokens"`            // 缓存的 tokens (输入)
+	CompletionTokens      StatCard          `json:"completion_tokens"`        // 完成 tokens (输出)
+	TotalTokens           StatCard          `json:"total_tokens"`             // 总 tokens
+	RPM                   StatCard          `json:"rpm"`                      // RPM
+	RequestCount          StatCard          `json:"request_count"`            // 请求数量
+	ErrorRate             StatCard          `json:"error_rate"`               // 错误率
+	SecurityWarnings      []SecurityWarning `json:"security_warnings"`
 }
 
 // ChartDataset 图表数据集
 type ChartDataset struct {
-	Label     string  `json:"label"`     // 翻译的显示名称
-	LabelKey  string  `json:"label_key"` // 用于颜色映射的 i18n 键
-	Data      []int64 `json:"data"`
+	Label    string  `json:"label"`     // 翻译的显示名称
+	LabelKey string  `json:"label_key"` // 用于颜色映射的 i18n 键
+	Data     []int64 `json:"data"`
 }
 
 // ChartData 图表的 API 响应

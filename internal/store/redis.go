@@ -249,10 +249,7 @@ func (s *RedisStore) Clear() error {
 	// 分批删除键以避免压垮 Redis
 	const batchSize = 1000
 	for i := 0; i < len(allKeys); i += batchSize {
-		end := i + batchSize
-		if end > len(allKeys) {
-			end = len(allKeys)
-		}
+		end := min(i+batchSize, len(allKeys))
 
 		batch := allKeys[i:end]
 		if err := s.client.Del(ctx, batch...).Err(); err != nil {

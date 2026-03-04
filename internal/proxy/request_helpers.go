@@ -6,6 +6,7 @@ import (
 	app_errors "gpt-load/internal/errors"
 	"gpt-load/internal/models"
 	"io"
+	"maps"
 	"net/http"
 
 	"github.com/goccy/go-json"
@@ -23,9 +24,7 @@ func (ps *ProxyServer) applyParamOverrides(bodyBytes []byte, group *models.Group
 		return bodyBytes, nil
 	}
 
-	for key, value := range group.ParamOverrides {
-		requestData[key] = value
-	}
+	maps.Copy(requestData, group.ParamOverrides)
 
 	finalBody, err := json.Marshal(requestData)
 	if err != nil {

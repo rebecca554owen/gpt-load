@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -797,18 +798,18 @@ func (s *GroupService) GetGroupConfigOptions() ([]ConfigOption, error) {
 	currentSettingsValue := reflect.ValueOf(currentSettings)
 	currentSettingsType := currentSettingsValue.Type()
 	jsonToFieldMap := make(map[string]string)
-	for i := 0; i < currentSettingsType.NumField(); i++ {
-		field := currentSettingsType.Field(i)
+	for field := range currentSettingsType.Fields() {
+		field := field
 		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
 		if jsonTag != "" {
 			jsonToFieldMap[jsonTag] = field.Name
 		}
 	}
 
-	groupConfigType := reflect.TypeOf(models.GroupConfig{})
+	groupConfigType := reflect.TypeFor[models.GroupConfig]()
 	var options []ConfigOption
-	for i := 0; i < groupConfigType.NumField(); i++ {
-		field := groupConfigType.Field(i)
+	for field := range groupConfigType.Fields() {
+		field := field
 		jsonTag := field.Tag.Get("json")
 		key := strings.Split(jsonTag, ",")[0]
 		if key == "" || key == "-" {
@@ -842,11 +843,10 @@ func (s *GroupService) validateAndCleanConfig(configMap map[string]any) (map[str
 		return nil, nil
 	}
 
-	var tempGroupConfig models.GroupConfig
-	groupConfigType := reflect.TypeOf(tempGroupConfig)
+	groupConfigType := reflect.TypeFor[models.GroupConfig]()
 	validFields := make(map[string]bool)
-	for i := 0; i < groupConfigType.NumField(); i++ {
-		jsonTag := groupConfigType.Field(i).Tag.Get("json")
+	for field := range groupConfigType.Fields() {
+		jsonTag := field.Tag.Get("json")
 		fieldName := strings.Split(jsonTag, ",")[0]
 		if fieldName != "" && fieldName != "-" {
 			validFields[fieldName] = true
@@ -1031,12 +1031,7 @@ func isValidValidationEndpoint(endpoint string) bool {
 
 // isValidChannelType 根据已注册的通道检查通道类型。
 func (s *GroupService) isValidChannelType(channelType string) bool {
-	for _, t := range s.channelRegistry {
-		if t == channelType {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s.channelRegistry, channelType)
 }
 
 // convertToJSONMap 将 map[string]string 转换为 datatypes.JSONMap
@@ -1220,6 +1215,7 @@ func (s *GroupService) normalizeModelMappings(ctx context.Context, groupID uint,
 
 	return datatypes.JSON(bytes), nil
 }
+
 // validateModelRedirectRules 验证模型重定向规则的格式和内容
 func validateModelRedirectRules(rules map[string]string) error {
 	if len(rules) == 0 {

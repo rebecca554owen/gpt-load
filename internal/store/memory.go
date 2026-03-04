@@ -2,6 +2,7 @@ package store
 
 import (
 	"fmt"
+	"maps"
 	"strconv"
 	"sync"
 	"time"
@@ -186,9 +187,7 @@ func (s *MemoryStore) HGetAll(key string) (map[string]string, error) {
 	}
 
 	result := make(map[string]string, len(hash))
-	for k, v := range hash {
-		result[k] = v
-	}
+	maps.Copy(result, hash)
 
 	return result, nil
 }

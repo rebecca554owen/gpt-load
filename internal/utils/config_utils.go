@@ -36,13 +36,13 @@ func GenerateSettingsMetadata(s *types.SystemSettings) []models.SystemSettingInf
 		var minValue *int
 		var required bool
 
-		rules := strings.Split(validateTag, ",")
-		for _, rule := range rules {
+		rules := strings.SplitSeq(validateTag, ",")
+		for rule := range rules {
 			rule = strings.TrimSpace(rule)
 			if rule == "required" {
 				required = true
-			} else if strings.HasPrefix(rule, "min=") {
-				valStr := strings.TrimPrefix(rule, "min=")
+			} else if after, ok := strings.CutPrefix(rule, "min="); ok {
+				valStr := after
 				if val, err := strconv.Atoi(valStr); err == nil {
 					minValue = &val
 				}

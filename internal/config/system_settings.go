@@ -54,8 +54,8 @@ func (sm *SystemSettingsManager) Initialize(store store.Store, gm groupManager, 
 		v := reflect.ValueOf(&settings).Elem()
 		t := v.Type()
 		jsonToField := make(map[string]string)
-		for i := range t.NumField() {
-			field := t.Field(i)
+		for field := range t.Fields() {
+			field := field
 			jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
 			if jsonTag != "" {
 				jsonToField[jsonTag] = field.Name
@@ -231,7 +231,7 @@ func (sm *SystemSettingsManager) GetEffectiveConfig(groupConfigJSON datatypes.JS
 
 	for i := range gcv.NumField() {
 		groupField := gcv.Field(i)
-		if groupField.Kind() == reflect.Ptr && !groupField.IsNil() {
+		if groupField.Kind() == reflect.Pointer && !groupField.IsNil() {
 			groupFieldValue := groupField.Elem()
 			effectiveField := ecv.FieldByName(gcv.Type().Field(i).Name)
 			if effectiveField.IsValid() && effectiveField.CanSet() {
@@ -265,13 +265,13 @@ type validationField struct {
 
 func buildJSONFieldMap(v any) map[string]reflect.StructField {
 	rv := reflect.ValueOf(v)
-	if rv.Kind() == reflect.Ptr {
+	if rv.Kind() == reflect.Pointer {
 		rv = rv.Elem()
 	}
 	rt := rv.Type()
 	jsonToField := make(map[string]reflect.StructField)
-	for i := range rt.NumField() {
-		field := rt.Field(i)
+	for field := range rt.Fields() {
+		field := field
 		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
 		if jsonTag != "" {
 			jsonToField[jsonTag] = field
@@ -310,8 +310,8 @@ func (sm *SystemSettingsManager) validateFields(settingsMap map[string]any, json
 
 			for _, rule := range rules {
 				trimmedRule := strings.TrimSpace(rule)
-				if strings.HasPrefix(trimmedRule, "min=") {
-					minValStr := strings.TrimPrefix(trimmedRule, "min=")
+				if after, ok0 := strings.CutPrefix(trimmedRule, "min="); ok0 {
+					minValStr := after
 					minVal, _ := strconv.Atoi(minValStr)
 					if intVal < minVal {
 						return fmt.Errorf("value for %s (%d) is below minimum value (%d)", key, intVal, minVal)
