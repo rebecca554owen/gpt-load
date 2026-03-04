@@ -1,0 +1,35 @@
+package db
+
+import (
+	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
+)
+
+// V1_4_8_AddModelMappingStrictColumn 向 groups 表添加 model_mapping_strict 列
+func V1_4_8_AddModelMappingStrictColumn(db *gorm.DB) error {
+	logrus.Info("Running v1.4.8 migration: Adding model_mapping_strict column to groups table")
+
+	// 检查列是否已存在
+	if db.Migrator().HasColumn(&groupTableStrict{}, "model_mapping_strict") {
+		logrus.Info("model_mapping_strict column already exists, skipping v1.4.8 migration")
+		return nil
+	}
+
+	// 添加列
+	if err := db.Migrator().AddColumn(&groupTableStrict{}, "model_mapping_strict"); err != nil {
+		logrus.WithError(err).Error("Failed to add model_mapping_strict column")
+		return err
+	}
+
+	logrus.Info("Migration v1.4.8 completed successfully")
+	return nil
+}
+
+// groupTableStrict 迁移用的最小模型
+type groupTableStrict struct {
+	ModelMappingStrict bool `gorm:"default:false"`
+}
+
+func (groupTableStrict) TableName() string {
+	return "groups"
+}
