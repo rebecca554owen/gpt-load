@@ -5,8 +5,27 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+interface GroupConfigBase {
+  timeout?: number;
+  retry?: number;
+}
+
+interface GroupConfigChannelSpecific {
+  openai?: {
+    model?: string;
+  };
+  gemini?: {
+    model?: string;
+  };
+  anthropic?: {
+    model?: string;
+  };
+}
+
+export type GroupConfig = GroupConfigBase & GroupConfigChannelSpecific;
+
 // 密钥状态
-export type KeyStatus = "active" | "invalid" | undefined;
+export type KeyStatus = "active" | "invalid";
 
 // 分组类型
 export type GroupType = "standard" | "aggregate";
@@ -28,6 +47,10 @@ export interface APIKey {
   updated_at: string;
 }
 
+export interface KeyRow extends APIKey {
+  is_visible: boolean;
+}
+
 export interface UpstreamInfo {
   url: string;
   weight: number;
@@ -39,13 +62,13 @@ export interface HeaderRule {
   action: "set" | "remove";
 }
 
-// 子分组配置（创建/更新时使用）
+// 子分组配置（用于创建/更新）
 export interface SubGroupConfig {
   group_id: number;
   weight: number;
 }
 
-// 子分组信息（展示时使用）
+// 子分组信息（用于显示）
 export interface SubGroupInfo {
   group: Group;
   weight: number;
@@ -54,12 +77,27 @@ export interface SubGroupInfo {
   invalid_keys: number;
 }
 
-// 父聚合分组信息（展示时使用）
+// 父聚合分组信息（用于显示）
 export interface ParentAggregateGroup {
   group_id: number;
   name: string;
   display_name: string;
   weight: number;
+}
+
+// 模型映射目标配置
+export interface ModelMappingTarget {
+  sub_group_id: number;
+  weight: number;
+  sub_group_name?: string;
+  model: string;
+  models?: string[];
+}
+
+// 模型映射配置
+export interface ModelMapping {
+  model: string;
+  targets: ModelMappingTarget[];
 }
 
 export interface Group {
@@ -72,17 +110,20 @@ export interface Group {
   channel_type: ChannelType;
   upstreams: UpstreamInfo[];
   validation_endpoint: string;
-  config: Record<string, unknown>;
+  config?: GroupConfig;
   api_keys?: APIKey[];
   endpoint?: string;
-  param_overrides: Record<string, unknown>;
-  model_redirect_rules: Record<string, string>;
+  param_overrides?: Record<string, unknown>;
+  model_redirect_rules?: Record<string, string>;
   model_redirect_strict: boolean;
+  model_mapping_strict?: boolean;
   header_rules?: HeaderRule[];
   proxy_keys: string;
   group_type?: GroupType;
-  sub_groups?: SubGroupInfo[]; // 子分组列表（仅聚合分组）
-  sub_group_ids?: number[]; // 子分组ID列表
+  sub_groups?: SubGroupInfo[];
+  sub_group_ids?: number[];
+  model_mappings?: string | ModelMapping[];
+  model_mappings_list?: ModelMapping[];
   created_at?: string;
   updated_at?: string;
 }
@@ -94,7 +135,38 @@ export interface GroupConfigOption {
   default_value: string | number;
 }
 
-// GroupStatsResponse defines the complete statistics for a group.
+export interface ConfigItem {
+  key: string;
+  value: number | string | boolean;
+}
+
+export interface HeaderRuleItem {
+  key: string;
+  value: string;
+  action: "set" | "remove";
+}
+
+export interface GroupFormData {
+  name: string;
+  display_name: string;
+  description: string;
+  upstreams: UpstreamInfo[];
+  channel_type: ChannelType;
+  sort: number;
+  test_model: string;
+  validation_endpoint: string;
+  param_overrides: string;
+  model_redirect_rules: string;
+  model_redirect_strict: boolean;
+  model_mapping_strict: boolean;
+  config: Record<string, number | string | boolean>;
+  configItems: ConfigItem[];
+  header_rules: HeaderRuleItem[];
+  proxy_keys: string;
+  group_type?: string;
+}
+
+// GroupStatsResponse 定义分组的完整统计数据
 export interface GroupStatsResponse {
   key_stats: KeyStats;
   stats_24_hour: RequestStats;
@@ -102,21 +174,21 @@ export interface GroupStatsResponse {
   stats_30_day: RequestStats;
 }
 
-// KeyStats defines the statistics for API keys in a group.
+// KeyStats 定义分组中 API 密钥的统计数据
 export interface KeyStats {
   total_keys: number;
   active_keys: number;
   invalid_keys: number;
 }
 
-// RequestStats defines the statistics for requests over a period.
+// RequestStats 定义一段时间内的请求统计数据
 export interface RequestStats {
   total_requests: number;
   failed_requests: number;
   failure_rate: number;
 }
 
-export type TaskType = "KEY_VALIDATION" | "KEY_IMPORT" | "KEY_DELETE";
+export type TaskType = "KEY_VALIDATION" | "KEY_IMPORT" | "KEY_DELETE" | "GROUP_SYNC";
 
 export interface KeyValidationResult {
   invalid_keys: number;
@@ -134,19 +206,28 @@ export interface KeyDeleteResult {
   ignored_count: number;
 }
 
+export interface GroupSyncResult {
+  synced_count: number;
+  failed_count: number;
+}
+
 export interface TaskInfo {
+  id?: number;
   task_type: TaskType;
   is_running: boolean;
+  status?: "pending" | "running" | "completed" | "failed";
   group_name?: string;
   processed?: number;
   total?: number;
   started_at?: string;
   finished_at?: string;
-  result?: KeyValidationResult | KeyImportResult | KeyDeleteResult;
+  created_at?: string;
+  updated_at?: string;
+  result?: KeyValidationResult | KeyImportResult | KeyDeleteResult | GroupSyncResult;
   error?: string;
 }
 
-// Based on backend response
+// 基于后端响应
 export interface RequestLog {
   id: string;
   timestamp: string;
@@ -164,9 +245,15 @@ export interface RequestLog {
   parent_group_name?: string;
   key_value?: string;
   model: string;
+  original_model?: string; // 原始请求的模型名称
   upstream_addr: string;
   is_stream: boolean;
   request_body?: string;
+  // Token 统计字段
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cached_tokens: number;
 }
 
 export interface Pagination {
@@ -220,15 +307,21 @@ export interface StatCard {
 
 // 安全警告信息
 export interface SecurityWarning {
-  type: string; // 警告类型：auth_key, encryption_key 等
-  message: string; // 警告信息
-  severity: string; // 严重程度：low, medium, high
-  suggestion: string; // 建议解决方案
+  type: string; // 警告类型：auth_key、encryption_key 等
+  message: string; // 警告消息
+  severity: string; // 严重程度：low、medium、high
+  suggestion: string; // 建议的解决方案
 }
 
 // 仪表盘基础统计响应
 export interface DashboardStatsResponse {
   key_count: StatCard;
+  token_consumption: StatCard;
+  prompt_tokens: StatCard;
+  non_cached_prompt_tokens: StatCard;
+  cached_tokens: StatCard;
+  completion_tokens: StatCard;
+  total_tokens: StatCard;
   rpm: StatCard;
   request_count: StatCard;
   error_rate: StatCard;
@@ -238,8 +331,8 @@ export interface DashboardStatsResponse {
 // 图表数据集
 export interface ChartDataset {
   label: string;
+  label_key?: string;
   data: number[];
-  color: string;
 }
 
 // 图表数据
@@ -247,3 +340,6 @@ export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];
 }
+
+// 仪表盘图表视图类型
+export type ChartViewType = "request" | "token" | "token_speed";

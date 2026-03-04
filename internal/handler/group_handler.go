@@ -1,8 +1,7 @@
-// Package handler provides HTTP handlers for the application
+// Package handler 提供应用的 HTTP 处理器
 package handler
 
 import (
-	"encoding/json"
 	"net/url"
 	"strconv"
 	"strings"
@@ -15,6 +14,7 @@ import (
 	"gpt-load/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/goccy/go-json"
 	"github.com/sirupsen/logrus"
 	"gorm.io/datatypes"
 )
@@ -43,7 +43,7 @@ func (s *Server) handleGroupError(c *gin.Context, err error) bool {
 	return true
 }
 
-// GroupCreateRequest defines the payload for creating a group.
+// GroupCreateRequest 定义创建组的载荷
 type GroupCreateRequest struct {
 	Name                string              `json:"name"`
 	DisplayName         string              `json:"display_name"`
@@ -60,9 +60,10 @@ type GroupCreateRequest struct {
 	Config              map[string]any      `json:"config"`
 	HeaderRules         []models.HeaderRule `json:"header_rules"`
 	ProxyKeys           string              `json:"proxy_keys"`
+	ModelMappings       json.RawMessage     `json:"model_mappings"`
 }
 
-// CreateGroup handles the creation of a new group.
+// CreateGroup 处理创建新组
 func (s *Server) CreateGroup(c *gin.Context) {
 	var req GroupCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -86,6 +87,7 @@ func (s *Server) CreateGroup(c *gin.Context) {
 		Config:              req.Config,
 		HeaderRules:         req.HeaderRules,
 		ProxyKeys:           req.ProxyKeys,
+		ModelMappings:       req.ModelMappings,
 	}
 
 	group, err := s.GroupService.CreateGroup(c.Request.Context(), params)
@@ -96,7 +98,7 @@ func (s *Server) CreateGroup(c *gin.Context) {
 	response.Success(c, s.newGroupResponse(group))
 }
 
-// ListGroups handles listing all groups.
+// ListGroups 处理列出所有组
 func (s *Server) ListGroups(c *gin.Context) {
 	groups, err := s.GroupService.ListGroups(c.Request.Context())
 	if s.handleGroupError(c, err) {
@@ -111,8 +113,8 @@ func (s *Server) ListGroups(c *gin.Context) {
 	response.Success(c, groupResponses)
 }
 
-// GroupUpdateRequest defines the payload for updating a group.
-// Using a dedicated struct avoids issues with zero values being ignored by GORM's Update.
+// GroupUpdateRequest 定义更新组的载荷
+// 使用专用结构体可避免 GORM 的 Update 忽略零值的问题
 type GroupUpdateRequest struct {
 	Name                *string             `json:"name,omitempty"`
 	DisplayName         *string             `json:"display_name,omitempty"`
@@ -126,12 +128,14 @@ type GroupUpdateRequest struct {
 	ParamOverrides      map[string]any      `json:"param_overrides"`
 	ModelRedirectRules  map[string]string   `json:"model_redirect_rules"`
 	ModelRedirectStrict *bool               `json:"model_redirect_strict"`
+	ModelMappingStrict  *bool               `json:"model_mapping_strict"`
 	Config              map[string]any      `json:"config"`
 	HeaderRules         []models.HeaderRule `json:"header_rules"`
 	ProxyKeys           *string             `json:"proxy_keys,omitempty"`
+	ModelMappings       json.RawMessage     `json:"model_mappings"`
 }
 
-// UpdateGroup handles updating an existing group.
+// UpdateGroup 处理更新现有组
 func (s *Server) UpdateGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -156,6 +160,7 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 		ParamOverrides:      req.ParamOverrides,
 		ModelRedirectRules:  req.ModelRedirectRules,
 		ModelRedirectStrict: req.ModelRedirectStrict,
+		ModelMappingStrict:  req.ModelMappingStrict,
 		Config:              req.Config,
 		ProxyKeys:           req.ProxyKeys,
 	}
@@ -175,6 +180,11 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 		params.HeaderRules = &rules
 	}
 
+	if req.ModelMappings != nil {
+		params.ModelMappings = req.ModelMappings
+		params.HasModelMappings = true
+	}
+
 	group, err := s.GroupService.UpdateGroup(c.Request.Context(), uint(id), params)
 	if s.handleGroupError(c, err) {
 		return
@@ -183,31 +193,33 @@ func (s *Server) UpdateGroup(c *gin.Context) {
 	response.Success(c, s.newGroupResponse(group))
 }
 
-// GroupResponse defines the structure for a group response, excluding sensitive or large fields.
+// GroupResponse 定义组响应的结构，排除敏感或大型字段
 type GroupResponse struct {
-	ID                  uint                `json:"id"`
-	Name                string              `json:"name"`
-	Endpoint            string              `json:"endpoint"`
-	DisplayName         string              `json:"display_name"`
-	Description         string              `json:"description"`
-	GroupType           string              `json:"group_type"`
-	Upstreams           datatypes.JSON      `json:"upstreams"`
-	ChannelType         string              `json:"channel_type"`
-	Sort                int                 `json:"sort"`
-	TestModel           string              `json:"test_model"`
-	ValidationEndpoint  string              `json:"validation_endpoint"`
-	ParamOverrides      datatypes.JSONMap   `json:"param_overrides"`
-	ModelRedirectRules  datatypes.JSONMap   `json:"model_redirect_rules"`
-	ModelRedirectStrict bool                `json:"model_redirect_strict"`
-	Config              datatypes.JSONMap   `json:"config"`
-	HeaderRules         []models.HeaderRule `json:"header_rules"`
-	ProxyKeys           string              `json:"proxy_keys"`
-	LastValidatedAt     *time.Time          `json:"last_validated_at"`
-	CreatedAt           time.Time           `json:"created_at"`
-	UpdatedAt           time.Time           `json:"updated_at"`
+	ID                  uint                      `json:"id"`
+	Name                string                    `json:"name"`
+	Endpoint            string                    `json:"endpoint"`
+	DisplayName         string                    `json:"display_name"`
+	Description         string                    `json:"description"`
+	GroupType           string                    `json:"group_type"`
+	Upstreams           datatypes.JSON            `json:"upstreams"`
+	ChannelType         string                    `json:"channel_type"`
+	Sort                int                       `json:"sort"`
+	TestModel           string                    `json:"test_model"`
+	ValidationEndpoint  string                    `json:"validation_endpoint"`
+	ParamOverrides      datatypes.JSONMap         `json:"param_overrides"`
+	ModelRedirectRules  datatypes.JSONMap         `json:"model_redirect_rules"`
+	ModelRedirectStrict bool                      `json:"model_redirect_strict"`
+	ModelMappingStrict  bool                      `json:"model_mapping_strict"`
+	Config              datatypes.JSONMap         `json:"config"`
+	HeaderRules         []models.HeaderRule       `json:"header_rules"`
+	ProxyKeys           string                    `json:"proxy_keys"`
+	ModelMappingList    []models.ModelMapping     `json:"model_mappings_list"`
+	LastValidatedAt     *time.Time                `json:"last_validated_at"`
+	CreatedAt           time.Time                 `json:"created_at"`
+	UpdatedAt           time.Time                 `json:"updated_at"`
 }
 
-// newGroupResponse creates a new GroupResponse from a models.Group.
+// newGroupResponse 从 models.Group 创建新的 GroupResponse
 func (s *Server) newGroupResponse(group *models.Group) *GroupResponse {
 	appURL := s.SettingsManager.GetAppUrl()
 	endpoint := ""
@@ -219,7 +231,7 @@ func (s *Server) newGroupResponse(group *models.Group) *GroupResponse {
 		}
 	}
 
-	// Parse header rules from JSON
+	// 从 JSON 解析头部规则
 	var headerRules []models.HeaderRule
 	if len(group.HeaderRules) > 0 {
 		if err := json.Unmarshal(group.HeaderRules, &headerRules); err != nil {
@@ -243,16 +255,18 @@ func (s *Server) newGroupResponse(group *models.Group) *GroupResponse {
 		ParamOverrides:      group.ParamOverrides,
 		ModelRedirectRules:  group.ModelRedirectRules,
 		ModelRedirectStrict: group.ModelRedirectStrict,
+		ModelMappingStrict:  group.ModelMappingStrict,
 		Config:              group.Config,
 		HeaderRules:         headerRules,
 		ProxyKeys:           group.ProxyKeys,
+		ModelMappingList:    group.ModelMappingList,
 		LastValidatedAt:     group.LastValidatedAt,
 		CreatedAt:           group.CreatedAt,
 		UpdatedAt:           group.UpdatedAt,
 	}
 }
 
-// DeleteGroup handles deleting a group.
+// DeleteGroup 处理删除组
 func (s *Server) DeleteGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -266,7 +280,7 @@ func (s *Server) DeleteGroup(c *gin.Context) {
 	response.SuccessI18n(c, "success.group_deleted", nil)
 }
 
-// ConfigOption represents a single configurable option for a group.
+// ConfigOption 表示组的单个可配置选项
 type ConfigOption struct {
 	Key          string `json:"key"`
 	Name         string `json:"name"`
@@ -274,7 +288,7 @@ type ConfigOption struct {
 	DefaultValue any    `json:"default_value"`
 }
 
-// GetGroupConfigOptions returns a list of available configuration options for groups.
+// GetGroupConfigOptions 返回组的可用配置选项列表
 func (s *Server) GetGroupConfigOptions(c *gin.Context) {
 	options, err := s.GroupService.GetGroupConfigOptions()
 	if s.handleGroupError(c, err) {
@@ -303,7 +317,7 @@ func (s *Server) GetGroupConfigOptions(c *gin.Context) {
 	response.Success(c, translated)
 }
 
-// calculateRequestStats is a helper to compute request statistics.
+// calculateRequestStats 是计算请求统计数据的辅助函数
 func (s *Server) GetGroupStats(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -319,17 +333,17 @@ func (s *Server) GetGroupStats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
-// GroupCopyRequest defines the payload for copying a group.
+// GroupCopyRequest 定义复制组的载荷
 type GroupCopyRequest struct {
 	CopyKeys string `json:"copy_keys"` // "none"|"valid_only"|"all"
 }
 
-// GroupCopyResponse defines the response for group copy operation.
+// GroupCopyResponse 定义组复制操作的响应
 type GroupCopyResponse struct {
 	Group *GroupResponse `json:"group"`
 }
 
-// CopyGroup handles copying a group with optional content.
+// CopyGroup 处理复制组及其可选内容
 
 func (s *Server) CopyGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
@@ -357,7 +371,7 @@ func (s *Server) CopyGroup(c *gin.Context) {
 	response.Success(c, copyResponse)
 }
 
-// List godoc
+// List 列出组
 func (s *Server) List(c *gin.Context) {
 	var groups []models.Group
 	if err := s.DB.Select("id, name,display_name").Find(&groups).Error; err != nil {
@@ -367,17 +381,17 @@ func (s *Server) List(c *gin.Context) {
 	response.Success(c, groups)
 }
 
-// AddSubGroupsRequest defines the payload for adding sub groups to an aggregate group
+// AddSubGroupsRequest 定义向聚合组添加子组的载荷
 type AddSubGroupsRequest struct {
 	SubGroups []services.SubGroupInput `json:"sub_groups"`
 }
 
-// UpdateSubGroupWeightRequest defines the payload for updating a sub group weight
+// UpdateSubGroupWeightRequest 定义更新子组权重的载荷
 type UpdateSubGroupWeightRequest struct {
 	Weight int `json:"weight"`
 }
 
-// GetSubGroups handles getting sub groups of an aggregate group
+// GetSubGroups 处理获取聚合组的子组
 func (s *Server) GetSubGroups(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -393,7 +407,7 @@ func (s *Server) GetSubGroups(c *gin.Context) {
 	response.Success(c, subGroups)
 }
 
-// AddSubGroups handles adding sub groups to an aggregate group
+// AddSubGroups 处理向聚合组添加子组
 func (s *Server) AddSubGroups(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -414,7 +428,7 @@ func (s *Server) AddSubGroups(c *gin.Context) {
 	response.SuccessI18n(c, "success.sub_groups_added", nil)
 }
 
-// UpdateSubGroupWeight handles updating the weight of a sub group
+// UpdateSubGroupWeight 处理更新子组的权重
 func (s *Server) UpdateSubGroupWeight(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -441,7 +455,7 @@ func (s *Server) UpdateSubGroupWeight(c *gin.Context) {
 	response.SuccessI18n(c, "success.sub_group_weight_updated", nil)
 }
 
-// DeleteSubGroup handles deleting a sub group from an aggregate group
+// DeleteSubGroup 处理从聚合组删除子组
 func (s *Server) DeleteSubGroup(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
@@ -462,7 +476,7 @@ func (s *Server) DeleteSubGroup(c *gin.Context) {
 	response.SuccessI18n(c, "success.sub_group_deleted", nil)
 }
 
-// GetParentAggregateGroups handles getting parent aggregate groups that reference a group
+// GetParentAggregateGroups 处理获取引用某个组的父聚合组
 func (s *Server) GetParentAggregateGroups(c *gin.Context) {
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
