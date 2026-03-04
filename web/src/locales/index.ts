@@ -13,9 +13,9 @@ export const SUPPORTED_LOCALES = [
 
 export type Locale = (typeof SUPPORTED_LOCALES)[number]["key"];
 
-// 获取默认语言
+// 获取默认语言环境
 function getDefaultLocale(): Locale {
-  // 1. 优先使用 localStorage 中保存的语言
+  // 1. 优先使用 localStorage 中保存的语言设置
   const savedLocale = localStorage.getItem("locale");
   if (savedLocale && SUPPORTED_LOCALES.some(l => l.key === savedLocale)) {
     return savedLocale as Locale;
@@ -29,21 +29,21 @@ function getDefaultLocale(): Locale {
     return browserLang as Locale;
   }
 
-  // 模糊匹配（如 zh 匹配 zh-CN）
+  // 模糊匹配（例如，zh 匹配 zh-CN）
   const shortLang = browserLang.split("-")[0];
   const matched = SUPPORTED_LOCALES.find(l => l.key.startsWith(shortLang));
   if (matched) {
     return matched.key;
   }
 
-  // 3. 默认中文
+  // 3. 默认使用中文
   return "zh-CN";
 }
 
 // 创建 i18n 实例
 const defaultLocale = getDefaultLocale();
 const i18n = createI18n({
-  legacy: false, // 使用 Composition API 模式
+  legacy: false,
   locale: defaultLocale,
   fallbackLocale: "zh-CN",
   messages: {
@@ -63,21 +63,21 @@ export function setLocale(locale: Locale) {
   // 保存到 localStorage
   localStorage.setItem("locale", locale);
 
-  // 更新 axios 的默认 headers
+  // 更新 axios 默认请求头
   if (axios.defaults.headers) {
     axios.defaults.headers.common["Accept-Language"] = locale;
   }
 
-  // 刷新页面以确保所有内容（包括后端数据）都使用新语言
+  // 重新加载页面以确保所有内容（包括后端数据）使用新语言
   window.location.reload();
 }
 
-// 获取当前语言
+// 获取当前语言环境
 export function getLocale(): Locale {
-  return i18n.global.locale.value as Locale;
+  return i18n.global.locale.value as string as Locale;
 }
 
-// 获取当前语言的标签
+// 获取当前语言环境的显示标签
 export function getCurrentLocaleLabel(): string {
   const current = getLocale();
   return SUPPORTED_LOCALES.find(l => l.key === current)?.label || "中文";

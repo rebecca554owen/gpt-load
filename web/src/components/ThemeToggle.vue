@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { themeMode, toggleTheme } from "@/utils/theme";
+import { useTheme } from "@/composables/useTheme";
 import { Contrast, Moon, Sunny } from "@vicons/ionicons5";
 import { NButton, NIcon, NTooltip } from "naive-ui";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
+const { mode: themeMode, toggleTheme } = useTheme();
 
-// 根据当前主题模式计算图标和提示文字
+// 根据当前主题模式计算图标和提示文本
 const themeConfig = computed(() => {
   switch (themeMode.value) {
     case "auto":
@@ -41,7 +42,7 @@ const themeConfig = computed(() => {
 <template>
   <n-tooltip trigger="hover">
     <template #trigger>
-      <n-button quaternary circle @click="toggleTheme">
+      <n-button quaternary circle @click="toggleTheme" :aria-label="t('theme.toggleTheme')">
         <template #icon>
           <n-icon :component="themeConfig.icon" />
         </template>

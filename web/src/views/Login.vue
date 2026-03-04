@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import AppFooter from "@/components/AppFooter.vue";
 import LanguageSelector from "@/components/LanguageSelector.vue";
-import { useAuthService } from "@/services/auth";
+import { useAuthService } from "@/composables/useAuth";
 import { LockClosedSharp } from "@vicons/ionicons5";
-import { NButton, NCard, NInput, NSpace, NIcon, useMessage } from "naive-ui";
+import { NButton, NCard, NInput, NSpace, NIcon, NFormItem, useMessage } from "naive-ui";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -32,7 +32,7 @@ const handleLogin = async () => {
 <template>
   <div class="login-container">
     <!-- 语言切换器 -->
-    <div class="language-selector-wrapper">
+    <div class="language-selector-wrapper" :aria-label="t('common.languageSelector')">
       <language-selector />
     </div>
     <div class="login-background">
@@ -55,18 +55,21 @@ const handleLogin = async () => {
         </template>
 
         <n-space vertical size="large">
-          <n-input
-            v-model:value="authKey"
-            type="password"
-            size="large"
-            :placeholder="t('login.authKeyPlaceholder')"
-            class="modern-input"
-            @keyup.enter="handleLogin"
-          >
-            <template #prefix>
-              <n-icon :component="LockClosedSharp" />
-            </template>
-          </n-input>
+          <n-form-item :label="t('login.authKey')">
+            <n-input
+              v-model:value="authKey"
+              type="password"
+              size="large"
+              :placeholder="t('login.authKeyPlaceholder')"
+              class="modern-input"
+              autocomplete="current-password"
+              @keyup.enter="handleLogin"
+            >
+              <template #prefix>
+                <n-icon :component="LockClosedSharp" />
+              </template>
+            </n-input>
+          </n-form-item>
 
           <n-button
             class="login-btn modern-button"
@@ -149,6 +152,18 @@ const handleLogin = async () => {
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .login-decoration,
+  .login-decoration-2 {
+    animation: none;
+    opacity: 0.05;
+  }
+
+  .login-btn:hover {
+    transform: none;
+  }
+}
+
 .login-content {
   position: relative;
   z-index: 1;
@@ -213,9 +228,9 @@ const handleLogin = async () => {
 }
 
 .login-btn:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: var(--primary-color-hover);
   transform: translateY(-1px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 25px rgba(13, 148, 136, 0.25);
 }
 
 :deep(.n-input) {
@@ -239,7 +254,7 @@ const handleLogin = async () => {
   padding-top: 0;
 }
 
-/* 暗黑模式适配 */
+/* 暗色模式适配 */
 :root.dark .login-decoration {
   opacity: 0.05;
 }
@@ -254,7 +269,7 @@ const handleLogin = async () => {
 }
 
 :root.dark .login-btn:hover {
-  background: linear-gradient(135deg, #7c8aac 0%, #8b94c0 100%);
-  box-shadow: 0 8px 25px rgba(139, 157, 245, 0.2);
+  background: var(--primary-color-hover);
+  box-shadow: 0 8px 25px rgba(20, 184, 166, 0.25);
 }
 </style>

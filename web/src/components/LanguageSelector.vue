@@ -18,7 +18,7 @@ const options = computed(() =>
 // 切换语言
 const handleSelect = (key: string) => {
   setLocale(key as Locale);
-  // 页面会自动刷新，不需要提示
+  // 页面会自动刷新，无需提示
 };
 </script>
 
@@ -38,7 +38,7 @@ const handleSelect = (key: string) => {
   min-width: 100px;
 }
 
-/* 确保在暗黑模式下有良好的对比度 */
+/* 确保暗黑模式下有良好的对比度 */
 :global(.dark) .language-selector-btn {
   color: var(--n-text-color);
 }

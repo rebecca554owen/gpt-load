@@ -1,371 +1,120 @@
 <script setup lang="ts">
-import { getDashboardChart, getGroupList } from "@/api/dashboard";
-import type { ChartData } from "@/types/models";
-import { getGroupDisplayName } from "@/utils/display";
-import { NSelect, NSpin } from "naive-ui";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, ref } from "vue";
+
+defineOptions({
+  name: "LineChart",
+});
+
 import { useI18n } from "vue-i18n";
+import type { ChartDataset, ChartViewType } from "@/types/models";
+import { NRadioGroup, NRadio, NSelect } from "naive-ui";
+import { useChartColors } from "@/composables/useChartColors";
+import { useChartData, type TimeRangeHours } from "@/composables/useChartData";
+import { useChartAnimation } from "@/composables/useChartAnimation";
+import { useChartInteraction } from "@/composables/useChartInteraction";
+import { useChartRendering } from "@/composables/useChartRendering";
+import { CHART_CONFIG } from "@/constants/chart";
+
+interface Props {
+  viewType: ChartViewType;
+  timeRange: TimeRangeHours;
+}
+
+const props = defineProps<Props>();
+
+const emit = defineEmits<{
+  "update:viewType": [value: ChartViewType];
+  "update:timeRange": [value: TimeRangeHours];
+}>();
 
 const { t } = useI18n();
+const { getDatasetColor: getColor, isErrorDataset: checkIsErrorDataset } = useChartColors();
 
-// 图表数据
-const chartData = ref<ChartData | null>(null);
-const selectedGroup = ref<number | null>(null);
-const loading = ref(true);
-const animationProgress = ref(0);
-const hoveredPoint = ref<{
-  datasetIndex: number;
-  pointIndex: number;
-  x: number;
-  y: number;
-} | null>(null);
-const tooltipData = ref<{
-  time: string;
-  datasets: Array<{
-    label: string;
-    value: number;
-    color: string;
-  }>;
-} | null>(null);
-const tooltipPosition = ref({ x: 0, y: 0 });
 const chartSvg = ref<SVGElement>();
 
-// 图表尺寸和边距
-const chartWidth = 800;
-const chartHeight = 260;
-const padding = { top: 40, right: 40, bottom: 60, left: 80 };
-
-// 格式化分组选项
-const groupOptions = ref<Array<{ label: string; value: number | null }>>([]);
-
-// 计算有效的绘图区域
-const plotWidth = chartWidth - padding.left - padding.right;
-const plotHeight = chartHeight - padding.top - padding.bottom;
-
-// 计算数据的最大值和最小值
-const dataRange = computed(() => {
-  if (!chartData.value) {
-    return { min: 0, max: 100 };
-  }
-
-  const allValues = chartData.value.datasets.flatMap(d => d.data);
-  const max = Math.max(...allValues, 0);
-  const min = Math.min(...allValues, 0);
-
-  // 如果所有数据都是0，设置一个合理的范围
-  if (max === 0 && min === 0) {
-    return { min: 0, max: 10 };
-  }
-
-  // 添加一些padding让图表更好看
-  const paddingValue = Math.max((max - min) * 0.1, 1);
-  return {
-    min: Math.max(0, min - paddingValue),
-    max: max + paddingValue,
-  };
-});
-
-// 生成Y轴刻度
-const yTicks = computed(() => {
-  const { min, max } = dataRange.value;
-  const range = max - min;
-  const tickCount = 5;
-  const step = range / (tickCount - 1);
-
-  return Array.from({ length: tickCount }, (_, i) => min + i * step);
-});
-
-// 格式化时间标签
-const formatTimeLabel = (isoString: string) => {
-  const date = new Date(isoString);
-  return date.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+const getDatasetColor = (dataset: ChartDataset, speedIndex?: number): string => {
+  return getColor(dataset.label_key || "", dataset.label, speedIndex);
 };
 
-// 生成可见的X轴标签（避免重叠）
-const visibleLabels = computed(() => {
+const isErrorDataset = (label: string): boolean => {
+  return checkIsErrorDataset(label, t);
+};
+
+// 跟踪 Token 速度数据集索引以进行颜色分配
+const isTokenSpeedView = computed(() => props.viewType === "token_speed");
+
+const {
+  chartData,
+  loading: _loading,
+  hiddenDatasetIndices,
+  toggleDataset,
+  timeRangeOptions,
+} = useChartData(
+  () => props.viewType,
+  () => props.timeRange,
+  () => {
+    startAnimation();
+  }
+);
+
+const {
+  chartWidth,
+  chartHeight,
+  padding,
+  plotWidth,
+  plotHeight,
+  dataRange: _dataRange,
+  yTicks,
+  visibleLabels,
+  getXPosition,
+  getYPosition,
+  generateLinePath,
+  generateAreaPath,
+  formatNumber,
+  formatTimeLabel,
+} = useChartRendering(
+  () => chartData.value,
+  () => props.timeRange,
+  () => hiddenDatasetIndices.value,
+  CHART_CONFIG.width,
+  CHART_CONFIG.height,
+  isTokenSpeedView.value ? CHART_CONFIG.paddingWithLegend : CHART_CONFIG.padding
+);
+
+const { startAnimation } = useChartAnimation(plotWidth, plotHeight);
+
+const { hoveredPoint, tooltipData, tooltipPosition, handleMouseMove, hideTooltip } =
+  useChartInteraction(
+    () => chartData.value,
+    () => chartSvg.value,
+    getXPosition,
+    getYPosition,
+    getDatasetColor,
+    () => hiddenDatasetIndices.value
+  );
+
+const translateLabel = (label: string): string => {
+  if (!label || label.trim() === "") {
+    return label;
+  }
+  if (/[一-龥]/.test(label)) {
+    return label;
+  }
+  // 对于格式为 "group_name - model_name" 的 token 速度标签，尝试翻译
+  if (label.includes(" - ")) {
+    return label; // 由于是动态组合，直接返回
+  }
+  return t(label);
+};
+
+const datasetsWithColor = computed(() => {
   if (!chartData.value) {
     return [];
   }
-
-  const labels = chartData.value.labels;
-  const maxLabels = 8; // 最多显示8个标签
-  const step = Math.ceil(labels.length / maxLabels);
-
-  return labels
-    .map((label, index) => ({ text: formatTimeLabel(label), index }))
-    .filter((_, i) => i % step === 1);
-});
-
-// 位置计算函数
-const getXPosition = (index: number) => {
-  if (!chartData.value) {
-    return 0;
-  }
-  const totalPoints = chartData.value.labels.length;
-  if (totalPoints <= 1) {
-    return padding.left + plotWidth / 2;
-  }
-  return padding.left + (index / (totalPoints - 1)) * plotWidth;
-};
-
-const getYPosition = (value: number) => {
-  const { min, max } = dataRange.value;
-  const ratio = (value - min) / (max - min);
-  return padding.top + (1 - ratio) * plotHeight;
-};
-
-// Helper to find segments of non-zero data (用于填充区域)
-const getSegments = (data: number[]) => {
-  const segments: Array<Array<{ value: number; index: number }>> = [];
-  let currentSegment: Array<{ value: number; index: number }> = [];
-
-  data.forEach((value, index) => {
-    if (value > 0) {
-      currentSegment.push({ value, index });
-    } else {
-      if (currentSegment.length > 0) {
-        segments.push(currentSegment);
-        currentSegment = [];
-      }
-    }
-  });
-
-  if (currentSegment.length > 0) {
-    segments.push(currentSegment);
-  }
-
-  return segments;
-};
-
-// 生成线条路径（连续线条，包括0值点）
-const generateLinePath = (data: number[]) => {
-  if (data.length === 0) {
-    return "";
-  }
-
-  // 找到第一个和最后一个非0值的位置
-  let firstNonZeroIndex = -1;
-  let lastNonZeroIndex = -1;
-
-  for (let i = 0; i < data.length; i++) {
-    if (data[i] > 0) {
-      if (firstNonZeroIndex === -1) {
-        firstNonZeroIndex = i;
-      }
-      lastNonZeroIndex = i;
-    }
-  }
-
-  // 如果没有非0值，返回空路径
-  if (firstNonZeroIndex === -1) {
-    return "";
-  }
-
-  // 生成连续的路径，从第一个非0值到最后一个非0值
-  const pathCommands: string[] = [];
-
-  for (let i = firstNonZeroIndex; i <= lastNonZeroIndex; i++) {
-    const x = getXPosition(i);
-    const y = getYPosition(data[i]);
-    const command = i === firstNonZeroIndex ? "M" : "L";
-    pathCommands.push(`${command} ${x},${y}`);
-  }
-
-  return pathCommands.join(" ");
-};
-
-// 生成填充区域路径（只为有数据的区域填充）
-const generateAreaPath = (data: number[]) => {
-  const segments = getSegments(data);
-  const pathParts: string[] = [];
-  const baseY = getYPosition(dataRange.value.min);
-
-  segments.forEach(segment => {
-    if (segment.length > 0) {
-      const points = segment.map(p => ({
-        x: getXPosition(p.index),
-        y: getYPosition(p.value),
-      }));
-      const firstPoint = points[0];
-      const lastPoint = points[points.length - 1];
-
-      const lineCommands = points.map(p => `L ${p.x},${p.y}`).join(" ");
-
-      pathParts.push(`M ${firstPoint.x},${baseY} ${lineCommands} L ${lastPoint.x},${baseY} Z`);
-    }
-  });
-
-  return pathParts.join(" ");
-};
-
-// 数字格式化
-const formatNumber = (value: number) => {
-  // if (value >= 1000000) {
-  //   return `${(value / 1000000).toFixed(1)}M`;
-  // } else
-  if (value >= 1000) {
-    return `${(value / 1000).toFixed(1)}K`;
-  }
-  return Math.round(value).toString();
-};
-
-const isErrorDataset = (label: string) => {
-  return label.includes("失败") || label.includes("Error") || label.includes("エラー");
-};
-
-// 动画相关
-const animatedStroke = ref("0");
-const animatedOffset = ref("0");
-
-const startAnimation = () => {
-  if (!chartData.value) {
-    return;
-  }
-
-  // 计算总路径长度（近似）
-  const totalLength = plotWidth + plotHeight;
-  animatedStroke.value = `${totalLength}`;
-  animatedOffset.value = `${totalLength}`;
-
-  let start = 0;
-  const animate = (timestamp: number) => {
-    if (!start) {
-      start = timestamp;
-    }
-    const progress = Math.min((timestamp - start) / 1500, 1);
-
-    animatedOffset.value = `${totalLength * (1 - progress)}`;
-    animationProgress.value = progress;
-
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-    }
-  };
-  requestAnimationFrame(animate);
-};
-
-// 鼠标交互
-const handleMouseMove = (event: MouseEvent) => {
-  if (!chartData.value || !chartSvg.value) {
-    return;
-  }
-
-  const rect = chartSvg.value.getBoundingClientRect();
-  // 考虑SVG的viewBox缩放
-  const scaleX = 800 / rect.width;
-  const scaleY = 260 / rect.height;
-
-  const mouseX = (event.clientX - rect.left) * scaleX;
-  const mouseY = (event.clientY - rect.top) * scaleY;
-
-  // 首先找到最接近的X轴位置（时间点）
-  let closestXDistance = Infinity;
-  let closestTimeIndex = -1;
-
-  chartData.value.labels.forEach((_, pointIndex) => {
-    const x = getXPosition(pointIndex);
-    const xDistance = Math.abs(mouseX - x);
-
-    if (xDistance < closestXDistance) {
-      closestXDistance = xDistance;
-      closestTimeIndex = pointIndex;
-    }
-  });
-
-  // 如果鼠标距离最近的时间点太远，不显示提示
-  if (closestXDistance > 50) {
-    hoveredPoint.value = null;
-    tooltipData.value = null;
-    return;
-  }
-
-  // 收集该时间点所有数据集的数据
-  const datasetsAtTime = chartData.value.datasets.map(dataset => ({
-    label: dataset.label,
-    value: dataset.data[closestTimeIndex],
-    color: dataset.color,
+  return chartData.value.datasets.map((dataset, index) => ({
+    ...dataset,
+    color: isTokenSpeedView.value ? getDatasetColor(dataset, index) : getDatasetColor(dataset),
   }));
-
-  if (closestTimeIndex >= 0) {
-    hoveredPoint.value = {
-      datasetIndex: 0, // 不再需要特定的数据集索引
-      pointIndex: closestTimeIndex,
-      x: mouseX,
-      y: mouseY,
-    };
-
-    // 显示 tooltip
-    const x = getXPosition(closestTimeIndex);
-    const avgY =
-      datasetsAtTime.reduce((sum, item) => sum + getYPosition(item.value), 0) /
-      datasetsAtTime.length;
-
-    tooltipPosition.value = {
-      x,
-      y: avgY - 20, // 在平均高度上方显示
-    };
-
-    tooltipData.value = {
-      time: formatTimeLabel(chartData.value.labels[closestTimeIndex]),
-      datasets: datasetsAtTime,
-    };
-  } else {
-    hoveredPoint.value = null;
-    tooltipData.value = null;
-  }
-};
-
-const hideTooltip = () => {
-  hoveredPoint.value = null;
-  tooltipData.value = null;
-};
-
-// 获取分组列表
-const fetchGroups = async () => {
-  try {
-    const response = await getGroupList();
-    groupOptions.value = [
-      { label: t("charts.allGroups"), value: null },
-      ...response.data.map(group => ({
-        label: getGroupDisplayName(group),
-        value: group.id || 0,
-      })),
-    ];
-  } catch (error) {
-    console.error("Failed to fetch groups:", error);
-  }
-};
-
-// 获取图表数据
-const fetchChartData = async () => {
-  try {
-    loading.value = true;
-    const response = await getDashboardChart(selectedGroup.value || undefined);
-    chartData.value = response.data;
-
-    // 延迟启动动画，确保DOM更新完成
-    setTimeout(() => {
-      startAnimation();
-    }, 100);
-  } catch (error) {
-    console.error("Failed to fetch chart data:", error);
-  } finally {
-    loading.value = false;
-  }
-};
-
-// 监听分组选择变化
-watch(selectedGroup, () => {
-  fetchChartData();
-});
-
-onMounted(() => {
-  fetchGroups();
-  fetchChartData();
 });
 </script>
 
@@ -373,30 +122,57 @@ onMounted(() => {
   <div class="chart-container">
     <div class="chart-header">
       <div class="chart-title-section">
-        <h3 class="chart-title">{{ t("charts.requestTrend24h") }}</h3>
+        <!-- 左上角：视图类型切换 -->
+        <n-radio-group
+          :value="viewType"
+          @update:value="
+            (value: 'request' | 'token' | 'token_speed') => emit('update:viewType', value)
+          "
+          size="small"
+          class="view-toggle"
+        >
+          <n-radio value="token_speed">{{ t("dashboard.tokenSpeedView") }}</n-radio>
+          <n-radio value="token">{{ t("dashboard.tokenView") }}</n-radio>
+          <n-radio value="request">{{ t("dashboard.requestView") }}</n-radio>
+        </n-radio-group>
       </div>
+      <!-- 右上角：时间范围选择器 -->
       <n-select
-        v-model:value="selectedGroup"
-        :options="groupOptions as any"
-        :placeholder="t('charts.allGroups')"
+        :value="timeRange"
+        @update:value="(value: number) => emit('update:timeRange', value as TimeRangeHours)"
+        :options="timeRangeOptions"
         size="small"
-        style="width: 150px"
-        clearable
+        style="width: 140px"
       />
     </div>
 
     <div v-if="chartData" class="chart-content">
       <div class="chart-wrapper">
-        <div class="chart-legend">
-          <div v-for="dataset in chartData.datasets" :key="dataset.label" class="legend-item">
-            <div class="legend-indicator" :style="{ backgroundColor: dataset.color }" />
-            <span class="legend-label">{{ dataset.label }}</span>
+        <div class="chart-legend" :class="{ 'legend-speed': viewType === 'token_speed' }">
+          <div
+            v-for="(dataset, index) in datasetsWithColor"
+            :key="dataset.label"
+            class="legend-item"
+            :class="{ 'legend-item-hidden': hiddenDatasetIndices.has(index) }"
+            @click="toggleDataset(index)"
+          >
+            <div
+              v-if="viewType === 'token_speed'"
+              class="legend-text-prefix"
+              :style="{ color: dataset.color }"
+            >
+              {{ index + 1 }}.
+            </div>
+            <div v-else class="legend-indicator" :style="{ backgroundColor: dataset.color }" />
+            <span class="legend-label">{{ translateLabel(dataset.label) }}</span>
           </div>
         </div>
         <svg
           ref="chartSvg"
           viewBox="0 0 800 260"
           class="chart-svg"
+          role="img"
+          :aria-label="t('dashboard.chartAriaLabel', { viewType: t(`dashboard.${viewType}View`) })"
           @mousemove="handleMouseMove"
           @mouseleave="hideTooltip"
         >
@@ -414,7 +190,7 @@ onMounted(() => {
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
 
-          <!-- Y轴刻度线和标签 -->
+          <!-- Y 轴刻度线和标签 -->
           <g class="y-axis">
             <line
               :x1="padding.left"
@@ -444,7 +220,7 @@ onMounted(() => {
             </g>
           </g>
 
-          <!-- X轴刻度线和标签 -->
+          <!-- X 轴刻度线和标签 -->
           <g class="x-axis">
             <line
               :x1="padding.left"
@@ -474,8 +250,12 @@ onMounted(() => {
             </g>
           </g>
 
-          <!-- 数据线条 -->
-          <g v-for="(dataset, datasetIndex) in chartData.datasets" :key="dataset.label">
+          <!-- 数据线 -->
+          <g
+            v-for="(dataset, datasetIndex) in datasetsWithColor"
+            :key="dataset.label"
+            v-show="!hiddenDatasetIndices.has(datasetIndex)"
+          >
             <!-- 渐变定义 -->
             <defs>
               <linearGradient :id="`gradient-${datasetIndex}`" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -489,10 +269,11 @@ onMounted(() => {
               :d="generateAreaPath(dataset.data)"
               :fill="`url(#gradient-${datasetIndex})`"
               class="area-path"
+              :class="{ 'area-path-speed': viewType === 'token_speed' }"
               :style="{ opacity: isErrorDataset(dataset.label) ? 0.3 : 0.6 }"
             />
 
-            <!-- 主线条 -->
+            <!-- 主线 -->
             <path
               :d="generateLinePath(dataset.data)"
               :stroke="dataset.color"
@@ -507,6 +288,7 @@ onMounted(() => {
 
             <!-- 数据点 -->
             <g v-for="(value, pointIndex) in dataset.data" :key="pointIndex">
+              <!-- 非零值点 -->
               <circle
                 v-if="value > 0"
                 :cx="getXPosition(pointIndex)"
@@ -520,6 +302,15 @@ onMounted(() => {
                   'point-hover': hoveredPoint?.pointIndex === pointIndex,
                 }"
                 :style="{ opacity: isErrorDataset(dataset.label) ? 0.8 : 1 }"
+              />
+              <!-- 零值点 - 仅对 total_tokens 显示，以指示该时间段内无数据 -->
+              <circle
+                v-else-if="dataset.label_key === 'dashboard.total_tokens'"
+                :cx="getXPosition(pointIndex)"
+                :cy="getYPosition(0)"
+                r="1.5"
+                :fill="dataset.color"
+                class="data-point-zero"
               />
             </g>
           </g>
@@ -538,26 +329,39 @@ onMounted(() => {
           />
         </svg>
 
-        <!-- 提示框 -->
+        <!-- 工具提示 -->
         <div
           v-if="tooltipData"
           class="chart-tooltip"
+          :class="{ 'tooltip-speed': viewType === 'token_speed' }"
           :style="{
-            left: tooltipPosition.x + 'px',
-            top: tooltipPosition.y + 'px',
+            left: (tooltipPosition.x / 800) * 100 + '%',
+            top: (tooltipPosition.y / 260) * 100 + '%',
           }"
         >
-          <div class="tooltip-time">{{ tooltipData.time }}</div>
-          <div v-for="dataset in tooltipData.datasets" :key="dataset.label" class="tooltip-value">
-            <span class="tooltip-color" :style="{ backgroundColor: dataset.color }" />
-            {{ dataset.label }}: {{ formatNumber(dataset.value) }}
+          <div class="tooltip-time">
+            {{
+              formatTimeLabel(tooltipData.time, tooltipData.index, chartData?.labels.length || 0)
+            }}
+          </div>
+          <div
+            v-for="(dataset, idx) in tooltipData.datasets"
+            :key="dataset.label"
+            class="tooltip-value"
+          >
+            <span v-if="viewType === 'token_speed'" class="tooltip-rank-text">{{ idx + 1 }}.</span>
+            <span v-else class="tooltip-color" :style="{ backgroundColor: dataset.color }" />
+            <span class="tooltip-label-text">{{ translateLabel(dataset.label) }}</span>
+            <span class="tooltip-value-number">{{ formatNumber(dataset.value) }}</span>
+            <span v-if="viewType === 'token_speed' && dataset.value > 0" class="tooltip-unit">
+              token/s
+            </span>
           </div>
         </div>
       </div>
     </div>
 
     <div v-else class="chart-loading">
-      <n-spin size="large" />
       <p>{{ t("common.loading") }}</p>
     </div>
   </div>
@@ -571,7 +375,7 @@ onMounted(() => {
   border: 1px solid var(--border-color-light);
 }
 
-/* 浅色主题 - 保持原有的紫色渐变设计 */
+/* 浅色主题 - 保持原紫色渐变设计 */
 :root:not(.dark) .chart-container {
   background: var(--primary-gradient);
   color: white;
@@ -579,76 +383,58 @@ onMounted(() => {
 
 /* 暗黑主题 - 使用深蓝紫渐变外层背景 */
 :root.dark .chart-container {
-  background: linear-gradient(135deg, #525a7a 0%, #424964 100%);
+  background: var(--chart-bg-dark-gradient);
   box-shadow: var(--shadow-md);
-  border: 1px solid rgba(139, 157, 245, 0.2);
-  color: #e8e8e8;
+  border: 1px solid var(--chart-border-dark);
+  color: var(--chart-text-dark);
 }
 
 .chart-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   margin-bottom: 12px;
   gap: 16px;
 }
 
 .chart-title-section {
   flex: 1;
+  display: flex;
+  align-items: center;
 }
 
-.chart-title {
-  /* margin: 0 0 4px 0; */
-  font-size: 24px;
-  line-height: 28px;
-  font-weight: 600;
+/* 浅色主题 - 视图切换按钮 */
+:root:not(.dark) .view-toggle {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 4px 8px;
 }
 
-/* 浅色主题 - 白色渐变文字 */
-:root:not(.dark) .chart-title {
-  background: linear-gradient(45deg, #fff, #f0f0f0);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* 暗黑主题 - 白色文字 */
-:root.dark .chart-title {
+:root:not(.dark) .view-toggle :deep(.n-radio) {
   color: white;
-  background: none;
-  -webkit-background-clip: unset;
-  -webkit-text-fill-color: unset;
-  background-clip: unset;
 }
 
-.chart-subtitle {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 400;
+:root:not(.dark) .view-toggle :deep(.n-radio__dot) {
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
-/* 浅色主题 */
-:root:not(.dark) .chart-subtitle {
-  color: rgba(255, 255, 255, 0.8);
+:root:not(.dark) .view-toggle :deep(.n-radio.n-radio--checked .n-radio__dot) {
+  background: white;
+  border-color: white;
 }
 
-/* 暗黑主题 */
-:root.dark .chart-subtitle {
-  color: var(--text-secondary);
+/* 暗黑主题 - 视图切换按钮 */
+:root.dark .view-toggle {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 4px 8px;
 }
-
-/* .chart-content {
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
-  padding: 12px;
-  color: #333;
-} */
 
 .chart-legend {
   position: absolute;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0px;
+  left: 115px;
+  right: 0px;
   z-index: 10;
   display: flex;
   justify-content: center;
@@ -656,6 +442,7 @@ onMounted(() => {
   padding: 2px;
   backdrop-filter: blur(8px);
   border-radius: 24px;
+  flex-wrap: wrap;
 }
 
 /* 浅色主题 */
@@ -670,6 +457,15 @@ onMounted(() => {
   border: 1px solid var(--border-color);
 }
 
+/* Token 速度图例样式 */
+.legend-speed {
+  gap: 12px;
+  padding: 8px 16px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  max-width: calc(100% - 130px);
+}
+
 .legend-item {
   display: flex;
   align-items: center;
@@ -679,11 +475,13 @@ onMounted(() => {
   padding: 8px 16px;
   border-radius: 20px;
   transition: all 0.2s ease;
+  cursor: pointer;
+  user-select: none;
 }
 
 /* 浅色主题 */
 :root:not(.dark) .legend-item {
-  color: #334155;
+  color: var(--chart-grid-light);
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.7);
 }
@@ -693,6 +491,12 @@ onMounted(() => {
   color: var(--text-primary);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-color);
+}
+
+/* Hidden state */
+.legend-item-hidden {
+  opacity: 0.4;
+  text-decoration: line-through;
 }
 
 /* 浅色主题悬停效果 */
@@ -733,6 +537,12 @@ onMounted(() => {
 .legend-label {
   font-size: 13px;
   color: inherit;
+}
+
+.legend-text-prefix {
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
 }
 
 .chart-wrapper {
@@ -804,23 +614,49 @@ onMounted(() => {
   border-radius: 8px;
   font-size: 13px;
   pointer-events: none;
-  transform: translateX(-50%) translateY(-100%);
+  transform: translate(-50%, -100%);
   z-index: 1000;
   backdrop-filter: blur(8px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   min-width: 140px;
-  max-width: 220px;
+  max-width: 240px;
+}
+
+/* 浅色主题工具提示 */
+:root:not(.dark) .chart-tooltip {
+  background: rgba(255, 255, 255, 0.95);
+  color: #1a1a2e;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.tooltip-speed {
+  min-width: 240px;
+  max-width: 400px;
+}
+
+:root:not(.dark) .tooltip-speed {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+:root.dark .tooltip-speed {
+  background: rgba(20, 20, 30, 0.95);
 }
 
 .tooltip-time {
   font-weight: 700;
   margin-bottom: 8px;
   text-align: center;
-  color: #e2e8f0;
+  color: var(--chart-axis-light);
   font-size: 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 6px;
+}
+
+:root:not(.dark) .tooltip-time {
+  color: #666;
+  border-bottom-color: rgba(0, 0, 0, 0.1);
 }
 
 .tooltip-value {
@@ -832,6 +668,40 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.tooltip-rank-text {
+  font-weight: 700;
+  color: #888;
+  min-width: 20px;
+  flex-shrink: 0;
+}
+
+:root:not(.dark) .tooltip-rank-text {
+  color: #999;
+}
+
+.tooltip-label-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.tooltip-value-number {
+  font-weight: 700;
+  font-feature-settings: "tnum";
+  color: #a8e6cf;
+}
+
+:root:not(.dark) .tooltip-value-number {
+  color: #059669;
+}
+
+.tooltip-unit {
+  font-size: 11px;
+  opacity: 0.7;
+  font-weight: 500;
+}
+
 .tooltip-value:last-child {
   margin-bottom: 0;
 }
@@ -840,6 +710,7 @@ onMounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .chart-loading {
@@ -863,14 +734,14 @@ onMounted(() => {
     padding: 16px;
   }
 
-  .chart-title {
-    font-size: 20px;
-  }
-
   .chart-header {
     flex-direction: column;
     gap: 12px;
-    align-items: flex-start;
+    align-items: stretch;
+  }
+
+  .chart-title-section {
+    justify-content: center;
   }
 
   .chart-wrapper {
@@ -897,15 +768,51 @@ onMounted(() => {
   .legend-item {
     padding: 4px 10px;
     font-size: 12px;
-    color: #333;
-    background: white;
-    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: var(--text-primary);
+    background: var(--card-bg-solid);
+    border: 1px solid var(--border-color);
     gap: 6px;
+  }
+
+  .legend-rank-badge {
+    padding-left: 24px;
+  }
+
+  .legend-rank {
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
   }
 
   .chart-svg {
     width: 100%;
     height: auto;
+  }
+
+  /* 移动端工具提示特殊处理 */
+  .chart-tooltip {
+    min-width: 160px;
+    max-width: calc(100vw - 32px);
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .tooltip-speed {
+    min-width: 180px;
+    max-width: calc(100vw - 32px);
+  }
+
+  .tooltip-value {
+    font-size: 11px;
+    gap: 6px;
+  }
+
+  .tooltip-label-text {
+    max-width: 120px;
+  }
+
+  .tooltip-value-number {
+    font-size: 11px;
   }
 }
 
