@@ -125,7 +125,7 @@ function generateValidationRules(item: Setting): FormItemRule[] {
                         <n-icon
                           :component="HelpCircle"
                           :size="16"
-                          style="cursor: help; color: #9ca3af"
+                          style="cursor: help; color: var(--text-tertiary)"
                         />
                       </template>
                       {{ item.description }}
@@ -175,11 +175,11 @@ function generateValidationRules(item: Setting): FormItemRule[] {
       style="display: flex; justify-content: center; padding-top: 12px"
     >
       <n-button
-        type="primary"
         size="large"
         :loading="isSaving"
         :disabled="isSaving"
         @click="handleSubmit"
+        class="btn-confirm"
         style="min-width: 200px"
       >
         <template #icon>

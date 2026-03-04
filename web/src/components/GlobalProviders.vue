@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { appState } from "@/utils/app-state";
-import { actualTheme } from "@/utils/theme";
+import { useAppStateStore } from "@/stores/appState";
+import { actualTheme } from "@/composables/useTheme";
 import { getLocale } from "@/locales";
 import {
   darkTheme,
@@ -21,125 +21,155 @@ import {
 } from "naive-ui";
 import { computed, defineComponent, watch } from "vue";
 
-// 自定义主题配置 - 根据主题动态调整
+const getCssVar = (varName: string): string => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  return getComputedStyle(document.documentElement).getPropertyValue(varName).trim() || "";
+};
+
+const rgba = (hexOrRgba: string, alpha: number): string => {
+  const hex = hexOrRgba.replace("#", "");
+  if (hex.length === 6) {
+    const r = Number.parseInt(hex.slice(0, 2), 16);
+    const g = Number.parseInt(hex.slice(2, 4), 16);
+    const b = Number.parseInt(hex.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hexOrRgba;
+};
+
 const themeOverrides = computed<GlobalThemeOverrides>(() => {
+  const primaryColor = getCssVar("--primary-color");
+  const primaryColorHover = getCssVar("--primary-color-hover");
+  const primaryColorPressed = getCssVar("--primary-color-pressed");
+  const primaryColorSuppl = getCssVar("--primary-color-suppl");
+  const errorColor = getCssVar("--error-color");
+
   const baseOverrides: GlobalThemeOverrides = {
     common: {
-      primaryColor: "#667eea",
-      primaryColorHover: "#5a6fd8",
-      primaryColorPressed: "#4c63d2",
-      primaryColorSuppl: "#8b9df5",
-      borderRadius: "12px",
-      borderRadiusSmall: "8px",
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+      primaryColor,
+      primaryColorHover,
+      primaryColorPressed,
+      primaryColorSuppl,
+      borderRadius: "10px",
+      borderRadiusSmall: "6px",
+      fontFamily: "'DM Sans', system-ui, sans-serif",
     },
     Card: {
-      paddingMedium: "24px",
+      paddingMedium: "20px",
     },
     Button: {
       fontWeight: "600",
-      heightMedium: "40px",
-      heightLarge: "48px",
+      heightMedium: "38px",
+      heightLarge: "44px",
     },
     Input: {
-      heightMedium: "40px",
-      heightLarge: "48px",
+      heightMedium: "38px",
+      heightLarge: "44px",
     },
     Menu: {
-      itemHeight: "42px",
+      itemHeight: "40px",
     },
     LoadingBar: {
-      colorLoading: "#667eea",
-      colorError: "#ff4757",
+      colorLoading: primaryColor,
+      colorError: errorColor,
       height: "3px",
     },
   };
 
-  // 暗黑模式下的特殊覆盖
   if (actualTheme.value === "dark") {
+    const bodyColor = getCssVar("--bg-primary");
+    const cardColor = getCssVar("--card-bg-solid");
+    const inputColor = getCssVar("--bg-tertiary");
+    const textColorBase = getCssVar("--text-primary");
+    const textColor2 = getCssVar("--text-secondary");
+    const textColor3 = getCssVar("--text-tertiary");
+    const borderColor = getCssVar("--border-color");
+    const dividerColor = getCssVar("--border-color-light");
+
     return {
       ...baseOverrides,
       common: {
         ...baseOverrides.common,
-        // 分层对比：浅色外层背景，深黑色内容
-        bodyColor: "#2b3038", // 外层背景 - 浅灰色
-        cardColor: "#0f1115", // 卡片内容 - 深黑色
-        modalColor: "#0f1115", // 模态框 - 深黑色
-        popoverColor: "#0f1115", // 弹出层 - 深黑色
-        tableColor: "#0f1115", // 表格 - 深黑色
-        inputColor: "#1a1d23", // 输入框 - 稍深一点
-        actionColor: "#1a1d23", // 操作区域
-        textColorBase: "#e8e8e8", // 文字 - 浅色高对比
-        textColor1: "#e8e8e8",
-        textColor2: "#b4b4b4",
-        textColor3: "#888888",
-        borderColor: "rgba(255, 255, 255, 0.08)",
-        dividerColor: "rgba(255, 255, 255, 0.05)",
+        bodyColor,
+        cardColor,
+        modalColor: cardColor,
+        popoverColor: cardColor,
+        tableColor: cardColor,
+        inputColor,
+        actionColor: inputColor,
+        textColorBase,
+        textColor1: textColorBase,
+        textColor2,
+        textColor3,
+        borderColor,
+        dividerColor,
       },
       Card: {
         ...baseOverrides.Card,
-        color: "#0f1115", // 卡片背景 - 深黑色
-        textColor: "#e8e8e8",
-        borderColor: "rgba(255, 255, 255, 0.08)",
+        color: cardColor,
+        textColor: textColorBase,
+        borderColor,
       },
       Input: {
         ...baseOverrides.Input,
-        color: "#1a1d23", // 输入框背景
-        textColor: "#e8e8e8",
-        colorFocus: "#1a1d23",
-        borderHover: "rgba(102, 126, 234, 0.5)",
-        borderFocus: "rgba(102, 126, 234, 0.8)",
-        placeholderColor: "#666666",
+        color: inputColor,
+        textColor: textColorBase,
+        colorFocus: inputColor,
+        borderHover: rgba(primaryColor, 0.4),
+        borderFocus: rgba(primaryColor, 0.6),
+        placeholderColor: textColor3,
       },
       Select: {
         peers: {
           InternalSelection: {
-            textColor: "#e8e8e8",
-            color: "#1a1d23",
-            placeholderColor: "#666666",
+            textColor: textColorBase,
+            color: inputColor,
+            placeholderColor: textColor3,
           },
         },
       },
       DataTable: {
-        tdColor: "#0f1115", // 表格单元格 - 深黑色
-        thColor: "#1a1d23", // 表头 - 稍深
-        thTextColor: "#e8e8e8",
-        tdTextColor: "#e8e8e8",
-        borderColor: "rgba(255, 255, 255, 0.08)",
+        tdColor: cardColor,
+        thColor: inputColor,
+        thTextColor: textColorBase,
+        tdTextColor: textColorBase,
+        borderColor,
       },
       Tag: {
-        textColor: "#e8e8e8",
+        textColor: textColorBase,
       },
       Pagination: {
-        itemTextColor: "#b4b4b4",
-        itemTextColorActive: "#e8e8e8",
-        itemColor: "#1a1d23",
-        itemColorActive: "#282c37",
+        itemTextColor: textColor2,
+        itemTextColorActive: textColorBase,
+        itemColor: inputColor,
+        itemColorActive: borderColor,
       },
       DatePicker: {
-        itemTextColor: "#e8e8e8",
-        itemColorActive: "#1a1d23",
-        panelColor: "#0f1115",
+        itemTextColor: textColorBase,
+        itemColorActive: inputColor,
+        panelColor: cardColor,
       },
       Message: {
-        color: "#323841", // 消息背景 - 浅灰色，比内容区域浅
-        textColor: "#e8e8e8",
-        iconColor: "#e8e8e8",
+        color: inputColor,
+        textColor: textColorBase,
+        iconColor: textColorBase,
         borderRadius: "8px",
-        colorInfo: "#323841",
-        colorSuccess: "#323841",
-        colorWarning: "#323841",
-        colorError: "#323841",
-        colorLoading: "#323841",
+        colorInfo: inputColor,
+        colorSuccess: inputColor,
+        colorWarning: inputColor,
+        colorError: inputColor,
+        colorLoading: inputColor,
       },
       LoadingBar: {
         ...baseOverrides.LoadingBar,
       },
       Notification: {
-        color: "#323841", // 通知背景 - 浅灰色
-        textColor: "#e8e8e8",
-        titleTextColor: "#e8e8e8",
-        descriptionTextColor: "#b4b4b4",
+        color: inputColor,
+        textColor: textColorBase,
+        titleTextColor: textColorBase,
+        descriptionTextColor: textColor2,
         borderRadius: "8px",
       },
     };
@@ -153,7 +183,7 @@ const theme = computed<GlobalTheme | undefined>(() => {
   return actualTheme.value === "dark" ? darkTheme : undefined;
 });
 
-// 根据当前语言返回对应的 locale 配置
+// 根据当前语言返回对应的语言配置
 const locale = computed(() => {
   const currentLocale = getLocale();
   switch (currentLocale) {
@@ -168,7 +198,7 @@ const locale = computed(() => {
   }
 });
 
-// 根据当前语言返回对应的日期 locale 配置
+// 根据当前语言返回对应的日期语言配置
 const dateLocale = computed(() => {
   const currentLocale = getLocale();
   switch (currentLocale) {
@@ -190,6 +220,7 @@ function useGlobalMessage() {
 const LoadingBar = defineComponent({
   setup() {
     const loadingBar = useLoadingBar();
+    const appState = useAppStateStore();
     watch(
       () => appState.loading,
       loading => {

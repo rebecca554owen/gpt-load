@@ -1,0 +1,202 @@
+/* web/src/styles/buttons.css */
+/* 操作按钮统一样式 - 柔和自然风格（方案A） */
+
+/* 查看按钮 - 蓝色 */
+.btn-view {
+  background: var(--btn-view-bg);
+  color: var(--btn-view-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-view:hover {
+  background: var(--btn-view-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(92, 124, 250, 0.25);
+}
+
+.btn-view:active {
+  background: var(--btn-view-pressed);
+  transform: translateY(0);
+}
+
+/* 测试按钮 - 蓝紫色 */
+.btn-test {
+  background: var(--btn-test-bg);
+  color: var(--btn-test-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-test:hover {
+  background: var(--btn-test-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+}
+
+.btn-test:active {
+  background: var(--btn-test-pressed);
+  transform: translateY(0);
+}
+
+/* 编辑按钮 - 中性灰 */
+.btn-edit {
+  background: var(--btn-edit-bg);
+  color: var(--btn-edit-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-edit:hover {
+  background: var(--btn-edit-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(107, 114, 128, 0.25);
+}
+
+.btn-edit:active {
+  background: var(--btn-edit-pressed);
+  transform: translateY(0);
+}
+
+/* 复制按钮 - 绿色 */
+.btn-copy {
+  background: var(--btn-copy-bg);
+  color: var(--btn-copy-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-copy:hover {
+  background: var(--btn-copy-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.btn-copy:active {
+  background: var(--btn-copy-pressed);
+  transform: translateY(0);
+}
+
+/* 移除按钮 - 橙色 */
+.btn-remove {
+  background: var(--btn-remove-bg);
+  color: var(--btn-remove-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-remove:hover {
+  background: var(--btn-remove-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
+}
+
+.btn-remove:active {
+  background: var(--btn-remove-pressed);
+  transform: translateY(0);
+}
+
+/* 创建按钮 - 青绿色 */
+.btn-create {
+  background: var(--btn-create-bg);
+  color: var(--btn-create-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-create:hover {
+  background: var(--btn-create-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);
+}
+
+.btn-create:active {
+  background: var(--btn-create-pressed);
+  transform: translateY(0);
+}
+
+/* 删除按钮 - 红色 */
+.btn-delete {
+  background: var(--btn-delete-bg);
+  color: var(--btn-delete-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-delete:hover {
+  background: var(--btn-delete-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+.btn-delete:active {
+  background: var(--btn-delete-pressed);
+  transform: translateY(0);
+}
+
+/* 确认按钮 - 主题色（青绿色） */
+.btn-confirm {
+  background: var(--btn-confirm-bg);
+  color: var(--btn-confirm-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-confirm:hover {
+  background: var(--btn-confirm-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);
+}
+
+.btn-confirm:active {
+  background: var(--btn-confirm-pressed);
+  transform: translateY(0);
+}
+
+/* 更新按钮 - 与确认按钮相同 */
+.btn-update {
+  background: var(--btn-confirm-bg);
+  color: var(--btn-confirm-text);
+  border: none;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-update:hover {
+  background: var(--btn-confirm-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25);
+}
+
+.btn-update:active {
+  background: var(--btn-confirm-pressed);
+  transform: translateY(0);
+}
+
+/* 取消按钮 - 中性灰 */
+.btn-cancel {
+  background: var(--btn-cancel-bg);
+  color: var(--btn-cancel-text);
+  border: var(--btn-cancel-border);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-cancel:hover {
+  background: var(--btn-cancel-hover);
+  border-color: var(--btn-cancel-hover-border);
+  transform: translateY(-1px);
+}
+
+.btn-cancel:active {
+  background: var(--btn-cancel-pressed);
+  transform: translateY(0);
+}

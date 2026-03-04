@@ -1,24 +1,40 @@
 /* 导入CSS变量定义 */
 @import "./variables.css";
 
+/* 导入按钮样式 */
+@import "../styles/buttons.css";
+
 :root {
   overflow-y: auto;
   font-family:
-    "Inter",
+    var(--font-body),
+    system-ui,
     -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    "Helvetica Neue",
-    Arial,
     sans-serif;
   line-height: 1.6;
   font-weight: 400;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono), monospace;
 }
 
 * {
@@ -28,7 +44,7 @@
 }
 
 html {
-  background: var(--header-bg);
+  background: var(--bg-primary);
 }
 
 body {
@@ -36,6 +52,32 @@ body {
   background: var(--bg-gradient);
   background-attachment: fixed;
   color: var(--text-primary);
+  position: relative;
+}
+
+/* 背景纹理 - 浅色模式 */
+:root:not(.dark) body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(13, 148, 136, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 85% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.03) 0%, transparent 60%);
+  z-index: 0;
+}
+
+/* 背景纹理 - 深色模式 */
+:root.dark body::before {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgba(20, 184, 166, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 85% 80%, rgba(129, 140, 248, 0.06) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(167, 139, 250, 0.04) 0%, transparent 60%);
 }
 
 #app {
@@ -134,56 +176,58 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 1px;
+  background: transparent;
+  border-radius: var(--radius-xs);
 }
 
 :root:not(.dark) ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 1px;
+  background: linear-gradient(180deg, var(--primary-color) 0%, var(--primary-color-hover) 100%);
+  border-radius: var(--radius-xs);
 }
 
 :root:not(.dark) ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: var(--primary-color-pressed);
 }
 
 /* 深色模式滚动条 */
 :root.dark ::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0);
-  border-radius: 1px;
+  background: transparent;
+  border-radius: var(--radius-xs);
 }
 
 :root.dark ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #7c8aac 0%, #646e8a 100%);
-  border-radius: 1px;
+  background: linear-gradient(180deg, #3b4252 0%, #2d3342 100%);
+  border-radius: var(--radius-xs);
 }
 
 :root.dark ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #8b9df5 0%, #a97dd4 100%);
+  background: linear-gradient(180deg, #4b5363 0%, #3d4352 100%);
 }
 
 /* 通用卡片样式和悬停效果 */
 .modern-card {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.2s ease;
+  background: var(--card-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--card-border);
+  transition: all var(--transition-base);
 }
 
 .modern-card:hover,
 .hover-lift:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-xl);
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-color);
 }
 
 /* 按钮增强 */
 .modern-button {
-  border-radius: var(--border-radius-md);
-  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
   font-weight: 600;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.01em;
 }
 
 .modern-button:hover {
@@ -191,36 +235,42 @@ body {
   box-shadow: var(--shadow-md);
 }
 
+.modern-button:active {
+  transform: translateY(0);
+}
+
 /* 输入框增强 */
 .modern-input {
-  border-radius: var(--border-radius-md);
-  transition: all 0.2s ease;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
+  font-family: var(--font-body);
 }
 
 .modern-input:focus {
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+  border-color: var(--primary-color);
 }
 
 /* 选择文本样式 - 浅色模式 */
 :root:not(.dark) ::selection {
-  background: rgba(102, 126, 234, 0.2);
-  color: #1e293b;
+  background: var(--primary-color-suppl);
+  color: var(--text-primary);
 }
 
 :root:not(.dark) ::-moz-selection {
-  background: rgba(102, 126, 234, 0.2);
-  color: #1e293b;
+  background: var(--primary-color-suppl);
+  color: var(--text-primary);
 }
 
-/* 选择文本样式 - 暗黑模式 */
+/* 选择文本样式 - 深色模式 */
 :root.dark ::selection {
-  background: #4a90e2;
-  color: #ffffff;
+  background: var(--primary-color-suppl);
+  color: var(--text-primary);
 }
 
 :root.dark ::-moz-selection {
-  background: #4a90e2;
-  color: #ffffff;
+  background: var(--primary-color-suppl);
+  color: var(--text-primary);
 }
 
 /* Focus样式增强 */
@@ -229,8 +279,9 @@ body {
 }
 
 *:focus-visible {
-  outline: 2px solid rgba(102, 126, 234, 0.5);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+  border-radius: var(--radius-xs);
 }
 
 /* 加载状态样式 */
@@ -240,8 +291,9 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(4px);
+  background: var(--overlay-bg);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -274,7 +326,13 @@ body {
 .glass-effect {
   background: rgba(255, 255, 255, 0.25);
   backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+:root.dark .glass-effect {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* 悬停效果增强 */

@@ -1,27 +1,35 @@
 <script setup lang="ts">
+import AppIcon from "@/components/icons/AppIcon.vue";
+import { useAuthService } from "@/composables/useAuth";
 import { type MenuOption } from "naive-ui";
 import { computed, h, watch } from "vue";
 import { RouterLink, useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 
 const { t } = useI18n();
+const { checkLogin } = useAuthService();
+const isLoggedIn = computed(() => checkLogin());
 
-const props = defineProps({
-  mode: {
-    type: String,
-    default: "horizontal",
-  },
+interface Props {
+  mode?: "horizontal" | "vertical";
+}
+const props = withDefaults(defineProps<Props>(), {
+  mode: "horizontal",
 });
 
 const emit = defineEmits(["close"]);
 
 const menuOptions = computed<MenuOption[]>(() => {
-  const options: MenuOption[] = [
-    renderMenuItem("dashboard", t("nav.dashboard"), "📊"),
-    renderMenuItem("keys", t("nav.keys"), "🔑"),
-    renderMenuItem("logs", t("nav.logs"), "📋"),
-    renderMenuItem("settings", t("nav.settings"), "⚙️"),
-  ];
+  const options: MenuOption[] = [renderMenuItem("dashboard", t("nav.dashboard"), "dashboard")];
+
+  // 仅登录后显示的管理员菜单项
+  if (isLoggedIn.value) {
+    options.push(
+      renderMenuItem("keys", t("nav.keys"), "keys"),
+      renderMenuItem("logs", t("nav.logs"), "logs"),
+      renderMenuItem("settings", t("nav.settings"), "settings")
+    );
+  }
 
   return options;
 });
@@ -35,7 +43,7 @@ watch(activeMenu, () => {
   }
 });
 
-function renderMenuItem(key: string, label: string, icon: string): MenuOption {
+function renderMenuItem(key: string, label: string, iconName: string): MenuOption {
   return {
     label: () =>
       h(
@@ -48,7 +56,7 @@ function renderMenuItem(key: string, label: string, icon: string): MenuOption {
         },
         {
           default: () => [
-            h("span", { class: "nav-item-icon" }, icon),
+            h(AppIcon, { name: iconName, size: 18, "aria-hidden": "true" }),
             h("span", { class: "nav-item-text" }, label),
           ],
         }
@@ -68,17 +76,17 @@ function renderMenuItem(key: string, label: string, icon: string): MenuOption {
 :deep(.nav-menu-item) {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   text-decoration: none;
   color: inherit;
-  padding: 8px;
-  border-radius: var(--border-radius-md);
-  transition: all 0.2s ease;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-base);
   font-weight: 500;
 }
 
 :deep(.n-menu-item) {
-  border-radius: var(--border-radius-md);
+  border-radius: var(--radius-md);
 }
 
 :deep(.n-menu--vertical .n-menu-item-content) {
@@ -90,21 +98,25 @@ function renderMenuItem(key: string, label: string, icon: string): MenuOption {
 }
 
 :deep(.n-menu-item:hover) {
-  background: rgba(102, 126, 234, 0.1);
+  background: var(--hover-bg);
   transform: translateY(-1px);
-  border-radius: var(--border-radius-md);
+  border-radius: var(--radius-md);
 }
 
 :deep(.n-menu-item--selected) {
   background: var(--primary-gradient);
-  color: white;
+  color: var(--text-inverse);
   font-weight: 600;
   box-shadow: var(--shadow-md);
-  border-radius: var(--border-radius-md);
+  border-radius: var(--radius-md);
 }
 
 :deep(.n-menu-item--selected:hover) {
-  background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+  background: var(--primary-color-hover);
   transform: translateY(-1px);
+}
+
+:deep(.n-menu-item--selected svg) {
+  color: var(--text-inverse);
 }
 </style>
