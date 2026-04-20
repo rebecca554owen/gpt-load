@@ -45,6 +45,7 @@ const confirmInput = ref("");
 const testingMsg = ref<MessageReactive | null>(null);
 const isDeling = ref(false);
 const isRestoring = ref(false);
+const isDisabling = ref(false);
 
 const createDialogShow = ref(false);
 const deleteDialogShow = ref(false);
@@ -315,6 +316,34 @@ async function restoreKey(key: KeyRow) {
   });
 }
 
+async function disableKey(key: KeyRow) {
+  if (!props.selectedGroup?.id || isDisabling.value) {
+    return;
+  }
+
+  const d = dialog.warning({
+    title: t("keys.disableKey"),
+    content: t("keys.confirmDisableKey", { key: maskKey(key.key_value) }),
+    positiveText: t("common.confirm"),
+    negativeText: t("common.cancel"),
+    onPositiveClick: async () => {
+      isDisabling.value = true;
+      d.loading = true;
+
+      try {
+        await keysApi.disableKey(key.id);
+        await loadKeys();
+        appState.triggerSyncOperationRefresh(props.selectedGroup!.name, "DISABLE_SINGLE");
+      } catch (_error) {
+        console.error("Disable failed");
+      } finally {
+        d.loading = false;
+        isDisabling.value = false;
+      }
+    },
+  });
+}
+
 async function deleteKey(key: KeyRow) {
   if (!props.selectedGroup?.id || !key.key_value || isDeling.value) {
     return;
@@ -563,6 +592,7 @@ function resetPage() {
                 @toggle-visibility="toggleKeyVisibility"
                 @copy="copyKey"
                 @test="testKey"
+                @disable="disableKey"
                 @restore="restoreKey"
                 @delete="deleteKey"
               />
@@ -580,6 +610,7 @@ function resetPage() {
             @toggle-visibility="toggleKeyVisibility"
             @copy="copyKey"
             @test="testKey"
+            @disable="disableKey"
             @restore="restoreKey"
             @delete="deleteKey"
           />

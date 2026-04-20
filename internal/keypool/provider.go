@@ -253,7 +253,7 @@ func (p *KeyProvider) handleFailure(apiKey *models.APIKey, group *models.Group, 
 		newFailureCount := failureCount + 1
 
 		updates := map[string]any{
-			"failure_count":  newFailureCount,
+			"failure_count": newFailureCount,
 			"request_count": gorm.Expr("request_count + ?", 1),
 			"last_used_at":  now,
 		}
@@ -513,6 +513,35 @@ func (p *KeyProvider) RestoreMultipleKeys(groupID uint, keyValues []string) (int
 	})
 
 	return restoredCount, err
+}
+
+func (p *KeyProvider) DisableKey(keyID uint) error {
+	return p.executeTransactionWithRetry(func(tx *gorm.DB) error {
+		var key models.APIKey
+		if err := tx.Set("gorm:query_option", "FOR UPDATE").First(&key, keyID).Error; err != nil {
+			return err
+		}
+
+		if key.Status != models.KeyStatusActive {
+			return nil
+		}
+
+		if err := tx.Model(&key).Update("status", models.KeyStatusInvalid).Error; err != nil {
+			return fmt.Errorf("failed to update key status in DB: %w", err)
+		}
+
+		activeKeysListKey := fmt.Sprintf("group:%d:active_keys", key.GroupID)
+		if err := p.store.LRem(activeKeysListKey, 0, key.ID); err != nil {
+			return fmt.Errorf("failed to remove key from active list: %w", err)
+		}
+
+		keyHashKey := fmt.Sprintf("key:%d", key.ID)
+		if err := p.store.HSet(keyHashKey, map[string]any{"status": models.KeyStatusInvalid}); err != nil {
+			return fmt.Errorf("failed to update key status in store: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // RemoveInvalidKeys 删除组中所有无效密钥。

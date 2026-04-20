@@ -221,6 +221,10 @@ func (s *KeyService) RestoreMultipleKeys(groupID uint, keysText string) (*Restor
 	}, nil
 }
 
+func (s *KeyService) DisableKey(keyID uint) error {
+	return s.KeyProvider.DisableKey(keyID)
+}
+
 // RestoreAllInvalidKeys 将组内所有 'inactive' 密钥的状态设置为 'active'。
 func (s *KeyService) RestoreAllInvalidKeys(groupID uint) (int64, error) {
 	return s.KeyProvider.RestoreKeys(groupID)

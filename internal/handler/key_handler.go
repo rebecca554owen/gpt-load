@@ -541,6 +541,20 @@ type UpdateKeyNotesRequest struct {
 	Notes string `json:"notes"`
 }
 
+func (s *Server) DisableKey(c *gin.Context) {
+	keyID, ok := parseUintParam(c, c.Param("id"), "validation.invalid_id_format")
+	if !ok {
+		return
+	}
+
+	if err := s.KeyService.DisableKey(keyID); err != nil {
+		response.Error(c, app_errors.ParseDBError(err))
+		return
+	}
+
+	response.Success(c, nil)
+}
+
 // UpdateKeyNotes 处理更新特定 API 密钥的备注
 func (s *Server) UpdateKeyNotes(c *gin.Context) {
 	keyID, ok := parseUintParam(c, c.Param("id"), "validation.invalid_id_format")

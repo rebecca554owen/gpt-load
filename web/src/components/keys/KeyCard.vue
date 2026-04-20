@@ -6,6 +6,7 @@ import {
   CopyOutline,
   EyeOffOutline,
   EyeOutline,
+  PauseCircleOutline,
   Pencil,
 } from "@vicons/ionicons5";
 import { NButton, NButtonGroup, NIcon, NInput, NTag } from "naive-ui";
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   "toggle-visibility": [key: KeyRow];
   copy: [key: KeyRow];
   test: [key: KeyRow];
+  disable: [key: KeyRow];
   restore: [key: KeyRow];
   delete: [key: KeyRow];
 }>();
@@ -66,6 +68,10 @@ function handleCopy() {
 
 function handleTest() {
   emit("test", props.keyData);
+}
+
+function handleDisable() {
+  emit("disable", props.keyData);
 }
 
 function handleRestore() {
@@ -157,6 +163,19 @@ function handleDelete() {
           :aria-label="t('keys.testKey')"
         >
           {{ t("keys.testShort") }}
+        </n-button>
+        <n-button
+          v-if="keyData.status === 'active'"
+          class="btn-view"
+          size="tiny"
+          @click="handleDisable"
+          :title="t('keys.disableKey')"
+          :aria-label="t('keys.disableKey')"
+        >
+          <template #icon>
+            <n-icon :component="PauseCircleOutline" />
+          </template>
+          {{ t("keys.disableShort") }}
         </n-button>
         <n-button
           v-if="keyData.status !== 'active'"
