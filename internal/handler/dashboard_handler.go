@@ -109,6 +109,31 @@ func buildTimeSelectClause(dbType string, granularity timeGranularity, fields st
 	return selectClause, groupClause
 }
 
+// quotedTable 返回适合当前数据库方言的带引号表名。
+// PostgreSQL 13+ 中 GROUPS 是保留关键字，必须用双引号。
+func quotedTable(dbType, name string) string {
+	if dbType == "postgres" {
+		return `"` + name + `"`
+	}
+	return "`" + name + "`"
+}
+
+// successFailureFields 返回适合当前数据库方言的成功/失败计数 SQL 片段。
+func successFailureFields(dbType string) string {
+	if dbType == "postgres" {
+		return "SUM(CASE WHEN is_success = true THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as failure"
+	}
+	return "SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure"
+}
+
+// failureCountField 返回适合当前数据库方言的失败计数 SQL 片段。
+func failureCountField(dbType string) string {
+	if dbType == "postgres" {
+		return "SUM(CASE WHEN is_success = false THEN 1 ELSE 0 END) as total_failures"
+	}
+	return "SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as total_failures"
+}
+
 // parseDaysParameter 将天数字符串转换为天数整数（用于统计 API）
 func parseDaysParameter(daysStr string) int {
 	switch daysStr {
@@ -344,14 +369,14 @@ func (s *Server) getRequestChart(c *gin.Context, startTime, endTime time.Time) {
 	var results []requestResult
 
 	dbType := s.DB.Dialector.Name()
-	fields := "SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as failure"
+	fields := successFailureFields(dbType)
 	selectClause, groupClause := buildTimeSelectClause(dbType, granularity, fields)
 
 	err := s.DB.Model(&models.RequestLog{}).
 		Select(selectClause).
 		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
 		Where("group_id NOT IN (?)",
-			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
+			s.DB.Table(quotedTable(dbType, "groups")).Select("id").Where("group_type = ?", "aggregate")).
 		Group(groupClause).
 		Order("time_slot asc").
 		Scan(&results).Error
@@ -669,14 +694,18 @@ func (s *Server) getTokenSpeedChart(c *gin.Context, startTime, endTime time.Time
 		CompletionTokens int64
 	}
 
+	dbType := s.DB.Dialector.Name()
+	qt := quotedTable(dbType, "groups")
+	joinClause := fmt.Sprintf("LEFT JOIN %s ON %s.id = request_logs.group_id", qt, qt)
+
 	var rawData []speedRawData
 	err := s.DB.Model(&models.RequestLog{}).
 		Select("request_logs.group_id, COALESCE(groups.display_name, groups.name, request_logs.group_name) as display_name, request_logs.model, request_logs.timestamp, request_logs.duration, request_logs.completion_tokens").
-		Joins("LEFT JOIN `groups` ON groups.id = request_logs.group_id").
+		Joins(joinClause).
 		Where("request_logs.timestamp >= ? AND request_logs.timestamp < ?", startTime, endTime).
 		Where("request_logs.is_success = ? AND request_logs.request_type = ?", true, models.RequestTypeFinal).
 		Where("request_logs.group_id NOT IN (?)",
-			s.DB.Table("`groups`").Select("id").Where("group_type = ?", "aggregate")).
+			s.DB.Table(qt).Select("id").Where("group_type = ?", "aggregate")).
 		Where("request_logs.duration > 0 AND request_logs.completion_tokens > 0").
 		Scan(&rawData).Error
 	if err != nil {
@@ -847,13 +876,12 @@ type hourlyStatResult struct {
 func (s *Server) getHourlyStats(startTime, endTime time.Time) (hourlyStatResult, error) {
 	var result hourlyStatResult
 
-	// 直接从 request_logs 表查询实时数据（与 token 统计相同）
-	// 仅统计最终请求，不包含重试请求
+	dbType := s.DB.Dialector.Name()
 	err := s.DB.Model(&models.RequestLog{}).
 		Where("timestamp >= ? AND timestamp < ? AND request_type = ?", startTime, endTime, models.RequestTypeFinal).
 		Where("group_id NOT IN (?)",
-			s.DB.Table("groups").Select("id").Where("group_type = ?", "aggregate")).
-		Select("COUNT(*) as total_requests, SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END) as total_failures").
+			s.DB.Table(quotedTable(dbType, "groups")).Select("id").Where("group_type = ?", "aggregate")).
+		Select(fmt.Sprintf("COUNT(*) as total_requests, %s", failureCountField(dbType))).
 		Scan(&result).Error
 
 	return result, err
@@ -862,7 +890,7 @@ func (s *Server) getHourlyStats(startTime, endTime time.Time) (hourlyStatResult,
 // getAggregateGroupIDs 返回聚合组 ID 的集合，用于快速查找
 func (s *Server) getAggregateGroupIDs() (map[uint]struct{}, error) {
 	var groupIDs []uint
-	err := s.DB.Table("groups").
+	err := s.DB.Table(quotedTable(s.DB.Dialector.Name(), "groups")).
 		Where("group_type = ?", "aggregate").
 		Pluck("id", &groupIDs).Error
 
