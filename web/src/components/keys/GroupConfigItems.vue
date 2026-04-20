@@ -131,6 +131,7 @@ function handleConfigKeyChange(index: number, key: string) {
                   v-else
                   :value="configItem.value"
                   :placeholder="t('keys.paramValue')"
+                  style="width: 100%"
                   @update:value="(value: string) => updateConfigItem(index, 'value', value)"
                 />
               </template>
@@ -206,6 +207,11 @@ function handleConfigKeyChange(index: number, key: string) {
 
 .config-value {
   flex: 1;
+}
+
+.config-value :deep(.n-tooltip__trigger) {
+  width: 100%;
+  display: flex;
 }
 
 .config-actions {

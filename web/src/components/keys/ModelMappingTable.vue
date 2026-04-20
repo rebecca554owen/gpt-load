@@ -48,7 +48,7 @@ const sortedModelMappings = computed<ModelMappingRow[]>(() => {
       const validWeight = mapping.targets.reduce((sum, target) => {
         const subGroup = props.subGroups?.find(sg => sg.group.id === target.sub_group_id);
         if (subGroup && subGroup.active_keys > 0) {
-          return sum + target.weight;
+          return sum + subGroup.weight * target.weight;
         }
         return sum;
       }, 0);

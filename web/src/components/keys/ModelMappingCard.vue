@@ -55,8 +55,12 @@ function getTestKey(target: ModelMappingTarget): string {
   return `${props.mapping.model}_${target.model}_${target.sub_group_id}`;
 }
 
+function getTargetSubGroup(subGroupId: number) {
+  return props.subGroups?.find(sg => sg.group.id === subGroupId);
+}
+
 function getSubGroupName(subGroupId: number): string {
-  const subGroup = props.subGroups?.find(sg => sg.group.id === subGroupId);
+  const subGroup = getTargetSubGroup(subGroupId);
   if (subGroup) {
     return subGroup.group.display_name || subGroup.group.name;
   }
@@ -65,7 +69,7 @@ function getSubGroupName(subGroupId: number): string {
 }
 
 function getTargetPercentage(target: ModelMappingTarget, mapping: ModelMappingRow): number {
-  const subGroup = props.subGroups?.find(sg => sg.group.id === target.sub_group_id);
+  const subGroup = getTargetSubGroup(target.sub_group_id);
   if (!subGroup || subGroup.active_keys === 0) {
     return 0;
   }
@@ -73,7 +77,7 @@ function getTargetPercentage(target: ModelMappingTarget, mapping: ModelMappingRo
   if (totalWeight === 0) {
     return 0;
   }
-  return Math.round((target.weight / totalWeight) * 100);
+  return Math.round(((subGroup.weight * target.weight) / totalWeight) * 100);
 }
 
 async function testSubGroupModel(target: ModelMappingTarget) {
@@ -281,7 +285,7 @@ function handleDelete() {
               ghost
               @click="testSubGroupModel(target)"
               :disabled="
-                (subGroups?.find(sg => sg.group.id === target.sub_group_id)?.active_keys || 0) ===
+                (getTargetSubGroup(target.sub_group_id)?.active_keys || 0) ===
                   0 || isTesting(getTestKey(target))
               "
               :loading="isTesting(getTestKey(target))"
@@ -305,10 +309,12 @@ function handleDelete() {
               class="weight-fill"
               :class="{
                 'weight-fill-active':
-                  (subGroups?.find(sg => sg.group.id === target.sub_group_id)?.active_keys || 0) >
+                  (getTargetSubGroup(target.sub_group_id)?.weight || 0) > 0 &&
+                  (getTargetSubGroup(target.sub_group_id)?.active_keys || 0) >
                   0,
                 'weight-fill-unavailable':
-                  (subGroups?.find(sg => sg.group.id === target.sub_group_id)?.active_keys || 0) ===
+                  (getTargetSubGroup(target.sub_group_id)?.weight || 0) === 0 ||
+                  (getTargetSubGroup(target.sub_group_id)?.active_keys || 0) ===
                   0,
               }"
               :style="{ width: `${Math.min(getTargetPercentage(target, mapping), 100)}%` }"
