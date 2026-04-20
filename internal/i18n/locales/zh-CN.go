@@ -82,6 +82,11 @@ var MessagesZhCN = map[string]string{
 	"validation.model_mapping_invalid_weight":                "模型映射 '{{.model}}' 的子分组 {{.sub_group_id}} 权重不能为负数",
 	"validation.model_mapping_target_model_required":         "模型映射 '{{.model}}' 的目标模型名称不能为空",
 	"validation.model_mapping_duplicate_target":              "模型映射 '{{.model}}' 存在重复的目标配置（子分组 + 模型名称组合必须唯一）",
+	"validation.reorder_items_required":                      "排序项不能为空",
+	"validation.reorder_group_id":                            "排序项包含无效分组ID",
+	"validation.reorder_sort_negative":                       "排序值不能为负数",
+	"validation.reorder_duplicate_group":                     "排序项中存在重复分组ID: {{.id}}",
+	"validation.reorder_group_not_found":                     "排序项包含不存在的分组",
 
 	// Task related
 	"task.validation_started": "密钥验证任务已开始",
@@ -124,6 +129,7 @@ var MessagesZhCN = map[string]string{
 	"success.keys_restored":        "{{.count}}个密钥已恢复",
 	"success.invalid_keys_cleared": "{{.count}}个无效密钥已清除",
 	"success.all_keys_cleared":     "{{.count}}个密钥已清除",
+	"success.groups_reordered":     "分组排序已保存",
 
 	// Password security related
 	"security.password_too_short":         "{{.keyType}}长度不足（{{.length}}字符），建议至少16字符",

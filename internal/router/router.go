@@ -121,6 +121,7 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		groups.GET("", serverHandler.ListGroups)
 		groups.GET("/list", serverHandler.List)
 		groups.GET("/config-options", serverHandler.GetGroupConfigOptions)
+		groups.PUT("/reorder", serverHandler.ReorderGroups)
 		groups.PUT("/:id", serverHandler.UpdateGroup)
 		groups.DELETE("/:id", serverHandler.DeleteGroup)
 		groups.GET("/:id/stats", serverHandler.GetGroupStats)
@@ -149,6 +150,7 @@ func registerProtectedAPIRoutes(api *gin.RouterGroup, serverHandler *handler.Ser
 		keys.POST("/validate-group", serverHandler.ValidateGroupKeys)
 		keys.POST("/test-multiple", serverHandler.TestMultipleKeys)
 		keys.POST("/test-next", serverHandler.TestNextKey)
+		keys.POST("/:id/disable", serverHandler.DisableKey)
 		keys.PUT("/:id/notes", serverHandler.UpdateKeyNotes)
 	}
 

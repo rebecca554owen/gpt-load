@@ -29,6 +29,17 @@ export const keysApi = {
     return res.data;
   },
 
+  // 批量重排分组
+  async reorderGroups(items: { id: number; sort: number }[]): Promise<void> {
+    await http.put(
+      "/groups/reorder",
+      { items },
+      {
+        hideMessage: true,
+      }
+    );
+  },
+
   // 删除组
   deleteGroup(groupId: number): Promise<void> {
     return http.delete(`/groups/${groupId}`);
@@ -127,6 +138,10 @@ export const keysApi = {
   // 更新密钥备注
   async updateKeyNotes(keyId: number, notes: string): Promise<void> {
     await http.put(`/keys/${keyId}/notes`, { notes }, { hideMessage: true });
+  },
+
+  async disableKey(keyId: number): Promise<void> {
+    await http.post(`/keys/${keyId}/disable`, undefined, { hideMessage: true });
   },
 
   // 测试密钥

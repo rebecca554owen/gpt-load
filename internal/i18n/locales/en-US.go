@@ -82,6 +82,11 @@ var MessagesEnUS = map[string]string{
 	"validation.model_mapping_invalid_weight":                "Invalid weight for sub-group {{.sub_group_id}} in model mapping '{{.model}}': cannot be negative",
 	"validation.model_mapping_target_model_required":         "Model name cannot be empty in model mapping '{{.model}}'",
 	"validation.model_mapping_duplicate_target":              "Duplicate target found in model mapping '{{.model}}': combination of sub-group and model name must be unique",
+	"validation.reorder_items_required":                      "Reorder items cannot be empty",
+	"validation.reorder_group_id":                            "Reorder item contains invalid group ID",
+	"validation.reorder_sort_negative":                       "Sort value cannot be negative",
+	"validation.reorder_duplicate_group":                     "Duplicate group ID in reorder items: {{.id}}",
+	"validation.reorder_group_not_found":                     "Reorder items contain non-existent group",
 
 	// Task related
 	"task.validation_started": "Key validation task started",
@@ -124,6 +129,7 @@ var MessagesEnUS = map[string]string{
 	"success.keys_restored":        "{{.count}} keys restored",
 	"success.invalid_keys_cleared": "{{.count}} invalid keys cleared",
 	"success.all_keys_cleared":     "{{.count}} keys cleared",
+	"success.groups_reordered":     "Group order saved",
 
 	// Password security related
 	"security.password_too_short":         "{{.keyType}} is too short ({{.length}} characters), recommend at least 16 characters",
